@@ -11,8 +11,10 @@ COPY wgcna-app/environment.yml /wgcna-pipeline/
 # Copy wgcna-package temporarily for installation
 COPY wgcna-package /tmp/wgcna-package/
 
-# Install Graphviz
-RUN apt-get update && apt-get install -y graphviz
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    graphviz && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Install Conda dependencies
 RUN conda env create -f environment.yml && \
@@ -30,12 +32,9 @@ RUN pip install --no-deps /tmp/wgcna-package
 # Install custom packages: PyWGCNA
 RUN pip install git+https://github.com/Mfkessler/PyWGCNA.git
 
-# Install Snakemake
-RUN pip install snakemake
-RUN pip install pulp==2.7.0
+# Install Snakemake and specific Pulp version
+RUN pip install snakemake pulp==2.7.0
 
-# Clean up
+# Clean up temporary files
 RUN rm -rf /tmp/wgcna-package
-RUN rm -rf ~/.cache/pip
-RUN rm -rf /tmp/* /var/cache/apk/* /root/.cache/
-RUN apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+RUN rm -rf ~/.cache/pip /tmp/* /var/tmp/*

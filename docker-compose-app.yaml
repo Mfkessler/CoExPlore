@@ -20,13 +20,12 @@ services:
       - .env
     volumes:
       - ./wgcna-app:/wgcna-app
-      - ./output:/wgcna-pipeline/output
-      - ./scripts/generate_db.py:/wgcna-pipeline/generate_db.py
-      - ./scripts/wait_for_postgres.py:/wgcna-pipeline/wait_for_postgres.py
-    working_dir: /wgcna-pipeline
+      - ./output:/output
+      - ./scripts/generate_db.py:/generate_db.py
+      - ./scripts/wait_for_postgres.py:/wait_for_postgres.py
+    working_dir: /
     command: >
-      bash -c "python wait_for_postgres.py && python generate_db.py && touch /wgcna-pipeline/output/db_done.txt"
-
+      bash -c "python wait_for_postgres.py && python generate_db.py && touch /output/db_done.txt"
     depends_on:
       - postgres
       - redis
@@ -40,11 +39,11 @@ services:
       - .env
     volumes:
       - ./wgcna-app:/wgcna-app
-      - ./output:/wgcna-pipeline/output
+      - ./output:/output
     working_dir: /wgcna-app
     command: >
       bash -c "
-        while [ ! -f /wgcna-pipeline/output/db_done.txt ]; do
+        while [ ! -f /output/db_done.txt ]; do
           echo 'Waiting for DB setup to finish...'
           sleep 30
         done;
@@ -65,11 +64,11 @@ services:
       - .env
     volumes:
       - ./wgcna-app:/wgcna-app
-      - ./output:/wgcna-pipeline/output
+      - ./output:/output
     working_dir: /wgcna-app
     command: >
       bash -c "
-        while [ ! -f /wgcna-pipeline/output/db_done.txt ]; do
+        while [ ! -f /output/db_done.txt ]; do
           echo 'Waiting for DB setup to finish...'
           sleep 30
         done;

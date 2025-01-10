@@ -7,8 +7,8 @@ services:
     volumes:
       - ./input:/wgcna-pipeline/input
       - ./output:/wgcna-pipeline/output
-      - ./config_cs.yml:/wgcna-pipeline/config.yml
-      - ./Snakefile:/wgcna-pipeline/Snakefile
+      - ./wgcna-pipeline/config.yml:/wgcna-pipeline/config.yml
+      - ./wgcna-pipeline/Snakefile:/wgcna-pipeline/Snakefile
       - ./wgcna-app:/wgcna-app
     working_dir: /wgcna-pipeline
     command: >
