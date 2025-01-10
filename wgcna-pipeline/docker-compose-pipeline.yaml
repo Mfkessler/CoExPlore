@@ -1,0 +1,15 @@
+services:
+  wgcna_pipeline:
+    image: wgcna_image:pipeline
+    container_name: wgcna_pipeline
+    env_file:
+      - .env
+    volumes:
+      - ./input:/wgcna-pipeline/input
+      - ./output:/wgcna-pipeline/output
+      - ./config_cs.yml:/wgcna-pipeline/config.yml
+      - ./Snakefile:/wgcna-pipeline/Snakefile
+      - ./wgcna-app:/wgcna-app
+    working_dir: /wgcna-pipeline
+    command: >
+      bash -c "snakemake --cores 4 && touch /wgcna-pipeline/output/pipeline_done.txt"

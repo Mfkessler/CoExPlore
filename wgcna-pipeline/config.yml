@@ -1,0 +1,18 @@
+species: "Racopilum vestitum"
+name: "RV"
+
+count_matrix: "/wgcna-pipeline/input/Ceratopteris_richardii.isoform.TMM.matrix"
+sample_mapping: "/wgcna-pipeline/input/sample_mapping.tsv"
+iprid: "/wgcna-pipeline/input/Ceratopteris_richardii.iprid.tsv"
+goid: "/wgcna-pipeline/input/Ceratopteris_richardii.goid.tsv"
+orthogroups: ""
+
+save_tom: true
+save_adjacency_matrix: false
+save_WGCNA: false
+figure_type: "png"
+reduce_matrix: true
+
+output_path: "/wgcna-pipeline/output/"
+
+app_path: "/wgcna-app"
