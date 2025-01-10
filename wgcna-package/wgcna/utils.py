@@ -2195,7 +2195,6 @@ def add_go_terms_to_adata(adata: AnnData, go_mapping_file: str) -> AnnData:
     
     # Load GO term mapping file into a DataFrame
     go_df = pd.read_csv(go_mapping_file, sep="\t", header=None, names=["transcript", "go_terms"])
-    go_df["transcript"] = go_df["transcript"] + ".v2.1"
     
     # Ensure GO terms are separated by commas instead of spaces
     go_df["go_terms"] = go_df["go_terms"].str.replace(r"\s+", ",", regex=True)
