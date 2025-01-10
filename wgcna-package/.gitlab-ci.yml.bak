@@ -1,0 +1,33 @@
+stages:
+  - setup
+  - test
+
+setup:
+  stage: setup
+  image: continuumio/miniconda3:latest
+  before_script:
+    - conda --version
+    - conda init bash
+    - source ~/.bashrc
+    - conda env create -f environment.yml
+    - conda activate wgcna-package
+    - pip install pytest
+    - pip install .
+    - pip install git+https://github.com/Mfkessler/PyWGCNA.git
+  script:
+    - conda list
+  artifacts:
+    paths:
+      - /root/.conda/envs/wgcna-package/
+
+test:
+  stage: test
+  image: continuumio/miniconda3:latest
+  dependencies:
+    - setup
+  before_script:
+    - conda init bash
+    - source ~/.bashrc
+    - conda activate wgcna-package
+  script:
+    - pytest tests/ --disable-warnings --maxfail=5
