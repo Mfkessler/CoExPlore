@@ -9,6 +9,7 @@ import tempfile
 import json
 import logging
 import redis
+import scanpy as sc
 import pandas as pd
 import numpy as np
 from PIL import Image
@@ -134,6 +135,12 @@ def index():
     elif mask_type == "Development":
         # Add "Ceratopteris richardii" to the species list
         species = get_species_list(species_names + ["Ceratopteris richardii"])
+    elif mask_type == "Custom":
+        # Load species names and abbreviations from the h5ad files
+        species = []
+        for file in glob.glob(os.path.join(Config.H5AD_DIR, "*.h5ad")):
+            adata = sc.read_h5ad(file)
+            species.append((adata.uns.get("name", "Unknown"), adata.uns.get("species", "Unknown")))
     else:
         raise ValueError(f"Unknown mask type: {mask_type}")
 
