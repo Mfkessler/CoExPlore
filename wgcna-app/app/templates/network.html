@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Co-Expression Network</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.1/css/all.min.css">
+    <script src="https://unpkg.com/cytoscape/dist/cytoscape.min.js"></script>
+    <script src="https://d3js.org/d3.v6.min.js"></script>
+    <style>
+        {{ css_content | safe }}
+    </style>
+</head>
+<body>
+    <!-- Cytoscape Container -->
+    <div id="cy"></div>
+
+    <!-- Loading Spinner -->
+    <div id="loading-spinner">
+        <div class="spinner"></div>
+    </div>
+
+    <!-- Buttons left -->
+    <div class="buttons-left">
+        <button id="zoom-in" class="icon-button" title="Zoom In"><i class="fas fa-search-plus"></i></button>
+        <button id="zoom-out" class="icon-button" title="Zoom Out"><i class="fas fa-search-minus"></i></button>
+        <button id="zoom-reset" class="icon-button" title="Reset Zoom"><i class="fas fa-home"></i></button>
+        <button id="toggleZoom" class="icon-button" title="Scroll Zoom"><i class="fas fa-mouse"></i></button>
+        <button id="rectangle-zoom" class="icon-button active" title="Rectangle Zoom"><i class="fas fa-vector-square"></i></button>
+        <button id="toggle-legend" class="icon-button" title="Toggle Legend"><i class="fas fa-list"></i></button> 
+        <button id="export-json" class="icon-button" title="Export to Cytoscape"><i class="fas fa-download"></i></button>
+    </div>
+
+    <!-- Tooltip -->
+    <div id="tooltip"></div>
+
+    <!-- Legend -->
+    <div id="legend" style="display: none;">
+        <p><b>Edge Weight (TOM Value)</b></p>
+        <div style="display: flex; align-items: center;">
+            <div style="width: 100px; height: 10px; background: linear-gradient(to right, #440154, #3b528b, #21918c, #5dc962, #fde725);" id="legend-gradient"></div>
+            <span style="margin-left: 10px;" id="minTOM"></span>
+            <span style="margin-left: 5px; margin-right: 5px;">→</span>
+            <span id="maxTOM"></span>
+        </div>
+    </div>
+      
+    <script>
+        {{ js_content | safe }}
+    </script>
+</body>
+</html>

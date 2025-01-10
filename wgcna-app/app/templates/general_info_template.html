@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <!-- Meta tags and title -->
+    <meta charset="UTF-8">
+    <title>RanOmics Plant Info</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <!-- DataTables CSS -->
+    <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.11.3/css/jquery.dataTables.css">
+    <!-- Responsive DataTables CSS -->
+    <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/responsive/2.2.9/css/responsive.dataTables.min.css">
+    <!-- DataTables Buttons CSS -->
+    <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/buttons/2.0.1/css/buttons.dataTables.min.css">
+    <!-- Custom CSS -->
+    <style>
+        /* Your custom styles here */
+        /* Remove all borders from the table */
+        table.dataTable.no-border,
+        table.dataTable.no-border thead,
+        table.dataTable.no-border tbody,
+        table.dataTable.no-border th,
+        table.dataTable.no-border td,
+        table.dataTable.no-border tr {
+            border: none !important;
+            border-collapse: collapse !important;
+        }
+
+        table.dataTable.no-border th,
+        table.dataTable.no-border td {
+            border-bottom: none !important;
+        }
+
+        /* Remove any default border styles from DataTables */
+        table.dataTable.no-border {
+            border-top: none !important;
+        }
+
+        table.dataTable.no-border thead th,
+        table.dataTable.no-border tbody td {
+            border: none !important;
+        }
+
+        /* Optional: Remove background color from header */
+        table.dataTable.no-border thead th {
+            background-color: transparent !important;
+        }
+
+        /* Remove card borders if needed */
+        .card {
+            border: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="card-body">
+            <table id="infoResults" class="display responsive nowrap no-border" style="width:100%; display:none;">
+                <thead>
+                    <tr>
+                        <th>Species</th>
+                        <th>Samples</th>
+                        <th>Transcripts</th>
+                        <th>Total Counts</th>
+                        <th>Modules</th>
+                        <th>Tissues</th>
+                    </tr>
+                </thead>
+            </table>
+        </div>
+    </div>
+
+    <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+    <!-- Bootstrap JS Bundle -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.2/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- DataTables JS -->
+    <script type="text/javascript" src="https://cdn.datatables.net/1.11.3/js/jquery.dataTables.js"></script>
+    <!-- Responsive DataTables JS -->
+    <script type="text/javascript" src="https://cdn.datatables.net/responsive/2.2.9/js/dataTables.responsive.min.js"></script>
+    <!-- DataTables Buttons JS -->
+    <script type="text/javascript" src="https://cdn.datatables.net/buttons/2.0.1/js/dataTables.buttons.min.js"></script>
+    <!-- JSZip for Buttons -->
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.3/jszip.min.js"></script>
+    <!-- Buttons HTML5 Export JS -->
+    <script type="text/javascript" src="https://cdn.datatables.net/buttons/2.0.1/js/buttons.html5.min.js"></script>
+
+    <script>
+        const BASE_URL = "{{ BASE_URL }}";
+
+        $(document).ready(function() {
+            function getParameterByName(name) {
+                var url = window.location.href;
+                name = name.replace(/[[]]/g, "\\$&");
+                var regex = new RegExp("[?&]" + name + "(=([^&#]*)|&|#|$)"),
+                    results = regex.exec(url);
+                if (!results) return null;
+                if (!results[2]) return '';
+                return decodeURIComponent(results[2].replace(/\+/g, " "));
+            }
+
+            var speciesFilterJson = getParameterByName('species_filter');
+            var initialSpeciesFilter = [];
+
+            if (speciesFilterJson) {
+                try {
+                    initialSpeciesFilter = JSON.parse(speciesFilterJson);
+                } catch (e) {
+                    console.error("Error parsing species_filter:", e);
+                }
+            }
+
+            console.log("Initial Species Filter:", initialSpeciesFilter);
+            // Initialize DataTable and add 'no-border' class
+            var table = $('#infoResults').addClass('no-border').DataTable({
+                "processing": true,
+                "serverSide": true,
+                "ajax": async function(data, callback, settings) {
+                    try {
+                        const response = await fetch(BASE_URL + "/api/data", {
+                            method: "POST",
+                            headers: {
+                                "Content-Type": "application/json"
+                            },
+                            body: JSON.stringify({
+                                ...data,
+                                species_filter: JSON.stringify(initialSpeciesFilter),
+                                table_name: "{{ INFO_DB }}"
+                            })
+                        });
+
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! status: ${response.status}`);
+                        }
+
+                        const json = await response.json();
+
+                        callback({
+                            draw: data.draw,
+                            recordsTotal: json.recordsTotal,
+                            recordsFiltered: json.recordsFiltered,
+                            data: json.data
+                        });
+                    } catch (error) {
+                        console.error("Error loading data for DataTables:", error);
+                        callback({
+                            draw: data.draw,
+                            recordsTotal: 0,
+                            recordsFiltered: 0,
+                            data: []
+                        });
+                    }
+                },
+                "columns": [
+                    { "data": "species" },
+                    { "data": "samples" },
+                    { "data": "transcripts" },
+                    { "data": "total_counts" },
+                    { "data": "modules" },
+                    { "data": "tissues" }
+                ],
+                responsive: true,
+                dom: 'Bfrtip',
+                lengthMenu: [ [10, 25, 50, -1], [10, 25, 50, "All"] ],
+                buttons: [
+                    'colvis',
+                    {
+                        extend: 'csvHtml5',
+                        text: 'Download Table',
+                        filename: function() {
+                            return prompt('Enter file name') || 'download';
+                        },
+                        exportOptions: {
+                            columns: ':visible'
+                        }
+                    }
+                ],
+                initComplete: function() {
+                    sendHeight();
+                    $('#infoResults').show();
+                    window.parent.postMessage('tableLoaded', '*');
+                }
+            });
+
+            table.buttons().container()
+                .appendTo('#infoResults_wrapper .col-md-6:eq(0)');
+
+            function sendHeight() {
+                var height = document.body.scrollHeight;
+                try {
+                    window.parent.postMessage({ type: 'resizeIframe', target: window.frameElement.id, height: height}, '*');
+                } catch (error) {
+                    console.error('Error sending message:', error);
+                }
+            }
+
+            setInterval(sendHeight, 500);
+            sendHeight();
+        });
+    </script>
+</body>
+</html>

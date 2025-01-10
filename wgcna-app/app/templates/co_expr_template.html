@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <!-- Meta Information -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ topic }} Co-Expression Network Analysis</title>
+
+    <!-- Bootstrap CSS, DataTables CSS, and Lightbox -->
+    <link href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.11.3/css/jquery.dataTables.css">
+    <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/responsive/2.2.9/css/responsive.dataTables.min.css">
+    <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/buttons/2.0.1/css/buttons.dataTables.min.css">
+
+    <!-- Custom and Minimal CSS for layout and removing borders -->
+    <style>
+        body {
+            background-color: #ffffff;
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+
+        .card {
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+
+        .card-body {
+            overflow-x: auto;
+        }
+
+        /* Remove borders and margin between elements */
+        iframe {
+            border: none;
+            margin: 0;
+            padding: 0;
+        }
+
+        .content-section {
+            margin: 0; /* No margin between content blocks */
+            padding: 0;
+        }
+
+        .imageDiv {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-around;
+            padding: 10px;
+        }
+
+        .lightbox-image {
+            width: 100%;  /* Set image width to 100% within the anchor */
+            height: auto;
+            margin: 10px;
+            transition: transform 0.2s;
+            cursor: pointer;
+        }
+
+        .imageDiv a {
+            flex: 1 1 22%;  /* Flex value for 4 images per row */
+            max-width: 22%; /* Maximum width of 22% */
+            box-sizing: border-box;
+            padding: 5px;
+        }
+
+        @media (max-width: 992px) {
+            .imageDiv a {
+            flex: 1 1 30%;  /* 3 images per row for medium screens */
+            max-width: 30%;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .imageDiv a {
+            flex: 1 1 45%;  /* 2 images per row for small screens */
+            max-width: 45%;
+            }
+        }
+
+        @media (max-width: 576px) {
+            .imageDiv a {
+            flex: 1 1 70%;  /* 1 image per row for very small screens */
+            max-width: 70%;  /* Limit image to 70% to prevent it from being too large */
+            }
+        }
+
+        .lightbox-image:hover {
+            transform: scale(1.05);
+        }
+
+        /* DataTable Styles */
+        table.display.dataTable.no-border {
+            border-collapse: collapse;
+            border: none;
+            width: 100%; /* Full width */
+        }
+
+        table.display.dataTable.no-border th, table.display.dataTable.no-border td {
+            border: none;
+        }
+
+        table.display.dataTable.no-border th {
+            text-align: left;
+        }
+
+        /* Center the DataTable buttons */
+        .dt-buttons {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 10px;
+        }
+        /* Custom class to highlight rows in the DataTable */
+        .highlight-row {
+            background-color: #ffeeba !important; /* Light yellow highlight */
+        }
+        /* Prevent text overflow in the first column of the TOM table */
+
+        #tomResults {
+            width: 100% !important;
+        }
+
+        #tomResults td {
+            word-wrap: break-word;
+            max-width: 150px;
+        }
+
+        .toggle-all-container {
+            margin-bottom: 10px;
+            text-align: right;
+        }
+
+    </style>
+
+    <!-- jQuery, Bootstrap JS, DataTables, and Lightbox JS -->
+    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/1.11.3/js/jquery.dataTables.js"></script>
+    <script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/responsive/2.2.9/js/dataTables.responsive.min.js"></script>
+    <script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/buttons/2.0.1/js/dataTables.buttons.min.js"></script>
+    <script type="text/javascript" src="https://cdn.datatables.net/buttons/2.0.1/js/buttons.colVis.min.js"></script>
+    <script type="text/javascript" charset="utf8" src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.3/jszip.min.js"></script>
+    <script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/buttons/2.0.1/js/buttons.html5.min.js"></script>
+    <script>
+        var isInIframe = (window.self !== window.top);
+        if (!isInIframe) {
+            var link = document.createElement('link');
+            link.rel = 'stylesheet';
+            link.href = 'https://cdn.jsdelivr.net/npm/@fancyapps/ui/dist/fancybox.css';
+            document.head.appendChild(link);
+
+            var script = document.createElement('script');
+            script.src = 'https://cdn.jsdelivr.net/npm/@fancyapps/ui/dist/fancybox.umd.js';
+            document.head.appendChild(script);
+        }
+    </script>
+</head>
+<body>
+    <div class="container my-4">
+        <!-- Toggle All Sections Link Button -->
+        <div class="toggle-all-container">
+            <h5 class="mb-0 d-flex justify-content-end align-items-center">
+                <button id="toggleAllSections" class="btn btn-link" aria-expanded="true">
+                    <span>Hide All Sections</span>
+                </button>
+            </h5>
+        </div>
+
+        <!-- Plot Co-expression plot -->
+        <div class="card mb-3">
+            <div class="card-header">
+                <h5 class="mb-0 d-flex justify-content-between align-items-center">
+                    Co-Expression Plot
+                    <button class="btn btn-link toggle-button" data-toggle="collapse" data-target="#plotSection" aria-expanded="true">
+                        <span>Show</span>
+                    </button>
+                </h5>
+            </div>
+            <div id="plotSection" class="collapse show">
+                <div class="card-body">
+                    <iframe src="{{ network_plot_path }}" width="100%" height="600px" class="content-section"></iframe>
+                </div>
+            </div>
+        </div>
+
+        <!-- TOM Table -->
+        <div class="card mb-3">
+            <div class="card-header">
+                <h5 class="mb-0 d-flex justify-content-between align-items-center">
+                    Nodes
+                    <button class="btn btn-link toggle-button" data-toggle="collapse" data-target="#tomTableSection" aria-expanded="true">
+                        <span>Show</span>
+                    </button>
+                </h5>
+            </div>
+            <div id="tomTableSection" class="collapse show">
+                <div class="card-body">
+                    {{ tom_table_html | safe }}
+                </div>
+            </div>
+        </div>
+
+        {% if ortho_table_html %}
+        <!-- Ortho Table -->
+        <div class="card mb-3">
+            <div class="card-header">
+                <h5 class="mb-0 d-flex justify-content-between align-items-center">
+                    Orthogroups
+                    <button class="btn btn-link toggle-button" data-toggle="collapse" data-target="#orthoTableSection" aria-expanded="true">
+                        <span>Show</span>
+                    </button>
+                </h5>
+            </div>
+
+            <div id="orthoTableSection" class="collapse show">
+                <div class="card-body">
+                    {{ ortho_table_html | safe }}
+                </div>
+
+                <iframe 
+                    src="{{ ortho_plot_path }}" 
+                    width="100%" 
+                    height="600px" 
+                    class="content-section"
+                ></iframe>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Cluster Table -->
+        <div class="card mb-3">
+            <div class="card-header">
+                <h5 class="mb-0 d-flex justify-content-between align-items-center">
+                    Cluster
+                    <button class="btn btn-link toggle-button" data-toggle="collapse" data-target="#analysisTableSection" aria-expanded="true">
+                        <span>Show</span>
+                    </button>
+                </h5>
+            </div>
+            <div id="analysisTableSection" class="collapse show">
+                <div class="card-body">
+                    {{ table_html | safe }}
+                </div>
+            </div>
+        </div>
+
+        {% if images %}
+        <!-- Eigengene Expression -->
+        <div class="card mb-3">
+            <div class="card-header">
+                <h5 class="mb-0 d-flex justify-content-between align-items-center">
+                    Cluster-trait Relationship
+                    <button class="btn btn-link toggle-button" data-toggle="collapse" data-target="#imageGallerySection" aria-expanded="true">
+                        <span>Show</span>
+                    </button>
+                </h5>
+            </div>
+            <div id="imageGallerySection" class="collapse show">
+                <div class="card-body">
+                    <div id="imageDiv" class="imageDiv content-section"></div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if combined_plot_path %}
+        <!-- Eigengene Expression Combined -->
+        <div class="card mb-3">
+            <div class="card-header">
+                <h5 class="mb-0 d-flex justify-content-between align-items-center">
+                    Combined Eigengene Expression
+                    <button class="btn btn-link toggle-button" data-toggle="collapse" data-target="#plotSectionCombined" aria-expanded="true">
+                        <span>Show</span>
+                    </button>
+                </h5>
+            </div>
+            <div id="plotSectionCombined" class="collapse show">
+                <div class="card-body">
+                    <iframe src="{{ combined_plot_path }}" width="100%" height="800px" class="content-section"></iframe>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        
+    </div>
+
+    <script>
+        $(document).ready(function() {
+            // Initialize button text based on the collapse state
+            $('.toggle-button').each(function() {
+                var target = $(this).data('target');
+                $(this).find('span').text($(target).hasClass('show') ? 'Hide' : 'Show');
+            });
+
+            let allVisible = true; // Initial state for the toggle button, assuming all sections start as visible
+
+            // Function to check and update the button text based on section visibility
+            function updateToggleAllButton() {
+                const totalSections = $('.collapse').length;
+                const visibleSections = $('.collapse.show').length;
+
+                // If all sections are shown, set the button to "Hide All Sections"
+                if (visibleSections === totalSections) {
+                    $('#toggleAllSections span').text('Hide All Sections');
+                    allVisible = true;
+                }
+                // If all sections are hidden, set the button to "Show All Sections"
+                else if (visibleSections === 0) {
+                    $('#toggleAllSections span').text('Show All Sections');
+                    allVisible = false;
+                }
+            }
+
+            // Toggle all sections on button click
+            $('#toggleAllSections').click(function() {
+                $('.collapse').each(function() {
+                    $(this).collapse(allVisible ? 'hide' : 'show');
+                });
+                // After toggling, update button state
+                allVisible = !allVisible;
+                $('#toggleAllSections span').text(allVisible ? 'Hide All Sections' : 'Show All Sections');
+            });
+
+            // Update the button if any individual section is shown or hidden
+            $('.collapse').on('shown.bs.collapse hidden.bs.collapse', function() {
+                updateToggleAllButton();
+            });
+
+            // Initial check on page load to set button text correctly
+            updateToggleAllButton();
+
+            // Update button text on collapse show/hide
+            $('.collapse').on('show.bs.collapse', function() {
+                $('button[data-target="#' + this.id + '"]').find('span').text('Hide');
+            }).on('hide.bs.collapse', function() {
+                $('button[data-target="#' + this.id + '"]').find('span').text('Show');
+            });
+
+            // Apply DataTable functionality to all tables with the class "dynamic-table"
+            $('.dynamic-table').each(function() {
+                var table = $(this).DataTable({
+                    responsive: true,
+                    dom: 'Bfrtip',
+                    buttons: [
+                        {
+                            extend: 'colvis',
+                            text: 'Column Visibility'
+                        },
+                        {
+                            extend: 'csvHtml5',
+                            text: 'Download Table',
+                            filename: function() {
+                                return prompt('Dateinamen eingeben') || 'download';
+                            },
+                            exportOptions: {
+                                columns: ':visible'
+                            }
+                        }
+                    ]
+                });
+            });
+
+            var tomResultsTable = $('#tomResults').DataTable();
+            var infoResultsTable = $('#infoResults').DataTable();
+            var orthoResultsTable = $('#orthoResults').DataTable();
+
+            // Keep track of the last selected node
+            var lastSelectedNode = null;
+
+            // Event listener for row click in the tomResults table
+            $('#tomResults tbody').on('click', 'tr', function() {
+                var data = tomResultsTable.row(this).data(); // Get row data
+                var nodeName = data ? data[0] : null; // Assuming the first column contains the node name
+                var species = data ? data[1] : null; // Assuming the second column contains the species name
+                var nodeID = species + "_" + nodeName; // Combine species and node name for unique ID
+
+                if (nodeID) {
+                    if (lastSelectedNode === nodeID) {
+                        // If the same node is clicked again, clear the selection
+                        var iframe = document.querySelector('iframe');
+                        if (iframe && iframe.contentWindow) {
+                            iframe.contentWindow.postMessage({ tableSelectedNode: null }, '*'); // Send null to clear highlights
+                        }
+                        lastSelectedNode = null; // Reset the last selected node
+                    } else {
+                        // If a new node is clicked, highlight it
+                        var iframe = document.querySelector('iframe');
+                        if (iframe && iframe.contentWindow) {
+                            iframe.contentWindow.postMessage({ tableSelectedNode: nodeID }, '*');
+                        }
+                        lastSelectedNode = nodeID; // Update the last selected node
+                    }
+                }
+            });
+
+            // Event listener to receive messages from the iframe (when nodes are selected in the plot)
+            window.addEventListener('message', function(event) {
+                if (event.data && event.data.highlightedNodes) {
+                    var highlightedNodes = event.data.highlightedNodes;
+
+                    if (highlightedNodes.length > 0) {
+                        // Create a regex string for exact matches, using word boundaries \b
+                        var searchRegex = highlightedNodes.map(function(nodeName) {
+                            return '\\b' + nodeName + '\\b'; // \b ensures exact match
+                        }).join('|'); // Join with | to create OR logic for multiple node names
+
+                        // Apply the regex search to the TOM Table
+                        $('#tomResults').DataTable().search(searchRegex, true, false).draw();
+                    } else {
+                        // If no nodes are highlighted, reset the TOM Table search
+                        $('#tomResults').DataTable().search('').draw();
+                    }
+                }
+            }, false);
+
+            // Event listener for DataTable search in the TOM Table (explicit search only)
+            $('#tomResults_filter input').on('input', function() {
+                var searchValue = this.value.trim();
+
+                // If there's a search value, send it to the iframe
+                if (searchValue) {
+                    updateHighlight(); // Update the iframe with the visible nodes
+                }
+            });
+
+            // Prevent highlighting based on paging or sorting
+            tomResultsTable.on('page.dt order.dt', function() {
+                tomResultsTable.rows().every(function() {
+                    $(this.node()).removeClass('highlight-row');  // Remove highlighting on page change or sort
+                });
+            });
+
+            // Reset filter when no node is clicked in Cytoscape (plot click outside nodes)
+            $('#resetFilterButton').on('click', function() {
+                tomResultsTable.search('').draw(); // Reset the table
+            });
+
+            // Event listener for row clicks in the infoResults table
+            $('#infoResults tbody').on('click', 'tr', function() {
+                var data = infoResultsTable.row(this).data(); // Get the data of the clicked row
+                var cluster = data ? data[0] : null; // Assuming the first column is the cluster name
+                var species = data ? data[1] : null; // Assuming the second column is the species name
+
+                console.log("Selected Cluster:", cluster);
+
+                if (cluster) {
+                    var searchRegex = '\\b' + cluster + '\\b'; // Regex for exact match of the cluster name
+
+                    // Apply the filter to the TOM Table to display only relevant nodes
+                    if (cluster === "All Clusters") {
+                        // Regex to show all nodes for the selected species, excluding "No clusters"
+                        searchRegex = '\\b' + species + '\\b(?!.*No clusters)';
+                    }
+
+                    tomResultsTable.search(searchRegex, true, false).draw();
+
+                    // Track the last selected cluster for debugging or further actions
+                    lastSelectedCluster = cluster;
+
+                    updateHighlight(); // Update the iframe with the visible nodes
+                }
+            });
+
+            // Event listener for row clicks in the orthoResults table
+            $('#orthoResults tbody').on('click', 'tr', function() {
+                var data = orthoResultsTable.row(this).data(); // Get the data of the clicked row
+                var orthogroup = data ? data[0] : null; // Assuming the first column is the orthogroup name
+
+                console.log("Selected Orthogroup:", orthogroup);
+
+                if (orthogroup) {
+                    var searchRegex = '\\b' + orthogroup + '\\b'; // Regex for exact match of the orthogroup name
+
+                    // Apply the filter to the TOM Table to display only relevant nodes
+                    tomResultsTable.search(searchRegex, true, false).draw();
+
+                    // Track the last selected orthogroup for debugging or further actions
+                    lastSelectedOrthogroup = orthogroup;
+
+                    updateHighlight(); // Update the iframe with the visible nodes
+                }
+            });
+
+            // Function to update highlighted nodes based on filtered results
+            function updateHighlight() {
+                // Collect the visible nodes after the table has been updated
+                var visibleNodes = tomResultsTable.rows({ filter: 'applied' }).data().toArray();
+
+                // Generate unique Node IDs using Species and NodeName
+                var nodeIDs = visibleNodes.map(function(row) {
+                    var nodeName = row[0]; // Assuming the first column contains the node name
+                    var species = row[1];   // Assuming the second column contains the species
+                    return species + "_" + nodeName; // Combine to create a unique Node ID
+                });
+
+                console.log("Updated visible nodes with unique IDs:", nodeIDs);
+
+                // Send the updated Node IDs to the iframe for highlighting
+                var iframe = document.querySelector('iframe');
+                if (iframe && iframe.contentWindow) {
+                    iframe.contentWindow.postMessage({ visibleNodes: nodeIDs }, '*');
+                }
+            }
+
+            if (isInIframe) {
+                sendHeight();
+            }
+        });
+
+        var isInIframe = (window.self !== window.top);
+
+        function sendHeight() {
+            var height = document.body.scrollHeight;
+            try {
+                window.parent.postMessage({ type: 'resizeBrowserAnalysis', target: window.frameElement.id, height: height}, '*');
+            } catch (error) {
+                console.error('Error sending message:', error);
+            }
+        }
+
+        if (isInIframe) {
+            setInterval(sendHeight, 500);
+        }
+
+        function displayImages(figures) {
+            var gallery = $('#imageDiv');
+            gallery.empty();
+            figures.sort();
+
+            figures.forEach(function(imageName) {
+                var thumb = $('<a>').attr({
+                    'href': imageName
+                }).append(
+                    $('<img>')
+                        .addClass('img-fluid m-2 lightbox-image')
+                        .attr('src', imageName)
+                );
+
+                if (isInIframe) {
+                    thumb.on('click', function(event) {
+                        event.preventDefault();
+                        window.parent.postMessage({ action: 'openFancybox', imageName: imageName }, '*');
+                    });
+                } else {
+                    thumb.attr('data-fancybox', 'gallery');
+                    thumb.attr('data-caption', 'Click the right or left side of the image to move to the next or previous image.');
+                }
+
+                gallery.append(thumb);
+            });
+
+            gallery.show();
+
+            if (isInIframe) {
+                window.parent.postMessage({ action: 'setImageList', images: figures }, '*');
+            }
+        }
+
+        function adjustThumbnailSize() {
+            var gallery = $('#imageDiv');
+            var thumbnails = $('#imageDiv a');
+            var galleryWidth = gallery.width();
+            var thumbnailWidth;
+        
+            if (window.innerWidth < 576) {
+                thumbnailWidth = 55; // 1 image per row for extra small screens
+            } else if (window.innerWidth < 768) {
+                thumbnailWidth = 50; // 2 images per row for small screens
+            } else if (window.innerWidth < 992) {
+                thumbnailWidth = 33.33; // 3 images per row for medium screens
+            } else {
+                thumbnailWidth = 25; // 4 images per row for large and above screens
+            }
+        
+            thumbnails.css('width', thumbnailWidth + '%'); // Set width in percentage
+        }
+
+        $(window).on('resize', adjustThumbnailSize);
+        $(window).on('load', function() {
+            adjustThumbnailSize();
+        });
+
+        var imageList = {{ images|tojson }};
+        displayImages(imageList);
+    </script>
+</body>
+</html>

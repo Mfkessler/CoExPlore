@@ -1,0 +1,14 @@
+output/
+config/__pycache__/__init__.cpython-38.pyc
+config/__pycache__/config.cpython-38.pyc
+app/__pycache__/__init__.cpython-38.pyc
+app/__pycache__/app.cpython-38.pyc
+app/__pycache__/cache.cpython-38.pyc
+app/__pycache__/extensions.cpython-38.pyc
+app/__pycache__/factory.cpython-38.pyc
+app/__pycache__/generate_index.cpython-38.pyc
+app/__pycache__/helper.cpython-38.pyc
+app/__pycache__/routes.cpython-38.pyc
+app/__pycache__/task_mapping.cpython-38.pyc
+app/__pycache__/tasks.cpython-38.pyc
+app/static/images/envs/

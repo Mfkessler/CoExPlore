@@ -1,0 +1,44 @@
+services:
+  web:
+    image: wgcna_image:latest
+    container_name: flask_app_ranomics
+    command: gunicorn -c gunicorn/gunicorn_config_ranomics.py app:app
+    env_file:
+      - /vol/blast/wgcna/wgcna-app/envs/.env.ranomics
+    volumes:
+      - /vol/share/ranomics_app/data/h5ad:/vol/share/ranomics_app/data/h5ad
+      - /vol/share/ranomics_app/data:/vol/share/ranomics_app/data
+      - /vol/blast/wgcna/wgcna-app/output/ranomics:/wgcna-app/output/ranomics
+    ports:
+      - "14569:14569"
+    depends_on:
+      - redis
+      - worker
+    networks:
+      - app-network
+
+  worker:
+    image: wgcna_image:latest
+    container_name: celery_worker_ranomics
+    command: celery -A app.celery worker --loglevel=info
+    env_file:
+      - /vol/blast/wgcna/wgcna-app/envs/.env.ranomics
+    volumes:
+      - /vol/share/ranomics_app/data/h5ad:/vol/share/ranomics_app/data/h5ad
+      - /vol/share/ranomics_app/data:/vol/share/ranomics_app/data
+      - /vol/blast/wgcna/wgcna-app/output/ranomics:/wgcna-app/output/ranomics
+    depends_on:
+      - redis
+    networks:
+      - app-network
+
+  redis:
+    image: redis:6.0-alpine
+    container_name: redis_ranomics
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    name: ranomics_app_network
+    driver: bridge
