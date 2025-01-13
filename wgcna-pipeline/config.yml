@@ -1,11 +1,11 @@
-species: "Test data"
-name: "TD"
+species: "Species 1"
+name: "S1"
 
-count_matrix: "/wgcna-pipeline/input/test_data/td.isoform.TMM.filtered.matrix"
-sample_mapping: "/wgcna-pipeline/input/test_data/td.sample_mapping.filtered.tsv"
-iprid: "/wgcna-pipeline/input/test_data/td.iprid.filtered.tsv"
-goid: "/wgcna-pipeline/input/test_data/td.goid.filtered.tsv"
-orthogroups: ""
+count_matrix: "/wgcna-pipeline/input/testdata_out/S1.isoform.TMM.matrix"
+sample_mapping: "/wgcna-pipeline/input/testdata_out/S1.sample_mapping.tsv"
+iprid: "/wgcna-pipeline/input/testdata_out/S1.iprid.tsv"
+goid: "/wgcna-pipeline/input/testdata_out/S1.goid.tsv"
+orthogroups: "/wgcna-pipeline/input/testdata_out/N0.tsv"
 
 save_tom: true
 save_adjacency_matrix: false

@@ -14,7 +14,7 @@ services:
       - app-network
 
   db_setup:
-    image: wgcna_image:pipeline
+    image: coexplore:latest
     container_name: db_setup
     env_file:
       - .env
@@ -33,7 +33,7 @@ services:
       - app-network
 
   web:
-    image: wgcna_image:pipeline
+    image: coexplore:latest
     container_name: flask_app
     env_file:
       - .env
@@ -58,7 +58,7 @@ services:
       - app-network
 
   worker:
-    image: wgcna_image:pipeline
+    image: coexplore:latest
     container_name: celery_worker
     env_file:
       - .env
