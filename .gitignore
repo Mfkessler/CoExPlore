@@ -1,2 +1,5 @@
 output/
-wgcna-app/app/static/images/
+app/app/static/images/
+package/build/
+package/notebooks/.ipynb_checkpoints/
+package/wgcna_package.egg-info/
