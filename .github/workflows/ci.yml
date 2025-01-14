@@ -25,6 +25,8 @@ jobs:
 
       - name: Install Dependencies
         run: |
+          . /usr/share/miniconda/etc/profile.d/conda.sh
+          conda activate wgcna-package
           pip install pytest
           pip install ./package
           pip install git+https://github.com/Mfkessler/PyWGCNA.git
@@ -39,6 +41,6 @@ jobs:
 
       - name: Activate Environment and Run Tests
         run: |
-          source ~/.bashrc
+          . /usr/share/miniconda/etc/profile.d/conda.sh
           conda activate wgcna-package
           pytest ./package/tests/ --disable-warnings --maxfail=5
