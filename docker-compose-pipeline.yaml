@@ -5,11 +5,11 @@ services:
     env_file:
       - .env
     volumes:
-      - ./input:/wgcna-pipeline/input
-      - ./output:/wgcna-pipeline/output
-      - ./wgcna-pipeline/config.yml:/wgcna-pipeline/config.yml
-      - ./wgcna-pipeline/Snakefile:/wgcna-pipeline/Snakefile
-      - ./wgcna-app:/wgcna-app
-    working_dir: /wgcna-pipeline
+      - ./input:/CoExPlore/input:z
+      - ./output:/CoExPlore/output:z
+      - ./pipeline/config.yml:/CoExPlore/config.yml:z
+      - ./pipeline/Snakefile:/CoExPlore/Snakefile:z
+      - ./app:/app:z
+    working_dir: /CoExPlore
     command: >
-      bash -c "snakemake --cores 4 && touch /wgcna-pipeline/output/pipeline_done.txt"
+      bash -c "snakemake --cores 4 && touch /CoExPlore/output/pipeline_done.txt"

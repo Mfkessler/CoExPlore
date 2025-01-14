@@ -2,14 +2,14 @@
 FROM continuumio/miniconda3:latest
 
 # Set the working directory
-WORKDIR /wgcna-pipeline
+WORKDIR /CoExPlore
 
 # Copy environment files
-COPY wgcna-app/requirements.txt /wgcna-pipeline/
-COPY wgcna-app/environment.yml /wgcna-pipeline/
+COPY app/requirements.txt /CoExPlore/
+COPY app/environment.yml /CoExPlore/
 
-# Copy wgcna-package temporarily for installation
-COPY wgcna-package /tmp/wgcna-package/
+# Copy package temporarily for installation
+COPY package /tmp/package/
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -26,8 +26,8 @@ ENV PATH=/opt/conda/envs/WGCNA_APP/bin:$PATH
 # Install Pip packages
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Install wgcna-package
-RUN pip install --no-deps /tmp/wgcna-package
+# Install package
+RUN pip install --no-deps /tmp/package
 
 # Install custom packages: PyWGCNA
 RUN pip install git+https://github.com/Mfkessler/PyWGCNA.git
@@ -36,5 +36,5 @@ RUN pip install git+https://github.com/Mfkessler/PyWGCNA.git
 RUN pip install snakemake pulp==2.7.0
 
 # Clean up temporary files
-RUN rm -rf /tmp/wgcna-package
+RUN rm -rf /tmp/package
 RUN rm -rf ~/.cache/pip /tmp/* /var/tmp/*

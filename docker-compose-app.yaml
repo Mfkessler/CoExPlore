@@ -19,7 +19,7 @@ services:
     env_file:
       - .env
     volumes:
-      - ./wgcna-app:/wgcna-app
+      - ./app:/app
       - ./output:/output
       - ./scripts/generate_db.py:/generate_db.py
       - ./scripts/wait_for_postgres.py:/wait_for_postgres.py
@@ -38,9 +38,9 @@ services:
     env_file:
       - .env
     volumes:
-      - ./wgcna-app:/wgcna-app
+      - ./app:/app
       - ./output:/output
-    working_dir: /wgcna-app
+    working_dir: /app
     command: >
       bash -c "
         while [ ! -f /output/db_done.txt ]; do
@@ -63,9 +63,9 @@ services:
     env_file:
       - .env
     volumes:
-      - ./wgcna-app:/wgcna-app
+      - ./app:/app
       - ./output:/output
-    working_dir: /wgcna-app
+    working_dir: /app
     command: >
       bash -c "
         while [ ! -f /output/db_done.txt ]; do
