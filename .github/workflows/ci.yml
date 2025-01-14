@@ -26,7 +26,7 @@ jobs:
       - name: Install Dependencies
         run: |
           pip install pytest
-          pip install .
+          pip install ./package
           pip install git+https://github.com/Mfkessler/PyWGCNA.git
 
   test:
@@ -40,4 +40,4 @@ jobs:
       - name: Activate Environment and Run Tests
         run: |
           conda activate wgcna-package
-          pytest package/tests/ --disable-warnings --maxfail=5
+          pytest ./package/tests/ --disable-warnings --maxfail=5
