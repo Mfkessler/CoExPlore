@@ -1,41 +1,43 @@
-stages:
-  - setup
-  - test
+name: CI Pipeline
 
-setup:
-  stage: setup
-  image: continuumio/miniconda3:latest
-  before_script:
-    # Check Conda version and initialize
-    - conda --version
-    - conda init bash
-    - source ~/.bashrc
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
 
-    # Create and activate Conda environment
-    - conda env create -f ../../package/environment.yml
-    - conda activate wgcna-package
+jobs:
+  setup:
+    name: Setup Environment
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-    # Install Pytest and other dependencies
-    - pip install pytest
-    - pip install ../../package
-    - pip install git+https://github.com/Mfkessler/PyWGCNA.git
-  script:
-    # Display installed packages
-    - conda list
-  artifacts:
-    paths:
-      - /root/.conda/envs/wgcna-package/
+      - name: Install Conda
+        uses: conda-incubator/setup-miniconda@v2
+        with:
+          python-version: "3.9"
+          environment-file: package/environment.yml
+          activate-environment: wgcna-package
 
-test:
-  stage: test
-  image: continuumio/miniconda3:latest
-  dependencies:
-    - setup
-  before_script:
-    # Initialize and activate the environment
-    - conda init bash
-    - source ~/.bashrc
-    - conda activate wgcna-package
-  script:
-    # Run tests
-    - pytest ../../package/tests/ --disable-warnings --maxfail=5
+      - name: Install Dependencies
+        run: |
+          pip install pytest
+          pip install .
+          pip install git+https://github.com/Mfkessler/PyWGCNA.git
+
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    needs: setup
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Activate Environment and Run Tests
+        run: |
+          conda activate wgcna-package
+          pytest package/tests/ --disable-warnings --maxfail=5
