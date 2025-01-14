@@ -19,7 +19,7 @@ jobs:
       - name: Install Conda
         uses: conda-incubator/setup-miniconda@v2
         with:
-          python-version: "3.9"
+          python-version: "3.8.19"
           environment-file: package/environment.yml
           activate-environment: wgcna-package
 
