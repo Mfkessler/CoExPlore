@@ -280,21 +280,21 @@ def main():
                         help="Target directory for output files.")
     parser.add_argument("--num_species", type=int, default=2,
                         help="Number of species (S1..S{n}).")
-    parser.add_argument("--num_transcripts", type=int, default=5000,
+    parser.add_argument("--num_transcripts", type=int, default=4000,
                         help="Number of transcripts per species.")
-    parser.add_argument("--num_traits", type=int, default=22,
+    parser.add_argument("--num_traits", type=int, default=10,
                         help="Number of traits (max. 22).")
-    parser.add_argument("--samples_per_trait", type=int, default=5,
+    parser.add_argument("--samples_per_trait", type=int, default=3,
                         help="Number of samples per trait.")
-    parser.add_argument("--num_modules", type=int, default=10,
+    parser.add_argument("--num_modules", type=int, default=5,
                         help="Number of correlated modules.")
     parser.add_argument("--module_size_mean", type=float, default=300.0,
                         help="Average size of a module (normally distributed).")
     parser.add_argument("--module_size_sd", type=float, default=100.0,
                         help="Standard deviation of module sizes.")
-    parser.add_argument("--cor_strength", type=float, default=0.8,
+    parser.add_argument("--cor_strength", type=float, default=0.95,
                         help="Correlation within a module (0..1).")
-    parser.add_argument("--noise_level", type=float, default=0.2,
+    parser.add_argument("--noise_level", type=float, default=0.01,
                         help="Noise level.")
     parser.add_argument("--go_per_gene", type=int, default=2,
                         help="How many GO-IDs per gene/transcript.")
