@@ -16,7 +16,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Install Conda
+      - name: Install Conda and Create Environment
         uses: conda-incubator/setup-miniconda@v2
         with:
           python-version: "3.8.19"
@@ -39,5 +39,6 @@ jobs:
 
       - name: Activate Environment and Run Tests
         run: |
+          source ~/.bashrc
           conda activate wgcna-package
           pytest ./package/tests/ --disable-warnings --maxfail=5
