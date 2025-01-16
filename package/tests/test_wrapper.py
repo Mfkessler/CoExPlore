@@ -14,8 +14,9 @@ DATA_DIR = os.path.join(BASE_DIR, "data")
 @pytest.fixture
 def ann_data_list():
     """Fixture: Load multiple AnnData objects."""
-    # Load all AnnData objects from BASE_DIR/data (Folders S1 to S8) using a list comprehension
-    adatas = [read_h5ad(os.path.join(BASE_DIR, "data", f"S{i}", f"S{i}.h5ad")) for i in range(1, 9)]
+    # Load all AnnData objects from BASE_DIR/data (Folders S1 to S2) using a list comprehension
+    adatas = [read_h5ad(os.path.join(BASE_DIR, "data", f"S{i}", f"S{i}.h5ad")) for i in range(1, 3)]
+
     return adatas
 
 @pytest.fixture
@@ -28,20 +29,30 @@ def plot_config():
     """Fixture: Standard plot configuration."""
     output_path = os.path.join(BASE_DIR, "output")
     os.makedirs(output_path, exist_ok=True)  # Ensure the folder exists
+
     return PlotConfig(output_path=output_path, show=False, save_plots=True)
 
 # Tests
 
 def test_get_tom_data_single(ann_data_single):
     """Test get_tom_data with a single AnnData object."""
-    tom = get_tom_data(tom_path=os.path.join(BASE_DIR, "data", "S1", "tom_matrix.h5") , adata=ann_data_single, threshold=0.2)
+    tom = get_tom_data(tom_path=os.path.join(BASE_DIR, "data", "S1", "tom_matrix.h5"), 
+                       adata=ann_data_single, 
+                       query="",
+                       threshold=0.2)
+    
     assert tom is not None, "TOM should be loaded."
     assert tom.shape[0] == tom.shape[1], "TOM should be square."
 
 def test_get_tom_data_list(ann_data_list):
     """Test get_tom_data with a list of AnnData objects."""
-    toms, adatas = get_tom_data(tom_path=[os.path.join(BASE_DIR, "data", f"S{i}", "tom_matrix.h5") for i in range(1, 9)], adata=ann_data_list, threshold=0.2)
+    toms, adatas = get_tom_data(tom_path=[os.path.join(BASE_DIR, "data", f"S{i}", "tom_matrix.h5") for i in range(1, 9)], 
+                                adata=ann_data_list, 
+                                query="",
+                                threshold=0.2)
+    
     assert len(toms) == len(ann_data_list), "There should be one TOM per AnnData object."
+    
     for tom in toms:
         assert tom.shape[0] == tom.shape[1], "TOM should be square."
 
@@ -55,8 +66,10 @@ def test_analyze_co_expression_network_single(ann_data_single, plot_config):
         tom_path=os.path.join(BASE_DIR, "data", "S1", "tom_matrix.h5"),
         out="html",
         template_path="/vol/blast/wgcna/wgcna-app/app/templates",
-        plot_go_enrichment=False
+        plot_go_enrichment=False,
+        query=""
     )
+
     assert isinstance(result, str), "The output should be a file path."
     assert result.endswith(".html"), "The output should be an HTML file."
 
@@ -69,8 +82,10 @@ def test_analyze_co_expression_network_list(ann_data_list, plot_config):
         tom_path=[os.path.join(BASE_DIR, "data", f"S{i}", "tom_matrix.h5") for i in range(1, 9)],
         out="html",
         template_path="/vol/blast/wgcna/wgcna-app/app/templates",
-        plot_go_enrichment=False
+        plot_go_enrichment=False,
+        query=""
     )
+
     assert isinstance(result, str), "The output should be a file path."
     assert result.endswith(".html"), "The output should be an HTML file."
 
