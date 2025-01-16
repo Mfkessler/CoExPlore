@@ -10,7 +10,12 @@ logging.basicConfig(level=logging.INFO)
 # Test data paths
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 DATA_DIR = os.path.join(BASE_DIR, "data")
-TEMPLATE_DIR = os.path.join("../../app/app/templates")
+
+script_dir = os.path.dirname(os.path.abspath(__file__))
+TEMPLATE_DIR = os.path.abspath(os.path.join(script_dir, "../../app/app/templates"))
+
+if not os.path.exists(TEMPLATE_DIR):
+    raise FileNotFoundError(f"Template directory not found: {TEMPLATE_DIR}")
 
 @pytest.fixture
 def ann_data_list():
