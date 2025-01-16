@@ -10,6 +10,7 @@ logging.basicConfig(level=logging.INFO)
 # Test data paths
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 DATA_DIR = os.path.join(BASE_DIR, "data")
+TEMPLATE_DIR = os.path.join("../../app/app/templates")
 
 @pytest.fixture
 def ann_data_list():
@@ -65,7 +66,7 @@ def test_analyze_co_expression_network_single(ann_data_single, plot_config):
         topic="Test1",
         tom_path=os.path.join(BASE_DIR, "data", "S1", "tom_matrix.h5"),
         out="html",
-        template_path="/vol/blast/wgcna/wgcna-app/app/templates",
+        template_path=TEMPLATE_DIR,
         plot_go_enrichment=False,
         query=""
     )
@@ -81,7 +82,7 @@ def test_analyze_co_expression_network_list(ann_data_list, plot_config):
         topic="Test2",
         tom_path=[os.path.join(BASE_DIR, "data", f"S{i}", "tom_matrix.h5") for i in range(1, 9)],
         out="html",
-        template_path="/vol/blast/wgcna/wgcna-app/app/templates",
+        template_path=TEMPLATE_DIR,
         plot_go_enrichment=False,
         query=""
     )
