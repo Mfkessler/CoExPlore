@@ -835,7 +835,7 @@ def get_top_expressed_genes_by_tissue(adatas: List[AnnData], n: int = 1, column:
             if trait not in adata.obs:
                 raise ValueError(f"{trait} not found in adata.obs")
             
-        species_name = adata.uns[trait]
+        species_name = adata.uns['species']
         
         tissue_genes = {}
         tissues = adata.obs[trait].unique()
