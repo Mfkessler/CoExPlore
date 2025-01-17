@@ -3,3 +3,5 @@ app/app/static/images/
 package/build/
 package/notebooks/.ipynb_checkpoints/
 package/wgcna_package.egg-info/
+package/tests/__pycache__/
+input/testdata_out/

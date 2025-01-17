@@ -1,83 +1,108 @@
+###############################################################################
+# Snakefile for CoExPlore pipeline
+###############################################################################
+
 import os
 import sys
 import matplotlib.pyplot as plt
 
 configfile: "config.yml"
 
+# Plotting settings
 plt.rcParams['savefig.bbox'] = 'tight'
 plt.rcParams['axes.labelsize'] = 10
 
-species = config["species"]
-name = config["name"]
-count_matrix = config["count_matrix"]
-sample_mapping = config["sample_mapping"]
-iprid = config["iprid"]
-goid = config["goid"]
+# Extract dataset information from config file
+species_list = config["species"]
+names_list = config["name"]
+count_matrix_list = config["count_matrix"]
+sample_mapping_list = config["sample_mapping"]
+iprid_list = config["iprid"]
+goid_list = config["goid"]
 orthogroups = config["orthogroups"]
 
+# Boolean or single-value entries from config
 save_tom = config["save_tom"]
 save_adjacency_matrix = config["save_adjacency_matrix"]
 save_WGCNA = config["save_WGCNA"]
 figure_type = config["figure_type"]
 reduce_matrix = config["reduce_matrix"]
 
-output_path = config["output_path"].format(name=name)
-output_path = f"{output_path}/" if not output_path.endswith("/") else output_path
-H5AD_PATH = f"{output_path}h5ad/"
-TOM_PATH = f"{output_path}tom/"
-
-# New output path
-output_path = f"{output_path}{name}/"
-
+# Paths from config
+output_path = config["output_path"]
 app_path = config["app_path"]
 
-os.makedirs(output_path, exist_ok=True)
+# Ensure our output_path has a trailing slash
+if not output_path.endswith("/"):
+    output_path += "/"
 
-MATRIX_FILE = f"{output_path}{name}_matrix.csv"
-H5AD_FILE = f"{output_path}{name}.h5ad"
-TOM_FILE = f"{output_path}tom_matrix.h5"
-FIGURES_DIR = f"{output_path}figures"
+# Subfolders (same for all datasets):
+H5AD_PATH = os.path.join(output_path, "h5ad/")
+TOM_PATH = os.path.join(output_path, "tom/")
 
-# Final positions after reorganization
-FINAL_H5AD = f"{H5AD_PATH}{name}.h5ad"
-FINAL_TOM = f"{TOM_PATH}tom_matrix_{name}.h5"
-FINAL_FIGURES_DIR = f"{app_path}/app/static/images/{name}"
-REORGANIZED_MARKER = f"{output_path}reorganized.done"  # Marks the completion
-
+###############################################################################
+# Rule ALL: collects final outputs for all datasets
+###############################################################################
 rule all:
     input:
-        FINAL_H5AD,
-        FINAL_TOM,
-        REORGANIZED_MARKER
+        expand(H5AD_PATH + "{name}.h5ad", name=names_list),
+        expand(TOM_PATH + "tom_matrix_{name}.h5", name=names_list),
+        expand(output_path + "{name}/reorganized.done", name=names_list)
 
+###############################################################################
+# Rule WGCNA_PIPELINE: main processing for each dataset
+###############################################################################
 rule wgcna_pipeline:
+    input:
+        count_matrix=lambda wc: count_matrix_list[names_list.index(wc.name)],
+        sample_mapping=lambda wc: sample_mapping_list[names_list.index(wc.name)],
+        iprid=lambda wc: iprid_list[names_list.index(wc.name)],
+        goid=lambda wc: goid_list[names_list.index(wc.name)]
     output:
-        H5AD_FILE,
-        TOM_FILE,
-        directory(FIGURES_DIR)
+        H5AD_FILE = output_path + "{name}/{name}.h5ad",
+        TOM_FILE = output_path + "{name}/tom_matrix.h5",
+        FIGURES_DIR = directory(output_path + "{name}/figures")
     run:
         import PyWGCNA
         import wgcna.utils as rutils
+        
+        # Get index and relevant info for this wildcard name
+        idx = names_list.index(wildcards.name)
+        sp = species_list[idx]
+        nm = names_list[idx]
+        cnt_matrix = input.count_matrix
+        smpl_map = input.sample_mapping
+        ipr = input.iprid
+        go = input.goid
 
-        rutils.create_dir(output_path)
-        count_df = rutils.transform_count_matrix(count_matrix)
+        # Create directory (if not existing) for storing intermediate files
+        rutils.create_dir(os.path.dirname(output.H5AD_FILE))
+
+        # Transform count matrix
+        count_df = rutils.transform_count_matrix(cnt_matrix)
+
+        # Optionally reduce matrix
         if reduce_matrix:
             count_df = rutils.remove_random_columns(count_df, percentage=0.9)
+
+        # Write intermediate CSV for PyWGCNA
+        MATRIX_FILE = f"{output_path}{nm}/{nm}_matrix.csv"
         count_df.to_csv(MATRIX_FILE, index=False)
 
+        # Initialize and run PyWGCNA
         pyWGCNA_obj = PyWGCNA.WGCNA(
-            name=name, 
-            species=species, 
+            name=nm, 
+            species=sp, 
             geneExpPath=MATRIX_FILE, 
-            outputPath=output_path,
+            outputPath=f"{output_path}{nm}/",
             figureType=figure_type,
             save=True
         )
-        pyWGCNA_obj.updateSampleInfo(path=sample_mapping, sep='\t')
-
+        pyWGCNA_obj.updateSampleInfo(path=smpl_map, sep='\t')
         pyWGCNA_obj.preprocess()
         pyWGCNA_obj.findModules()
 
+        # Add combined column and set color metadata
         rutils.add_combined_column(pyWGCNA_obj.datExpr, drop_others=True)
         pyWGCNA_obj.setMetadataColor(
             "Combined_Trait", 
@@ -86,21 +111,25 @@ rule wgcna_pipeline:
             )
         )
 
+        # Perform analysis
         pyWGCNA_obj.analyseWGCNA(show=False)
 
-        # Process GO terms and IPR
-        gaf_path = goid if goid.endswith(".gaf.gz") else None
+        # Determine if user provided .gaf.gz or .tsv for GO terms
+        gaf_path = go if go.endswith(".gaf.gz") else None
         ortho_file = orthogroups if orthogroups.endswith(".tsv") else None
 
-        if not gaf_path and goid.endswith(".tsv"):
-            rutils.add_go_terms_to_adata(pyWGCNA_obj.datExpr, goid)
+        # If GO is a .tsv file, add GO terms
+        if not gaf_path and go.endswith(".tsv"):
+            rutils.add_go_terms_to_adata(pyWGCNA_obj.datExpr, go)
 
-        if iprid:
-            rutils.add_ipr_columns(pyWGCNA_obj.datExpr, iprid)
+        # If ipr path is present, add InterPro IDs
+        if ipr:
+            rutils.add_ipr_columns(pyWGCNA_obj.datExpr, ipr)
 
+        # Final saving (TOM, adjacency matrix, WGCNA object) depending on config
         rutils.prepare_and_save_wgcna(
             pyWGCNA_obj, 
-            output_path, 
+            f"{output_path}{nm}/", 
             gaf_path=gaf_path, 
             ortho_file=ortho_file, 
             save_tom=save_tom, 
@@ -108,41 +137,39 @@ rule wgcna_pipeline:
             save_WGCNA=save_WGCNA
         )
 
+###############################################################################
+# Rule REORGANIZE_OUTPUTS: move/rename final files to consistent locations
+###############################################################################
 rule reorganize_outputs:
-    """
-    Reorganize and rename the generated files, and copy the figures to the app.
-    Creates a 'reorganized.done' file as a marker.
-    """
     input:
-        H5AD_FILE,
-        TOM_FILE,
-        directory(FIGURES_DIR)
+        H5AD_FILE = output_path + "{name}/{name}.h5ad",
+        TOM_FILE = output_path + "{name}/tom_matrix.h5",
+        FIGURES_DIR = directory(output_path + "{name}/figures")
     output:
-        FINAL_H5AD,
-        FINAL_TOM,
-        REORGANIZED_MARKER
+        FINAL_H5AD = H5AD_PATH + "{name}.h5ad",
+        FINAL_TOM = TOM_PATH + "tom_matrix_{name}.h5",
+        REORGANIZED_MARKER = output_path + "{name}/reorganized.done"
     run:
         import shutil
 
-        # Create target directories
-        os.makedirs(H5AD_PATH, exist_ok=True)
-        os.makedirs(TOM_PATH, exist_ok=True)
+        # Create target directories if needed
+        os.makedirs(os.path.dirname(output.FINAL_H5AD), exist_ok=True)
+        os.makedirs(os.path.dirname(output.FINAL_TOM), exist_ok=True)
 
-        # Move h5ad
-        shutil.move(H5AD_FILE, FINAL_H5AD)
+        # Move the H5AD file into the final "h5ad" folder
+        shutil.move(input.H5AD_FILE, output.FINAL_H5AD)
 
-        # Rename and move tom
-        shutil.move(TOM_FILE, FINAL_TOM)
+        # Move the TOM file into the final "tom" folder
+        shutil.move(input.TOM_FILE, output.FINAL_TOM)
 
-        # Copy figures to the app
-        images_dir = os.path.join(app_path, "app", "static", "images", name)
+        # Copy figures to the application's static images folder
+        images_dir = os.path.join(app_path, "app", "static", "images", wildcards.name)
         os.makedirs(images_dir, exist_ok=True)
-
-        for f in os.listdir(FIGURES_DIR):
-            src = os.path.join(FIGURES_DIR, f)
+        for f in os.listdir(input.FIGURES_DIR):
+            src = os.path.join(input.FIGURES_DIR, f)
             if os.path.isfile(src):
                 shutil.copy(src, images_dir)
 
-        # Create marker file
-        with open(output[2], 'w') as marker:
+        # Finally, write the reorganized marker file
+        with open(output.REORGANIZED_MARKER, 'w') as marker:
             marker.write("Reorganization done.\n")
