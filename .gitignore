@@ -5,3 +5,6 @@ package/notebooks/.ipynb_checkpoints/
 package/wgcna_package.egg-info/
 package/tests/__pycache__/
 input/testdata_out/
+app/docker
+app/envs
+app/gunicorn
