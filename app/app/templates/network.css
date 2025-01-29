@@ -1,6 +1,14 @@
+html, body {
+    margin: 0;
+    padding: 0;
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+}
+
 #cy {
     width: 100%;
-    height: 550px;
+    height: 100%;
     display: block;
     border: 1px solid #ccc;
     background-color: #e5ecf6ff;

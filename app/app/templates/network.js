@@ -443,6 +443,57 @@ document.addEventListener('DOMContentLoaded', function() {
         jitterNodes(nodesToJitter);
     }    
 
+    /* Fullscreen */
+    const container = document.documentElement; // Entire document for fullscreen
+    const fullscreenButton = document.getElementById("toggle-fullscreen");
+    
+    function toggleFullscreen() {
+        if (!document.fullscreenElement) {
+            // Enter fullscreen mode
+            if (container.requestFullscreen) {
+                container.requestFullscreen();
+            } else if (container.mozRequestFullScreen) {
+                container.mozRequestFullScreen();
+            } else if (container.webkitRequestFullscreen) {
+                container.webkitRequestFullscreen();
+            } else if (container.msRequestFullscreen) {
+                container.msRequestFullscreen();
+            }
+            fullscreenButton.classList.add("active"); // Activate button design
+        } else {
+            // Exit fullscreen mode
+            if (document.exitFullscreen) {
+                document.exitFullscreen();
+            } else if (document.mozCancelFullScreen) {
+                document.mozCancelFullScreen();
+            } else if (document.webkitExitFullscreen) {
+                document.webkitExitFullscreen();
+            } else if (document.msExitFullscreen) {
+                document.msExitFullscreen();
+            }
+            fullscreenButton.classList.remove("active"); // Deactivate button design
+        }
+    }
+    
+    // Event listener for the fullscreen button
+    fullscreenButton.addEventListener("click", function() {
+        toggleFullscreen();
+    });
+    
+    // Event listener for fullscreen change -> Resize and fit the graph, adjust button status
+    document.addEventListener("fullscreenchange", function() {
+        cy.resize();  
+        cy.fit();
+    
+        // If fullscreen is exited, reset the button
+        if (!document.fullscreenElement) {
+            cy.zoom(initialZoom);  // Restore the initial zoom level
+            cy.pan(initialPan);    // Reset to the initial pan position
+            cy.center();           // Ensure the graph is centered correctly
+            fullscreenButton.classList.remove("active");
+        }
+    });
+
     const button = document.getElementById("toggle-metadata");
     const buttonTooltip = document.getElementById("button-tooltip");
 
