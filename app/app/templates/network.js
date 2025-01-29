@@ -22,9 +22,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         }
                         return useBackgroundColor ? node.data('moduleColor') : 'black';
                     },
-                    'shape': function(node) {
-                        return useShapes ? node.data('shape') : 'ellipse';
-                    },
+                    'shape': 'ellipse',
                     'text-valign': 'center',
                     'color': 'white',
                     'border-color': 'black',
@@ -62,6 +60,33 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     cy.ready(function() {
+        if (useShapes) {
+            const availableShapes = [
+                'ellipse', 'triangle', 'rectangle', 'diamond', 'pentagon', 
+                'hexagon', 'heptagon', 'octagon', 'vee', 'rhomboid' 
+            ]; // At least 10 shapes
+
+            let organismShapes = {};  // Stores mapping from organism to shape
+
+            // Identify unique organisms
+            let uniqueOrganisms = [...new Set(cy.nodes().map(node => node.data('organism')))];
+            
+            // Assign shapes to organisms cyclically
+            uniqueOrganisms.forEach((organism, index) => {
+                organismShapes[organism] = availableShapes[index % availableShapes.length];
+            });
+
+            // Dynamically update node styles
+            cy.batch(function() {
+                cy.nodes().forEach(node => {
+                    let organism = node.data('organism');
+                    let newShape = organismShapes[organism] || 'ellipse';
+                    node.style('shape', newShape);
+                });
+            });
+        }
+    });
+
         var thresholdDegree = 10; // Threshold for node degree
         var topEdges = 10;        // Number of edges to show for high-degree nodes
 
