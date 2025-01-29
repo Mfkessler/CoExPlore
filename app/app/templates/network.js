@@ -407,7 +407,14 @@ document.addEventListener('DOMContentLoaded', function() {
     button.addEventListener('click', function() {
         currentMetadataIndex = (currentMetadataIndex + 1) % metadataKeys.length;
         highlightNodesByMetadata(metadataKeys[currentMetadataIndex]);
-    });
+    
+        buttonTooltip.innerHTML = "Current Metadata: <b>" + metadataMapping[metadataKeys[currentMetadataIndex]] + "</b>";
+        buttonTooltip.style.display = "block";
+    
+        let rect = button.getBoundingClientRect();
+        buttonTooltip.style.left = (rect.left + window.scrollX + 20) + "px";
+        buttonTooltip.style.top = (rect.top + window.scrollY - 10) + "px";
+    });    
 
     button.addEventListener("mouseover", function(event) {
         buttonTooltip.innerHTML = "Current Metadata: <b>" + metadataMapping[metadataKeys[currentMetadataIndex]] + "</b>";
