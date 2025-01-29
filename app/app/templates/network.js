@@ -85,7 +85,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
             });
         }
-    });
 
         var thresholdDegree = 10; // Threshold for node degree
         var topEdges = 10;        // Number of edges to show for high-degree nodes
@@ -407,7 +406,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
 
                 setTimeout(() => node.position(currentPosition), 100);
-            }, 500);
+            }, 200);
         });
     }
 
