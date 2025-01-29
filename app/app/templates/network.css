@@ -82,3 +82,14 @@
     z-index: 1000; /* Ensure the legend is above the plot */
     transition: opacity 0.5s ease, visibility 0.5s ease, top 0.5s ease;
 }
+
+#button-tooltip {
+    position: absolute;
+    display: none;
+    background: rgba(255, 255, 255, 0.9);
+    padding: 5px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    font-size: 12px;
+    pointer-events: none;
+}

@@ -349,16 +349,31 @@ document.addEventListener('DOMContentLoaded', function() {
     
     adjustNodeAndEdgeSize();
 
-    // Function to make nodes "jitter"
-    function jitterNodes(nodes) {
-        stopJitter(); // Stop previous jitter animations
+    // Jitter effect for all metadata
+    const metadataKeys = ["ortho_ID", "degree", "gene", "moduleColor", "organism"];
+    const metadataMapping = {
+        "ortho_ID": "Orthogroup",
+        "degree": "Degree",
+        "gene": "Transcript",
+        "moduleColor": "Module",
+        "organism": "Species"
+    };
 
-        nodes.forEach(function(node) {
+    let currentMetadataIndex = 0;
+    let jitterIntervals = {};
+
+    function stopJitter() {
+        Object.values(jitterIntervals).forEach(interval => clearInterval(interval));
+        jitterIntervals = {};
+    }
+
+    function jitterNodes(nodes) {
+        stopJitter();
+        nodes.forEach(node => {
             let nodeId = node.id();
-            
-            jitterIntervals[nodeId] = setInterval(function() {
+            jitterIntervals[nodeId] = setInterval(() => {
                 let currentPosition = node.position();
-                let jitterX = (Math.random() - 0.5) * 10;  // Random shift ±5px
+                let jitterX = (Math.random() - 0.5) * 10;
                 let jitterY = (Math.random() - 0.5) * 10;
 
                 node.position({
@@ -366,28 +381,46 @@ document.addEventListener('DOMContentLoaded', function() {
                     y: currentPosition.y + jitterY
                 });
 
-                // Return to the original position after a short time
-                setTimeout(function() {
-                    node.position(currentPosition);
-                }, 100);
-            }, 200);
+                setTimeout(() => node.position(currentPosition), 100);
+            }, 500);
         });
     }
 
-    // Function to make nodes with the same orthogroup jitter
-    function highlightOrthogroup(orthoID) {
-        var nodesToJitter = cy.nodes().filter(function(node) {
-            return node.data('ortho_ID') === orthoID;
-        });
+    function highlightNodesByMetadata(metadataKey) {
+        stopJitter();
+        let selectedNode = cy.nodes('.highlight').first();
+        if (!selectedNode) return;
+
+        let metadataValue = metadataKey === "degree" ? selectedNode.degree() : selectedNode.data(metadataKey);
+        if (metadataValue === undefined) return;
+
+        let nodesToJitter = cy.nodes().filter(node => 
+            metadataKey === "degree" ? node.degree() === metadataValue : node.data(metadataKey) === metadataValue
+        );
 
         jitterNodes(nodesToJitter);
     }
 
-    // Function to stop the jitter effect
-    function stopJitter() {
-        Object.values(jitterIntervals).forEach(interval => clearInterval(interval));
-        jitterIntervals = {}; // Reset all stored intervals
-    }
+    const button = document.getElementById("toggle-metadata");
+    const buttonTooltip = document.getElementById("button-tooltip");
+
+    button.addEventListener('click', function() {
+        currentMetadataIndex = (currentMetadataIndex + 1) % metadataKeys.length;
+        highlightNodesByMetadata(metadataKeys[currentMetadataIndex]);
+    });
+
+    button.addEventListener("mouseover", function(event) {
+        buttonTooltip.innerHTML = "Current Metadata: <b>" + metadataMapping[metadataKeys[currentMetadataIndex]] + "</b>";
+        buttonTooltip.style.display = "block";
+
+        let rect = button.getBoundingClientRect();
+        buttonTooltip.style.left = (rect.left + window.scrollX + 20) + "px";
+        buttonTooltip.style.top = (rect.top + window.scrollY - 10) + "px";
+    });
+
+    button.addEventListener("mouseout", function() {
+        buttonTooltip.style.display = "none";
+    });
 
     cy.on('zoom', function() {
         adjustNodeAndEdgeSize();
@@ -449,19 +482,17 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Track the state of clicked nodes
     let lastClickedNode = null; // Track the last clicked node
-    let jitterIntervals = {}; // Stores intervals for the jitter effect to stop them later
 
     cy.on('tap', 'node', function(evt) {
         var node = evt.target;
-        var nodeId = node.id(); // Unique node id
-        var orthoID = node.data('ortho_ID'); // Orthogroup ID of the clicked node
+        var nodeId = node.id();
 
         cy.batch(function() {
             if (node.hasClass('highlight')) {
-                // Node was already highlighted, so highlight its neighbors as well
+                // Highlight the neighborhood of the clicked node
                 node.neighborhood().addClass('highlight');
             } else {
-                // New highlighting: Reset all highlighted nodes
+                // Remove highlight from all nodes and highlight the clicked node
                 cy.nodes('.highlight').removeClass('highlight');
                 node.addClass('highlight');
                 lastClickedNode = nodeId;
@@ -473,13 +504,11 @@ document.addEventListener('DOMContentLoaded', function() {
             return node.data('gene'); 
         });
 
-        // Send highlighted nodes to the main page
+        // Send the highlighted nodes back to the main page
         window.parent.postMessage({ highlightedNodes: highlightedNodes }, '*');
 
-        // If an orthogroup exists, apply the jitter effect
-        if (orthoID) {
-            highlightOrthogroup(orthoID);
-        }
+        // Jitter based on the active metadata category
+        highlightNodesByMetadata(metadataKeys[currentMetadataIndex]);
     });
 
     // When clicking anywhere in the Cytoscape plot (but not on nodes), reset the table
