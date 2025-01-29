@@ -3208,7 +3208,7 @@ def plot_cyto_network(config: PlotConfig, custom_filename: str = "cyto_network",
     if cluster_info:
         for node in network_data['nodes']:
             node_id = node['data']['id']
-            node['data']['cluster'] = cluster_info[node_id] if cluster_info[node_id] == "No clusters" else cluster_info[node_id].split(' ')[-1]
+            node['data']['cluster'] = cluster_info[node_id]
 
     if use_shapes:
         shape_dict = generate_cyto_shape_dict([node['data']['moduleColor'] for node in network_data['nodes']], None)

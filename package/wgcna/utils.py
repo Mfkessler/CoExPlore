@@ -1609,7 +1609,7 @@ def calculate_eigengenes(adata: AnnData, cluster_map: Dict[str, str], column: st
         if mod != "No clusters":
             included_genes.extend(module_genes)
 
-        mod = f"{adata.uns['name']}: {mod}"
+        mod = f"{mod}"
 
         # Imputation and scaling
         if impute and expr_mod.size > 0:
@@ -1693,8 +1693,8 @@ def calculate_eigengenes(adata: AnnData, cluster_map: Dict[str, str], column: st
     moduleInfo_df.index.name = "Cluster"
 
     # Remove the "No clusters" key if it exists
-    PrinComps = PrinComps.drop(f"{adata.uns['name']}: No clusters", axis=1, errors='ignore')
-    moduleInfo_df = moduleInfo_df.drop(f"{adata.uns['name']}: No clusters", axis=0, errors='ignore')
+    PrinComps = PrinComps.drop(f"No clusters", axis=1, errors='ignore')
+    moduleInfo_df = moduleInfo_df.drop(f"No clusters", axis=0, errors='ignore')
         
     return {
         "eigengenes": PrinComps,
@@ -1848,7 +1848,8 @@ def export_co_expression_network_to_cytoscape(
                     'name': gene,
                     'moduleColor': gene_metadata.loc[gene, 'moduleColors'],
                     'ortho_ID': gene_metadata.loc[gene, 'ortho_ID'] if "ortho_ID" in gene_metadata.columns else "",
-                    'organism': organism
+                    'organism': organism,
+                    'name': current_adata.uns['name']
                 }
             }
             nodes.append(node_data)
@@ -1916,9 +1917,10 @@ def identify_network_clusters_from_json(network_data: dict, cluster_name: str,
     for node_data in network_data['nodes']:
         node = node_data['data']['id']
         if node not in visited:
+            name = node_data['data']['name']
             cluster = []
             dfs(node, cluster)
-            clusters.append(cluster)
+            clusters.append((cluster, name))
 
     # Apply node_threshold based on percentage
     if not node_threshold:
@@ -1927,13 +1929,14 @@ def identify_network_clusters_from_json(network_data: dict, cluster_name: str,
         node_threshold = int(len(network_data['nodes']) * node_threshold_percent)
 
     # Filter clusters based on the node_threshold
-    filtered_clusters = [cluster for cluster in clusters if len(cluster) >= node_threshold]
+    filtered_clusters = [cluster for cluster in clusters if len(cluster[0]) >= node_threshold]
 
     # Assign clusters to transcripts
     cluster_map = {}
     for new_cluster_id, cluster in enumerate(filtered_clusters, start=1):
-        for transcript in cluster:
-            cluster_map[transcript] = f"{cluster_name} {new_cluster_id}"
+        # Get a node name (node_data['data']['name']) from the current cluster
+        for transcript in cluster[0]:
+            cluster_map[transcript] = f"{cluster[1]}: {cluster_name} {new_cluster_id}"
 
     # Assign 'No clusters' to transcripts that are not in any cluster
     all_transcripts = {node['data']['id'] for node in network_data['nodes']}
