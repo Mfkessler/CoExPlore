@@ -60,6 +60,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     cy.ready(function() {
+        /* Shape assignment based on organism */
         if (useShapes) {
             const availableShapes = [
                 'ellipse', 'triangle', 'rectangle', 'diamond', 'pentagon', 
@@ -86,6 +87,7 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
 
+        /* Edge Filtering */
         var thresholdDegree = 10; // Threshold for node degree
         var topEdges = 10;        // Number of edges to show for high-degree nodes
 
@@ -279,6 +281,17 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
+    /* Highlight Button */
+
+    // Default: Highlighting is deactivated
+    let highlightingActive = false;
+
+    // Toggle button to activate/deactivate highlighting
+    document.getElementById('toggle-highlighting').addEventListener('click', function() {
+        highlightingActive = !highlightingActive;
+        this.classList.toggle('active', highlightingActive);
+    });
+
     /* Edge Coloring and Transparency */
     if (useEdgeTransparency || useEdgeColoring) {
         /* Color Scale */
@@ -410,20 +423,25 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    function highlightNodesByMetadata(metadataKey) {
+    function highlightNodesByMetadata(metadataKey, selectedNode = null) {
         stopJitter();
-        let selectedNode = cy.nodes('.highlight').first();
-        if (!selectedNode) return;
-
+    
+        // Retain the currently selected node if none is explicitly passed
+        if (!selectedNode) {
+            selectedNode = lastClickedNode ? cy.$(`node[id="${lastClickedNode}"]`) : null;
+        }
+        
+        if (!selectedNode || selectedNode.empty()) return;  // Abort if no node exists
+    
         let metadataValue = metadataKey === "degree" ? selectedNode.degree() : selectedNode.data(metadataKey);
         if (metadataValue === undefined) return;
-
+    
         let nodesToJitter = cy.nodes().filter(node => 
             metadataKey === "degree" ? node.degree() === metadataValue : node.data(metadataKey) === metadataValue
         );
-
+    
         jitterNodes(nodesToJitter);
-    }
+    }    
 
     const button = document.getElementById("toggle-metadata");
     const buttonTooltip = document.getElementById("button-tooltip");
@@ -517,29 +535,31 @@ document.addEventListener('DOMContentLoaded', function() {
     cy.on('tap', 'node', function(evt) {
         var node = evt.target;
         var nodeId = node.id();
+        lastClickedNode = nodeId;
 
-        cy.batch(function() {
-            if (node.hasClass('highlight')) {
-                // Highlight the neighborhood of the clicked node
-                node.neighborhood().addClass('highlight');
-            } else {
-                // Remove highlight from all nodes and highlight the clicked node
-                cy.nodes('.highlight').removeClass('highlight');
-                node.addClass('highlight');
-                lastClickedNode = nodeId;
-            }
-        });
+        if (highlightingActive) {
+            cy.batch(function() {
+                if (node.hasClass('highlight')) {
+                    // Highlight the neighborhood of the clicked node
+                    node.neighborhood().addClass('highlight');
+                } else {
+                    // Remove highlight from all nodes and highlight the clicked node
+                    cy.nodes('.highlight').removeClass('highlight');
+                    node.addClass('highlight');
+                }
+            });
 
-        // Collect highlighted nodes
-        var highlightedNodes = cy.nodes('.highlight').map(function(node) {
-            return node.data('gene'); 
-        });
+            // Collect highlighted nodes
+            var highlightedNodes = cy.nodes('.highlight').map(function(node) {
+                return node.data('gene'); 
+            });
 
-        // Send the highlighted nodes back to the main page
-        window.parent.postMessage({ highlightedNodes: highlightedNodes }, '*');
+            // Send the highlighted nodes back to the main page
+            window.parent.postMessage({ highlightedNodes: highlightedNodes }, '*');
+        }
 
         // Jitter based on the active metadata category
-        highlightNodesByMetadata(metadataKeys[currentMetadataIndex]);
+        highlightNodesByMetadata(metadataKeys[currentMetadataIndex], node);
     });
 
     // When clicking anywhere in the Cytoscape plot (but not on nodes), reset the table
