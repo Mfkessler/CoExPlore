@@ -347,8 +347,47 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-
     adjustNodeAndEdgeSize();
+
+    // Function to make nodes "jitter"
+    function jitterNodes(nodes) {
+        stopJitter(); // Stop previous jitter animations
+
+        nodes.forEach(function(node) {
+            let nodeId = node.id();
+            
+            jitterIntervals[nodeId] = setInterval(function() {
+                let currentPosition = node.position();
+                let jitterX = (Math.random() - 0.5) * 10;  // Random shift ±5px
+                let jitterY = (Math.random() - 0.5) * 10;
+
+                node.position({
+                    x: currentPosition.x + jitterX,
+                    y: currentPosition.y + jitterY
+                });
+
+                // Return to the original position after a short time
+                setTimeout(function() {
+                    node.position(currentPosition);
+                }, 100);
+            }, 200);
+        });
+    }
+
+    // Function to make nodes with the same orthogroup jitter
+    function highlightOrthogroup(orthoID) {
+        var nodesToJitter = cy.nodes().filter(function(node) {
+            return node.data('ortho_ID') === orthoID;
+        });
+
+        jitterNodes(nodesToJitter);
+    }
+
+    // Function to stop the jitter effect
+    function stopJitter() {
+        Object.values(jitterIntervals).forEach(interval => clearInterval(interval));
+        jitterIntervals = {}; // Reset all stored intervals
+    }
 
     cy.on('zoom', function() {
         adjustNodeAndEdgeSize();
@@ -410,20 +449,22 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Track the state of clicked nodes
     let lastClickedNode = null; // Track the last clicked node
+    let jitterIntervals = {}; // Stores intervals for the jitter effect to stop them later
 
     cy.on('tap', 'node', function(evt) {
         var node = evt.target;
         var nodeId = node.id(); // Unique node id
+        var orthoID = node.data('ortho_ID'); // Orthogroup ID of the clicked node
 
         cy.batch(function() {
             if (node.hasClass('highlight')) {
-                // Node was already highlighted, now mark neighbors
+                // Node was already highlighted, so highlight its neighbors as well
                 node.neighborhood().addClass('highlight');
             } else {
-                // First click, mark only this node and reset the others
-                cy.nodes('.highlight').removeClass('highlight'); // Only update highlighted nodes
+                // New highlighting: Reset all highlighted nodes
+                cy.nodes('.highlight').removeClass('highlight');
                 node.addClass('highlight');
-                lastClickedNode = nodeId; // Track this node as the last clicked
+                lastClickedNode = nodeId;
             }
         });
 
@@ -432,8 +473,13 @@ document.addEventListener('DOMContentLoaded', function() {
             return node.data('name'); 
         });
 
-        // Send the highlighted nodes back to the main page
+        // Send highlighted nodes to the main page
         window.parent.postMessage({ highlightedNodes: highlightedNodes }, '*');
+
+        // If an orthogroup exists, apply the jitter effect
+        if (orthoID) {
+            highlightOrthogroup(orthoID);
+        }
     });
 
     // When clicking anywhere in the Cytoscape plot (but not on nodes), reset the table
@@ -444,6 +490,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 cy.nodes('.highlight').removeClass('highlight');
                 lastClickedNode = null; // Clear the last clicked node tracking
             });
+
+            stopJitter(); // Stop the jitter effect
 
             // Send an empty array to the main page to reset the DataTable
             window.parent.postMessage({ highlightedNodes: [] }, '*');
