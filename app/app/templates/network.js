@@ -300,7 +300,7 @@ document.addEventListener('DOMContentLoaded', function() {
     cy.on('mouseover', 'node', function(evt) {
         var node = evt.target;
         var tooltipText = '<b>Species:</b> ' + node.data('organism') +
-                        '<br><b>Transcript:</b> ' + node.data('name') +
+                        '<br><b>Transcript:</b> ' + node.data('gene') +
                         '<br><b>Module:</b> ' + node.data('moduleColor') +
                         '<br><b>Orthogroup:</b> ' + node.data('ortho_ID') +
                         '<br><b>Degree:</b> ' + node.degree();
@@ -470,7 +470,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Collect highlighted nodes
         var highlightedNodes = cy.nodes('.highlight').map(function(node) {
-            return node.data('name'); 
+            return node.data('gene'); 
         });
 
         // Send highlighted nodes to the main page

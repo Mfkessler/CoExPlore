@@ -1845,7 +1845,7 @@ def export_co_expression_network_to_cytoscape(
             node_data = {
                 'data': {
                     'id': f"{organism}_{gene}",
-                    'name': gene,
+                    'gene': gene,
                     'moduleColor': gene_metadata.loc[gene, 'moduleColors'],
                     'ortho_ID': gene_metadata.loc[gene, 'ortho_ID'] if "ortho_ID" in gene_metadata.columns else "",
                     'organism': organism,
