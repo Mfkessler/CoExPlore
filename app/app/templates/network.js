@@ -336,11 +336,28 @@ document.addEventListener('DOMContentLoaded', function() {
     // Tooltip on hover
     cy.on('mouseover', 'node', function(evt) {
         var node = evt.target;
+        var goTerms = node.data('go_terms');
+        var iprIds = node.data('ipr_id');
+      
+        // Adjust GO Terms
+        if (goTerms && goTerms.includes(',')) {
+          var goTermsArray = goTerms.split(',');
+          goTerms = goTermsArray[0] + ', +' + (goTermsArray.length - 1);
+        }
+          
+        // Adjust InterPro IDs
+        if (iprIds && iprIds.includes(',')) {
+          var iprIdsArray = iprIds.split(',');
+          iprIds = iprIdsArray[0] + ', +' + (iprIdsArray.length - 1);
+        }
+      
         var tooltipText = '<b>Species:</b> ' + node.data('organism') +
-                        '<br><b>Transcript:</b> ' + node.data('gene') +
-                        '<br><b>Module:</b> ' + node.data('moduleColor') +
-                        '<br><b>Orthogroup:</b> ' + node.data('ortho_ID') +
-                        '<br><b>Degree:</b> ' + node.degree();
+          '<br><b>Transcript:</b> ' + node.data('gene') +
+          '<br><b>Module:</b> ' + node.data('moduleColor') +
+          '<br><b>Orthogroup:</b> ' + node.data('ortho_ID') +
+          '<br><b>Degree:</b> ' + node.degree() +
+          '<br><b>GO Terms:</b> ' + goTerms +
+          '<br><b>InterPro IDs:</b> ' + iprIds;
                         
         if (useClusterTooltip) { 
             tooltipText += '<br><b>Cluster:</b> ' + node.data('cluster');
@@ -387,13 +404,15 @@ document.addEventListener('DOMContentLoaded', function() {
     adjustNodeAndEdgeSize();
 
     // Jitter effect for all metadata
-    const metadataKeys = ["ortho_ID", "degree", "gene", "moduleColor", "organism"];
+    const metadataKeys = ["ortho_ID", "degree", "gene", "moduleColor", "organism", "go_terms", "ipr_id"];
     const metadataMapping = {
         "ortho_ID": "Orthogroup",
         "degree": "Degree",
         "gene": "Transcript",
         "moduleColor": "Module",
-        "organism": "Species"
+        "organism": "Species",
+        "go_terms": "GO Terms",
+        "ipr_id": "InterPro IDs"
     };
 
     let currentMetadataIndex = 0;
