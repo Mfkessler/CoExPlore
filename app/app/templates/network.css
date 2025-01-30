@@ -101,3 +101,25 @@ html, body {
     font-size: 15px;
     pointer-events: none;
 }
+
+.node-size-buttons {
+    position: absolute;
+    bottom: 10px;
+    right: 10px;
+    display: flex;
+    flex-direction: row;
+}
+
+.node-size-button {
+    margin: 5px;
+    padding: 10px;
+    font-size: 20px;
+    cursor: pointer;
+    border: none;
+    background-color: transparent;
+    color: gray;
+}
+
+.node-size-button:hover {
+    color: black;
+}

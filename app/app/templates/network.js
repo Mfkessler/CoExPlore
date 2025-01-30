@@ -501,16 +501,35 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Event listener for fullscreen change -> Resize and fit the graph, adjust button status
     document.addEventListener("fullscreenchange", function() {
-        cy.resize();  
+        // Store the initial node and edge sizes
+        var initialNodeSize = cy.nodes()[0].style('width'); // Get the current size of the first node
+        var initialEdgeWidth = cy.edges()[0].style('width'); // Get the current width of the first edge
+
+        cy.resize();
         cy.fit();
-    
+
         // If fullscreen is exited, reset the button
         if (!document.fullscreenElement) {
             cy.zoom(initialZoom);  // Restore the initial zoom level
             cy.pan(initialPan);    // Reset to the initial pan position
             cy.center();           // Ensure the graph is centered correctly
             fullscreenButton.classList.remove("active");
-        }
+
+
+        } 
+
+        // Restore node and edge sizes
+        cy.nodes().forEach(function(node) {
+            if (initialNodeSize) {
+                node.style('width', initialNodeSize);
+                node.style('height', initialNodeSize);
+            }
+        });
+        cy.edges().forEach(function(edge) {
+            if (initialEdgeWidth) {
+                edge.style('width', initialEdgeWidth);
+            }
+        });
     });
 
     const button = document.getElementById("toggle-metadata");
@@ -545,6 +564,46 @@ document.addEventListener('DOMContentLoaded', function() {
         adjustNodeAndEdgeSize();
     });
 
+    /* Adjust Node Size */
+
+    // Increase node size button
+    const increaseNodeSizeButton = document.getElementById("increase-node-size");
+    increaseNodeSizeButton.addEventListener('click', function() {
+        cy.nodes().forEach(function(node) {
+        // Get current node size
+        var currentNodeSize = node.style('width');  
+    
+        // Increase size by 10%
+        var newNodeSize = parseFloat(currentNodeSize) * 1.1;  
+    
+        node.style('width', newNodeSize);
+        node.style('height', newNodeSize);
+        });
+    
+        // Adjust edge width proportionally (using the same logic)
+        cy.edges().forEach(function(edge) {
+        var currentEdgeWidth = edge.style('width');
+        var newEdgeWidth = parseFloat(currentEdgeWidth) * 1.1;
+        edge.style('width', newEdgeWidth);
+        });
+    });
+    
+    // Decrease node size button (using the same logic)
+    const decreaseNodeSizeButton = document.getElementById("decrease-node-size");
+    decreaseNodeSizeButton.addEventListener('click', function() {
+        cy.nodes().forEach(function(node) {
+        var currentNodeSize = node.style('width');
+        var newNodeSize = parseFloat(currentNodeSize) * 0.9;
+        node.style('width', newNodeSize);
+        node.style('height', newNodeSize);
+        });
+    
+        cy.edges().forEach(function(edge) {
+        var currentEdgeWidth = edge.style('width');
+        var newEdgeWidth = parseFloat(currentEdgeWidth) * 0.9;
+        edge.style('width', newEdgeWidth);
+        });
+    });
     /* Highlighting nodes */
 
     // Event listener to receive messages from the parent window (main page)
