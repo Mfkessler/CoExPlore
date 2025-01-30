@@ -498,10 +498,25 @@ document.addEventListener('DOMContentLoaded', function() {
     fullscreenButton.addEventListener("click", function() {
         toggleFullscreen();
     });
+
+    function restoreNodeAndEdgeSize(initialNodeSize, initialEdgeWidth) {
+        // Restore node and edge sizes
+        cy.nodes().forEach(function(node) {
+            if (initialNodeSize) {
+                node.style('width', initialNodeSize);
+                node.style('height', initialNodeSize);
+            }
+        });
+
+        cy.edges().forEach(function(edge) {
+            if (initialEdgeWidth) {
+                edge.style('width', initialEdgeWidth);
+            }
+        });
+    }
     
     // Event listener for fullscreen change -> Resize and fit the graph, adjust button status
     document.addEventListener("fullscreenchange", function() {
-        // Store the initial node and edge sizes
         var initialNodeSize = cy.nodes()[0].style('width'); // Get the current size of the first node
         var initialEdgeWidth = cy.edges()[0].style('width'); // Get the current width of the first edge
 
@@ -514,22 +529,10 @@ document.addEventListener('DOMContentLoaded', function() {
             cy.pan(initialPan);    // Reset to the initial pan position
             cy.center();           // Ensure the graph is centered correctly
             fullscreenButton.classList.remove("active");
-
-
         } 
 
         // Restore node and edge sizes
-        cy.nodes().forEach(function(node) {
-            if (initialNodeSize) {
-                node.style('width', initialNodeSize);
-                node.style('height', initialNodeSize);
-            }
-        });
-        cy.edges().forEach(function(edge) {
-            if (initialEdgeWidth) {
-                edge.style('width', initialEdgeWidth);
-            }
-        });
+        restoreNodeAndEdgeSize(initialNodeSize, initialEdgeWidth);
     });
 
     const button = document.getElementById("toggle-metadata");
