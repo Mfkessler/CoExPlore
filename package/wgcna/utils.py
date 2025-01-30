@@ -1849,9 +1849,13 @@ def export_co_expression_network_to_cytoscape(
                     'moduleColor': gene_metadata.loc[gene, 'moduleColors'],
                     'ortho_ID': gene_metadata.loc[gene, 'ortho_ID'] if "ortho_ID" in gene_metadata.columns else "",
                     'organism': organism,
-                    'name': current_adata.uns['name']
+                    'name': current_adata.uns['name'],
+                    'go_terms': gene_metadata.loc[gene, 'go_terms'] if "go_terms" in gene_metadata.columns else "",
+                    'ipr_id': gene_metadata.loc[gene, 'ipr_id'] if "ipr_id" in gene_metadata.columns else ""
                 }
             }
+            # Replace all NaN values with empty strings
+            node_data['data'] = {k: v if not pd.isna(v) else "" for k, v in node_data['data'].items()}
             nodes.append(node_data)
 
         # Add edges
