@@ -199,7 +199,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Variable to track the state of scroll zoom
     let scrollZoomActive = false; // Initial state off
-    var rectangleZoomMode = true; // Rectangle zoom is active by default
+    var rectangleZoomMode = false; // Rectangle zoom is off by default
     cy.userZoomingEnabled(false); // Ensure consistency
 
     document.getElementById('toggleZoom').addEventListener('click', function() {
@@ -410,16 +410,16 @@ document.addEventListener('DOMContentLoaded', function() {
             let nodeId = node.id();
             jitterIntervals[nodeId] = setInterval(() => {
                 let currentPosition = node.position();
-                let jitterX = (Math.random() - 0.5) * 10;
-                let jitterY = (Math.random() - 0.5) * 10;
+                let jitterX = (Math.random() - 0.5) * 5;
+                let jitterY = (Math.random() - 0.5) * 5;
 
                 node.position({
                     x: currentPosition.x + jitterX,
                     y: currentPosition.y + jitterY
                 });
 
-                setTimeout(() => node.position(currentPosition), 100);
-            }, 200);
+                setTimeout(() => node.position(currentPosition), 50);
+            }, 100);
         });
     }
 
@@ -636,9 +636,11 @@ document.addEventListener('DOMContentLoaded', function() {
     var containerOffset;
 
     // Disable default interactions during rectangle zoom
-    cy.userPanningEnabled(false);
-    cy.userZoomingEnabled(false);
-    cy.container().style.cursor = 'crosshair';
+    if (rectangleZoomMode) {
+        cy.userPanningEnabled(false);
+        cy.userZoomingEnabled(false);
+        cy.container().style.cursor = 'crosshair';
+    }
 
     // Determine container offset for coordinate calculation
     var rect = cy.container().getBoundingClientRect();
