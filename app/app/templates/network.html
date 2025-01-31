@@ -31,13 +31,19 @@
         <button id="toggle-legend" class="icon-button" title="Toggle Legend"><i class="fas fa-list"></i></button> 
         <button id="toggle-highlighting" class="icon-button" title="Toggle Node Highlighting"><i class="fas fa-highlighter"></i></button>        
         <button id="toggle-metadata" class="icon-button" title="Switch Metadata Highlight"><i class="fas fa-random"></i></button>
-        <button id="export-json" class="icon-button" title="Export to Cytoscape"><i class="fas fa-download"></i></button>
     </div>
 
-    <!-- Buttons right -->
-    <div class="node-size-buttons">
-        <button id="increase-node-size" class="node-size-button">+</button>
-        <button id="decrease-node-size" class="node-size-button">-</button>
+    <!-- Buttons top right -->
+    <div class="buttons-top-right">
+        <button id="export-json" class="icon-button" title="Export to Cytoscape"><i class="fas fa-download"></i></button>
+        <button id="export-png" class="icon-button" title="Export as PNG"><i class="fas fa-image"></i></button> </div>
+    </div>
+
+    <!-- Buttons bottom right -->
+    <div class="node-size-slider">
+        <i class="fas fa-circle slider-indicator-left"></i>
+        <input type="range" id="node-size-range" min="1" max="30" value="{{ node_size }}" step="1">
+        <i class="fas fa-circle slider-indicator-right"></i>
     </div>
 
     <!-- Tooltip -->

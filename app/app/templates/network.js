@@ -402,6 +402,9 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     /* Zooming node and edge sizes */
+    const nodeSizeRange = document.getElementById('node-size-range');
+    const minNodeSize = 1; // Minimum node size
+    const maxNodeSize = 30; // Maximum node size
 
     let currentNodeSize = nodeSize;  
     let currentEdgeWidth = edgeWidth;
@@ -555,26 +558,45 @@ document.addEventListener('DOMContentLoaded', function() {
     const toggleMetadataButton = document.getElementById("toggle-metadata");
     const buttonTooltip = document.getElementById("button-tooltip");
 
+    let metadataActive = false; // Flag to track if metadata highlighting is active
+
     toggleMetadataButton.addEventListener('click', function() {
-        currentMetadataIndex = (currentMetadataIndex + 1) % metadataKeys.length;
-        highlightNodesByMetadata(metadataKeys[currentMetadataIndex]);
-    
-        buttonTooltip.innerHTML = "Current Metadata: <b>" + metadataMapping[metadataKeys[currentMetadataIndex]] + "</b>";
-        buttonTooltip.style.display = "block";
-    
-        let rect = toggleMetadataButton.getBoundingClientRect();
-        buttonTooltip.style.left = (rect.left + window.scrollX + 20) + "px";
-        buttonTooltip.style.top = (rect.top + window.scrollY - 10) + "px";
+        if (!metadataActive) {
+            // Activate metadata highlighting
+            metadataActive = true;
+            this.classList.add('active'); // Add the active class to the button
+            highlightNodesByMetadata(metadataKeys[currentMetadataIndex]); // Show the first metadata
+        } else {
+            currentMetadataIndex = (currentMetadataIndex + 1) % metadataKeys.length;
+            if (currentMetadataIndex === 0) {
+                // Deactivate metadata highlighting after cycling through all metadata
+                metadataActive = false;
+                this.classList.remove('active'); // Remove the active class
+                stopJitter(); // Stop any ongoing jitter effect
+            } else {
+                highlightNodesByMetadata(metadataKeys[currentMetadataIndex]);
+            }
+        }
+
+        updateTooltipText();
     });    
 
     toggleMetadataButton.addEventListener("mouseover", function(event) {
-        buttonTooltip.innerHTML = "Current Metadata: <b>" + metadataMapping[metadataKeys[currentMetadataIndex]] + "</b>";
-        buttonTooltip.style.display = "block";
+        updateTooltipText();
+    });
 
+    function updateTooltipText() {
+        if (metadataActive) { // Show metadata only if active
+            buttonTooltip.innerHTML = "Current Metadata: <b>" + metadataMapping[metadataKeys[currentMetadataIndex]] + "</b>";
+        } else {
+            buttonTooltip.innerHTML = "Current Metadata: <b>None</b>"; // Show "None" when inactive
+        }
+        buttonTooltip.style.display = "block";
+    
         let rect = toggleMetadataButton.getBoundingClientRect();
         buttonTooltip.style.left = (rect.left + window.scrollX + 20) + "px";
         buttonTooltip.style.top = (rect.top + window.scrollY - 10) + "px";
-    });
+    }
 
     toggleMetadataButton.addEventListener("mouseout", function() {
         buttonTooltip.style.display = "none";
@@ -586,20 +608,22 @@ document.addEventListener('DOMContentLoaded', function() {
 
     /* Adjust Node Size */
 
-    // Button to increase node size
-    document.getElementById("increase-node-size").addEventListener('click', function() {
-        currentNodeSize *= 1.1; // Increase by 10%
-        currentEdgeWidth *= 1.1; // Also increase edge width
+    nodeSizeRange.value = currentNodeSize;
+
+    nodeSizeRange.addEventListener('input', function() {
+        var oldNodeSize = currentNodeSize; // Store the old node size
+    
+        currentNodeSize = parseInt(this.value);  // Get node size from slider
+    
+        // Calculate the scaling factor based on the old and new node sizes
+        var scaleFactor = currentNodeSize / oldNodeSize;
+    
+        // Scale the edge width by the same factor as the node size
+        currentEdgeWidth *= scaleFactor; 
+    
         adjustNodeAndEdgeSize();
     });
-
-    // Button to decrease node size
-    document.getElementById("decrease-node-size").addEventListener('click', function() {
-        currentNodeSize *= 0.9; // Decrease by 10%
-        currentEdgeWidth *= 0.9; // Also decrease edge width
-        adjustNodeAndEdgeSize();
-    });
-
+    
     /* Highlighting nodes */
 
     // Event listener to receive messages from the parent window (main page)
@@ -683,8 +707,9 @@ document.addEventListener('DOMContentLoaded', function() {
             window.parent.postMessage({ highlightedNodes: highlightedNodes }, '*');
         }
 
-        // Jitter based on the active metadata category
-        highlightNodesByMetadata(metadataKeys[currentMetadataIndex], node);
+        if (metadataActive) { // Only jitter if metadata highlighting is active
+            highlightNodesByMetadata(metadataKeys[currentMetadataIndex], node);
+        }
     });
 
     // When clicking anywhere in the Cytoscape plot (but not on nodes), reset the table
@@ -702,6 +727,8 @@ document.addEventListener('DOMContentLoaded', function() {
             window.parent.postMessage({ highlightedNodes: [] }, '*');
         }
     });
+
+    /* Rectangle Zoom */
 
     // Variables for rectangle zoom
     var isMouseDown = false;
@@ -824,6 +851,26 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Zoom into the bounding box
         cy.fit(boundingBox);
+    });
+
+    /* Export Graph (PNG) */
+
+    // Event listener for the export button (PNG)
+    document.getElementById('export-png').addEventListener('click', function() {
+        var png = cy.png({ 
+            output: 'blob', //  Export as a blob URL
+            full: true,     //  Export the whole graph
+            scale: 3,       //  Increase the resolution (adjust as needed)
+            bg: '#fff'      //  Set the background color
+        }); 
+
+        // Create a link element to trigger the download
+        var link = document.createElement('a');
+        link.href = URL.createObjectURL(png);
+        link.download = 'cyto_network.png'; 
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
     });
 
     // Hide the loading spinner when the layout is complete
