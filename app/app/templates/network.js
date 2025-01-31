@@ -1,5 +1,6 @@
 document.addEventListener('DOMContentLoaded', function() {
     // Initialize Cytoscape
+    var filterEdges = {{ filter_edges|tojson }};  // Flag from Python
     var useBackgroundColor = {{ use_background_color|tojson }};  // Flag from Python
     var useShapes = {{ use_shapes|tojson }};
     var useClusterTooltip = {{ use_cluster_tooltip|tojson }};
@@ -88,74 +89,76 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         /* Edge Filtering */
-        var thresholdDegree = 10; // Threshold for node degree
-        var topEdges = 10;        // Number of edges to show for high-degree nodes
+        if (filterEdges) {
+            var thresholdDegree = 10; // Threshold for node degree
+            var topEdges = 10;        // Number of edges to show for high-degree nodes
 
-        // Calculate the degree for all nodes
-        var degreeCount = {};
-        cy.nodes().forEach(function(node) {
-            degreeCount[node.id()] = node.degree();
-        });
-
-        // Create a map for edges between high-degree nodes
-        var highDegreeEdges = {};
-
-        cy.edges().forEach(function(edge) {
-            var source = edge.source().id();
-            var target = edge.target().id();
-
-            // Check if both nodes exceed the degree threshold
-            if (degreeCount[source] >= thresholdDegree && degreeCount[target] >= thresholdDegree) {
-                // Add this edge to the list of high-degree edges
-                if (!highDegreeEdges[source]) highDegreeEdges[source] = [];
-                if (!highDegreeEdges[target]) highDegreeEdges[target] = [];
-
-                highDegreeEdges[source].push(edge);
-                highDegreeEdges[target].push(edge);
-            } else {
-                // Keep the edge as at least one node is below the threshold
-                edge.show();
-            }
-        });
-
-        // Reduce the number of edges for high-degree nodes
-        var hiddenEdges = new Set();
-        Object.keys(highDegreeEdges).forEach(function(nodeId) {
-            var edges = highDegreeEdges[nodeId];
-
-            // Sort edges by weight
-            var sortedEdges = edges.sort(function(a, b) {
-                return b.data('weight') - a.data('weight');
+            // Calculate the degree for all nodes
+            var degreeCount = {};
+            cy.nodes().forEach(function(node) {
+                degreeCount[node.id()] = node.degree();
             });
 
-            // Always show the strongest edge
-            if (sortedEdges.length > 0) {
-                sortedEdges[0].show();
-            }
+            // Create a map for edges between high-degree nodes
+            var highDegreeEdges = {};
 
-            // Show only the top edges for this node (starting from index 1 as the strongest edge is already shown)
-            for (var i = 1; i < sortedEdges.length && i < topEdges; i++) {
-                var edge = sortedEdges[i];
-                var edgeId = edge.id();
+            cy.edges().forEach(function(edge) {
+                var source = edge.source().id();
+                var target = edge.target().id();
 
-                // Check if the edge has already been shown
-                if (!hiddenEdges.has(edgeId)) {
+                // Check if both nodes exceed the degree threshold
+                if (degreeCount[source] >= thresholdDegree && degreeCount[target] >= thresholdDegree) {
+                    // Add this edge to the list of high-degree edges
+                    if (!highDegreeEdges[source]) highDegreeEdges[source] = [];
+                    if (!highDegreeEdges[target]) highDegreeEdges[target] = [];
+
+                    highDegreeEdges[source].push(edge);
+                    highDegreeEdges[target].push(edge);
+                } else {
+                    // Keep the edge as at least one node is below the threshold
                     edge.show();
-                    hiddenEdges.add(edgeId);  // Track shown edges to avoid duplicates
                 }
-            }
+            });
 
-            // Hide all remaining edges
-            for (var i = topEdges; i < sortedEdges.length; i++) {
-                var edge = sortedEdges[i];
-                var edgeId = edge.id();
+            // Reduce the number of edges for high-degree nodes
+            var hiddenEdges = new Set();
+            Object.keys(highDegreeEdges).forEach(function(nodeId) {
+                var edges = highDegreeEdges[nodeId];
 
-                if (!hiddenEdges.has(edgeId)) {
-                    edge.hide();
-                    hiddenEdges.add(edgeId);
+                // Sort edges by weight
+                var sortedEdges = edges.sort(function(a, b) {
+                    return b.data('weight') - a.data('weight');
+                });
+
+                // Always show the strongest edge
+                if (sortedEdges.length > 0) {
+                    sortedEdges[0].show();
                 }
-            }
-        });
+
+                // Show only the top edges for this node (starting from index 1 as the strongest edge is already shown)
+                for (var i = 1; i < sortedEdges.length && i < topEdges; i++) {
+                    var edge = sortedEdges[i];
+                    var edgeId = edge.id();
+
+                    // Check if the edge has already been shown
+                    if (!hiddenEdges.has(edgeId)) {
+                        edge.show();
+                        hiddenEdges.add(edgeId);  // Track shown edges to avoid duplicates
+                    }
+                }
+
+                // Hide all remaining edges
+                for (var i = topEdges; i < sortedEdges.length; i++) {
+                    var edge = sortedEdges[i];
+                    var edgeId = edge.id();
+
+                    if (!hiddenEdges.has(edgeId)) {
+                        edge.hide();
+                        hiddenEdges.add(edgeId);
+                    }
+                }
+            });
+        }
     });
 
     // Calculate the minimum and maximum TOM value

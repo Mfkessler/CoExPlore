@@ -3184,7 +3184,7 @@ def plot_cyto_network(config: PlotConfig, custom_filename: str = "cyto_network",
                       searchpath: str = "../flask/app_dev/templates/", use_colors: bool = True, use_shapes: bool = False,
                       cluster_info: Dict[str, str] = None, node_size: int = 10, highlight: List[str] = None, 
                       edge_width: int = 1, highlight_color: str = "magenta",
-                      use_edge_transparency: bool = False, use_edge_coloring: bool = True) -> str:
+                      use_edge_transparency: bool = False, use_edge_coloring: bool = True, filter_edges: bool = True) -> str:
     """
     Plot a network using Cytoscape.js and save it as an HTML file.
 
@@ -3202,6 +3202,10 @@ def plot_cyto_network(config: PlotConfig, custom_filename: str = "cyto_network",
     - highlight_color (str): Color to use for highlighting the nodes.
     - use_edge_transparency (bool): Whether to apply transparency to edges based on weights.
     - use_edge_coloring (bool): Whether to color edges based on weights.
+    - filter_edges (bool): Whether to filter edges.
+
+    Returns:
+    - The absolute path to the saved HTML file.
     """
     
     # Adding cluster information to each node
@@ -3233,6 +3237,7 @@ def plot_cyto_network(config: PlotConfig, custom_filename: str = "cyto_network",
     # Render the JS template
     js_template = env.get_template("network.js")
     js_content = js_template.render(network_data=network_data, 
+                                    filter_edges=filter_edges, 
                                     use_background_color=use_colors, 
                                     use_shapes=use_shapes,
                                     use_cluster_tooltip=cluster_info is not None,

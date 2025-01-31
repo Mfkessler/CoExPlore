@@ -33,7 +33,7 @@ def analyze_co_expression_network(adata: Union[AnnData, List[AnnData]], config: 
                                   highlight_color: str = "magenta", tool: str = "cytoscape",
                                   use_colors: bool = False, use_shapes: bool = False,
                                   node_size: int = 10, use_symmetry: bool = False, progress_callback: Callable[[str], None] = None,
-                                  trait: str = "tissue") -> dict:
+                                  trait: str = "tissue", filter_edges: bool = True) -> dict:
     """
     Analyze co-expression network for a given topic:
     - Plot the co-expression network and identify clusters.
@@ -69,6 +69,7 @@ def analyze_co_expression_network(adata: Union[AnnData, List[AnnData]], config: 
     - use_symmetry (bool): Use one half of the TOM matrix to generate the network.
     - progress_callback (Callable[[str], None]): Callback function to report progress.
     - trait (str): Column name in adata.obs containing the trait information.
+    - filter_edges (bool): Filter edges to increase performance.
 
     Returns:
     - dict: Eigengenes for clusters if out is not "html".
@@ -122,7 +123,8 @@ def analyze_co_expression_network(adata: Union[AnnData, List[AnnData]], config: 
         if progress_callback:
             progress_callback(f"Plotting {tool} network")
         plot_cyto_network(config, custom_filename=custom_filename, network_data=cyto_data, use_colors=use_colors, use_shapes=use_shapes,
-                          cluster_info=cluster_map, searchpath=template_path, node_size=node_size, highlight=highlight, highlight_color=highlight_color)
+                          cluster_info=cluster_map, searchpath=template_path, node_size=node_size, highlight=highlight, 
+                          highlight_color=highlight_color, filter_edges=filter_edges)
     else:
         if progress_callback:
             progress_callback(f"Plotting {tool} network")
