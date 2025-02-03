@@ -548,7 +548,7 @@ $(document).ready(function() {
                             console.log("Selected plot type:", selectedPlotType);
                             requestData.threshold = parseFloat(threshold);
                             requestData.highlightList = highlightList;
-                            requestData.useShapes = useShapes;
+                            requestData.useShapesSpecies = useShapesSpecies;
                             requestData.useColors = useColors;
                             requestData.plotOnly = plotOnly;
                             text = true;
@@ -1052,7 +1052,7 @@ $(document).ready(function() {
                 $('#plotTypeGroupBrowser').show();
                 $('#thresholdGroupBrowser').show();
                 $('#highlightListGroupBrowser').show();
-                $('#useShapesGroupBrowser').show();
+                $('#useShapesSpeciesGroupBrowser').show();
                 $('#useColorsGroupBrowser').show();
                 $('#plotOnlyGroupBrowser').show();
                 break;

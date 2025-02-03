@@ -1166,8 +1166,7 @@ def plot_overlap(overlap_matrix: pd.DataFrame, config: PlotConfig, column: str =
         zmax=data_max,
         # Colorbar adjustment
         colorbar=dict(
-            title="Jaccard Index",
-            titleside='right',
+            title=dict(text="Jaccard Index", side="right"),
             tickvals=[data_min, (data_min + data_max) / 2, data_max],  # Set tick labels dynamically
             ticktext=[f'{data_min:.2f}', f'{(data_min + data_max) / 2:.2f}', f'{data_max:.2f}'],  # Tick formatting
         ),

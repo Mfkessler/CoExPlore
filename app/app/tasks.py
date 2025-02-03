@@ -59,7 +59,7 @@ def plot_co_expression_network_task(self, data):
     transcripts = data.get('transcripts')
     logger.info(f"Transcripts before filtering: {len(transcripts)}")
     threshold = float(data.get('threshold', 0.1))
-    use_shapes = data.get('useShapes', False)
+    use_shapes = data.get('useShapesSpecies', False)
     use_colors = data.get('useColors', False)
     plot_only = data.get('plotOnly', False)
     highlight_list = data.get('highlightList', None)
