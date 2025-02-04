@@ -22,7 +22,6 @@ from pandas.api.types import is_numeric_dtype
 from jinja2 import Environment, FileSystemLoader
 from collections import defaultdict
 from scipy.spatial.distance import squareform
-from scipy.sparse import coo_matrix
 from sqlalchemy import text
 
 
@@ -1253,67 +1252,102 @@ def save_matrix_to_hdf5(table: pd.DataFrame, filename: str, save_sym_only: bool 
 
 
 def load_subset_from_hdf5(filename: str, rows: list, cols: list = None, threshold: float = None,
-                          index_map=None, columns_map=None, use_symmetry: bool = False) -> pd.DataFrame:
+                          index_map=None, columns_map=None, use_symmetry: bool = False,
+                          include_neighbours: bool = False, max_neighbors: int = 10) -> pd.DataFrame:
     """
     Loads a subset of a large HDF5 file into a pandas DataFrame.
-
+    Optionally, if include_neighbours is True, for each transcript in rows, the function
+    checks for neighbors with a connection value >= threshold and adds up to max_neighbors
+    (sorted by connection strength). After that, nodes without any valid connection are removed.
+    
     Parameters:
-    - filename (str): The name of the HDF5 file.
-    - rows (list): The list of row labels to load.
-    - cols (list): The list of column labels to load. If None, uses the same as rows.
-    - threshold (float): The threshold value to apply to the loaded subset.
-    - index_map (dict): A dictionary mapping row labels to indices.
-    - columns_map (dict): A dictionary mapping column labels to indices.
-    - use_symmetry (bool): If True, utilizes the symmetry of the TOM to load only half of the matrix.
-
+    - filename (str): HDF5 file name.
+    - rows (list): List of transcript labels (for both rows and columns).
+    - cols (list): List of transcript labels for columns. If None, uses rows.
+    - threshold (float): Only edges with value >= threshold are considered.
+    - index_map (dict): Mapping from transcript labels to row indices.
+    - columns_map (dict): Mapping from transcript labels to column indices.
+    - use_symmetry (bool): If True, uses symmetry (not supported with include_neighbours).
+    - include_neighbours (bool): If True, add neighbors with connection >= threshold.
+    - max_neighbors (int): Maximum number of neighbors to add per transcript.
+    
     Returns:
-    - pd.DataFrame: The subset of the data as a DataFrame.
+    - pd.DataFrame: The filtered TOM subset.
     """
 
-    # Remove duplicates and ensure lists
+    # Ensure unique lists for rows and cols
     rows = list(set(rows))
     if cols:
         cols = list(set(cols))
     else:
         cols = rows
 
-    # Load or create index maps
+    if include_neighbours:
+        if threshold is None:
+            raise ValueError("A threshold must be provided if include_neighbours is True.")
+        if use_symmetry:
+            raise NotImplementedError("include_neighbours is not supported with use_symmetry=True.")
+        # Load index maps if not provided
+        if index_map is None or columns_map is None:
+            with h5py.File(filename, 'r') as f:
+                file_index = [s.decode('utf-8') for s in f['index'][:]]
+                file_columns = [s.decode('utf-8') for s in f['columns'][:]]
+            index_map = {label: idx for idx, label in enumerate(file_index)}
+            columns_map = {label: idx for idx, label in enumerate(file_columns)}
+
+        new_transcripts = set(rows)
+        inv_columns_map = {v: k for k, v in columns_map.items()}
+
+        with h5py.File(filename, 'r') as f:
+            data = f['data']
+            for transcript in rows:
+                try:
+                    r_idx = index_map[transcript]
+                except KeyError:
+                    continue
+                row_data = data[r_idx, :]
+                # Find indices with value >= threshold
+                neighbor_idxs = np.where(row_data >= threshold)[0]
+                # Exclude self
+                neighbor_idxs = neighbor_idxs[neighbor_idxs != r_idx]
+                # If more than max_neighbors, select the strongest
+                if len(neighbor_idxs) > max_neighbors:
+                    sorted_idx = neighbor_idxs[np.argsort(row_data[neighbor_idxs])[::-1]]
+                    neighbor_idxs = sorted_idx[:max_neighbors]
+                for col_idx in neighbor_idxs:
+                    neighbor = inv_columns_map.get(col_idx)
+                    if neighbor is not None:
+                        new_transcripts.add(neighbor)
+        rows = list(new_transcripts)
+        cols = list(new_transcripts)
+
+    # Load or create index maps if not already provided
     if index_map is None or columns_map is None:
         with h5py.File(filename, 'r') as f:
-            index = [s.decode('utf-8') for s in f['index'][:]]
-            columns = [s.decode('utf-8') for s in f['columns'][:]]
-        index_map = {label: idx for idx, label in enumerate(index)}
-        columns_map = {label: idx for idx, label in enumerate(columns)}
+            file_index = [s.decode('utf-8') for s in f['index'][:]]
+            file_columns = [s.decode('utf-8') for s in f['columns'][:]]
+        index_map = {label: idx for idx, label in enumerate(file_index)}
+        columns_map = {label: idx for idx, label in enumerate(file_columns)}
 
-    # Map labels to indices
     try:
         row_indices = [index_map[row] for row in rows]
         col_indices = [columns_map[col] for col in cols]
     except KeyError as e:
-        raise Exception("Error: Label not found in index or columns - " + str(e))
+        raise Exception("Label not found in index or columns: " + str(e))
 
-    # Sort the indices
-    sorted_row_indices = np.argsort(row_indices)
-    sorted_col_indices = np.argsort(col_indices)
+    sorted_row_order = np.argsort(row_indices)
+    sorted_col_order = np.argsort(col_indices)
+    row_indices_sorted = np.array(row_indices)[sorted_row_order]
+    col_indices_sorted = np.array(col_indices)[sorted_col_order]
 
-    row_indices_sorted = np.array(row_indices)[sorted_row_indices]
-    col_indices_sorted = np.array(col_indices)[sorted_col_indices]
-
-    # Load the .h5 file and extract the required block
     try:
         with h5py.File(filename, 'r') as f:
             if use_symmetry:
-                # Only the upper triangle matrix is stored
                 data_upper = f['data_upper'][:]
                 n = f.attrs['n']
-
-                # Convert the flattened upper triangle matrix into a square matrix
                 full_matrix = squareform(data_upper)
-                # Add diagonal if not already present
                 if full_matrix.shape[0] < n:
                     full_matrix = np.pad(full_matrix, ((0, 1), (0, 1)), mode='constant', constant_values=0)
-
-                # Now extract the required rows and columns
                 block_data = full_matrix[np.ix_(row_indices_sorted, col_indices_sorted)]
             else:
                 data = f['data']
@@ -1322,16 +1356,12 @@ def load_subset_from_hdf5(filename: str, rows: list, cols: list = None, threshol
     except Exception as e:
         raise Exception("Error loading block from HDF5 file: " + str(e))
 
-    # Reorder data to original order
-    original_row_order = np.argsort(sorted_row_indices)
-    original_col_order = np.argsort(sorted_col_indices)
-
-    data_subset = block_data[original_row_order, :]
-    data_subset = data_subset[:, original_col_order]
+    original_row_order = np.argsort(sorted_row_order)
+    original_col_order = np.argsort(sorted_col_order)
+    data_subset = block_data[original_row_order, :][:, original_col_order]
 
     df_subset = pd.DataFrame(data_subset, index=rows, columns=cols)
 
-    # Apply threshold if specified
     if threshold is not None:
         np.fill_diagonal(df_subset.values, np.nan)
         mask = df_subset > threshold
