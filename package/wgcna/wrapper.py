@@ -33,7 +33,8 @@ def analyze_co_expression_network(adata: Union[AnnData, List[AnnData]], config: 
                                   highlight_color: str = "magenta", tool: str = "cytoscape",
                                   use_colors: bool = False, use_shapes: bool = False,
                                   node_size: int = 10, use_symmetry: bool = False, progress_callback: Callable[[str], None] = None,
-                                  trait: str = "tissue", filter_edges: bool = True) -> dict:
+                                  trait: str = "tissue", filter_edges: bool = True, include_neighbours: bool = False,
+                                  max_neighbors: int = 10) -> dict:
     """
     Analyze co-expression network for a given topic:
     - Plot the co-expression network and identify clusters.
@@ -70,6 +71,9 @@ def analyze_co_expression_network(adata: Union[AnnData, List[AnnData]], config: 
     - progress_callback (Callable[[str], None]): Callback function to report progress.
     - trait (str): Column name in adata.obs containing the trait information.
     - filter_edges (bool): Filter edges to increase performance.
+    - include_neighbours (bool): If True, for each transcript in rows, 
+                                check for neighbours with value >= threshold and include them.
+    - max_neighbors (int): Maximum number of neighbours to include.
 
     Returns:
     - dict: Eigengenes for clusters if out is not "html".
@@ -96,10 +100,12 @@ def analyze_co_expression_network(adata: Union[AnnData, List[AnnData]], config: 
 
     if isinstance(adata, list):
         tom, adata = get_tom_data(tom_path, adata, transcripts=transcripts, query=query, threshold=threshold, tom_prefix=tom_prefix, 
-                                  use_symmetry=use_symmetry, progress_callback=progress_callback)
+                                  use_symmetry=use_symmetry, progress_callback=progress_callback, include_neighbours=include_neighbours,
+                                  max_neighbors=max_neighbors)
     else:
         tom = get_tom_data(tom_path, adata, transcripts=transcripts, query=query, threshold=threshold, tom_prefix=tom_prefix, 
-                           use_symmetry=use_symmetry, progress_callback=progress_callback)
+                           use_symmetry=use_symmetry, progress_callback=progress_callback, include_neighbours=include_neighbours,
+                           max_neighbors=max_neighbors)
 
     title_suffix = topic
     print(f"Plotting co-expression network for {topic}")
@@ -196,7 +202,8 @@ def analyze_co_expression_network(adata: Union[AnnData, List[AnnData]], config: 
 
 def get_tom_data(tom_path: Union[str, List[str]], adata: Union[AnnData, List[AnnData]], transcripts: Dict[str, List[str]] = None, query: str = "GO:0009908", 
              threshold: float = 0.2, tom_prefix: str = "/vol/share/ranomics_app/data/tom", use_symmetry: bool = False, index_map: dict = None,
-             columns_map: dict = None, progress_callback: Callable[[str], None] = None) -> Union[pd.DataFrame, List[pd.DataFrame]]:
+             columns_map: dict = None, progress_callback: Callable[[str], None] = None,
+             include_neighbours: bool = False, max_neighbors: int = 10) -> Union[pd.DataFrame, List[pd.DataFrame]]:
     """
     This function loads the TOM matrix for one or multiple AnnData objects.
     
@@ -211,6 +218,9 @@ def get_tom_data(tom_path: Union[str, List[str]], adata: Union[AnnData, List[Ann
     - index_map (dict): A dictionary mapping row labels to indices.
     - columns_map (dict): A dictionary mapping column labels to indices.
     - progress_callback (Callable[[str], None]): Callback function to report progress.
+    - include_neighbours (bool): If True, for each transcript in rows,
+                                check for neighbours with value >= threshold and include them.  
+    - max_neighbors (int): Maximum number of neighbours to include.
 
     Returns:
     - tom (Union[np.ndarray, List[np.ndarray]]): The loaded TOM matrix or a list of TOM matrices.
@@ -248,7 +258,8 @@ def get_tom_data(tom_path: Union[str, List[str]], adata: Union[AnnData, List[Ann
             if progress_callback:
                 progress_callback(f"Loading {len(current_transcripts)} transcripts from TOM of dataset {ad.uns['name']}")
             tom = load_subset_from_hdf5(filename=current_tom_path, rows=current_transcripts, cols=current_transcripts, 
-                                        threshold=threshold, use_symmetry=use_symmetry, index_map=index_map, columns_map=columns_map)
+                                        threshold=threshold, use_symmetry=use_symmetry, index_map=index_map, columns_map=columns_map,
+                                        include_neighbours=include_neighbours, max_neighbors=max_neighbors)
             print(f"Transcripts after filtering: {tom.shape[0]}")
             toms.append(tom)
             valid_adatas.append(ad)
@@ -277,7 +288,8 @@ def get_tom_data(tom_path: Union[str, List[str]], adata: Union[AnnData, List[Ann
         print(f"Loading {len(transcripts)} transcripts from {tom_path}")
         if progress_callback:
             progress_callback(f"Loading {len(transcripts)} transcripts from TOM of dataset {adata.uns['name']}")
-        tom = load_subset_from_hdf5(filename=tom_path, rows=transcripts, cols=transcripts, threshold=threshold, use_symmetry=use_symmetry)
+        tom = load_subset_from_hdf5(filename=tom_path, rows=transcripts, cols=transcripts, threshold=threshold, use_symmetry=use_symmetry,
+                                    include_neighbours=include_neighbours, max_neighbors=max_neighbors)
         print(f"Transcripts after filtering: {tom.shape[0]}")
 
         tom = tom.astype("float64")
