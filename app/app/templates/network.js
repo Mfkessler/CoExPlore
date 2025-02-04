@@ -98,13 +98,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 shapeElement = document.createElementNS(svgNS, "polygon");
                 shapeElement.setAttribute("points", "5,2 15,2 18,10 15,18 5,18 2,10");
                 break;
-            case 'heptagon':
+            case 'barrel':
                 shapeElement = document.createElementNS(svgNS, "polygon");
-                shapeElement.setAttribute("points", "10,1 17,5 19,12 15,18 5,18 1,12 3,5");
+                shapeElement.setAttribute("points", "4,2 16,2 18,6 18,14 16,18 4,18 2,14 2,6");
                 break;
-            case 'octagon':
+            case 'tag':
                 shapeElement = document.createElementNS(svgNS, "polygon");
-                shapeElement.setAttribute("points", "7,1 13,1 19,7 19,13 13,19 7,19 1,13 1,7");
+                shapeElement.setAttribute("points", "2,2 14,2 18,10 14,18 2,18");
                 break;
             case 'vee':
                 shapeElement = document.createElementNS(svgNS, "polygon");
@@ -125,15 +125,24 @@ document.addEventListener('DOMContentLoaded', function() {
         shapeElement.setAttribute("fill", color);
         svg.appendChild(shapeElement);
         return svg;
-    }
+    }    
 
     cy.ready(function() {
         /* Shape assignment based on organism */
         if (useShapes) {
             const availableShapes = [
-                'ellipse', 'triangle', 'rectangle', 'diamond', 'pentagon', 
-                'hexagon', 'heptagon', 'octagon', 'vee', 'rhomboid'
+                'ellipse',
+                'triangle',
+                'rectangle',
+                'diamond',
+                'pentagon',
+                'tag',
+                'vee',
+                'rhomboid',
+                'hexagon',
+                'barrel',
             ];
+              
             let organismShapes = {};
 
             // Determine unique organisms
