@@ -60,20 +60,85 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
+    /* SVG Shape Creation */
+    function createShapeSVG(shape, color = 'black', size = 15) {
+        const svgNS = "http://www.w3.org/2000/svg";
+        const svg = document.createElementNS(svgNS, "svg");
+        svg.setAttribute("width", size);
+        svg.setAttribute("height", size);
+        svg.setAttribute("viewBox", "0 0 20 20");
+        let shapeElement;
+        switch(shape) {
+            case 'ellipse':
+                shapeElement = document.createElementNS(svgNS, "circle");
+                shapeElement.setAttribute("cx", "10");
+                shapeElement.setAttribute("cy", "10");
+                shapeElement.setAttribute("r", "9");
+                break;
+            case 'triangle':
+                shapeElement = document.createElementNS(svgNS, "polygon");
+                shapeElement.setAttribute("points", "10,2 18,18 2,18");
+                break;
+            case 'rectangle':
+                shapeElement = document.createElementNS(svgNS, "rect");
+                shapeElement.setAttribute("x", "2");
+                shapeElement.setAttribute("y", "2");
+                shapeElement.setAttribute("width", "16");
+                shapeElement.setAttribute("height", "16");
+                break;
+            case 'diamond':
+                shapeElement = document.createElementNS(svgNS, "polygon");
+                shapeElement.setAttribute("points", "10,2 18,10 10,18 2,10");
+                break;
+            case 'pentagon':
+                shapeElement = document.createElementNS(svgNS, "polygon");
+                shapeElement.setAttribute("points", "10,2 18,8 15,18 5,18 2,8");
+                break;
+            case 'hexagon':
+                shapeElement = document.createElementNS(svgNS, "polygon");
+                shapeElement.setAttribute("points", "5,2 15,2 18,10 15,18 5,18 2,10");
+                break;
+            case 'heptagon':
+                shapeElement = document.createElementNS(svgNS, "polygon");
+                shapeElement.setAttribute("points", "10,1 17,5 19,12 15,18 5,18 1,12 3,5");
+                break;
+            case 'octagon':
+                shapeElement = document.createElementNS(svgNS, "polygon");
+                shapeElement.setAttribute("points", "7,1 13,1 19,7 19,13 13,19 7,19 1,13 1,7");
+                break;
+            case 'vee':
+                shapeElement = document.createElementNS(svgNS, "polygon");
+                shapeElement.setAttribute("points", "2,2 10,18 18,2");
+                break;
+            case 'rhomboid':
+                shapeElement = document.createElementNS(svgNS, "polygon");
+                shapeElement.setAttribute("points", "4,2 16,2 12,18 0,18");
+                break;
+            default:
+                shapeElement = document.createElementNS(svgNS, "rect");
+                shapeElement.setAttribute("x", "2");
+                shapeElement.setAttribute("y", "2");
+                shapeElement.setAttribute("width", "16");
+                shapeElement.setAttribute("height", "16");
+                break;
+        }
+        shapeElement.setAttribute("fill", color);
+        svg.appendChild(shapeElement);
+        return svg;
+    }
+
     cy.ready(function() {
         /* Shape assignment based on organism */
         if (useShapes) {
             const availableShapes = [
                 'ellipse', 'triangle', 'rectangle', 'diamond', 'pentagon', 
-                'hexagon', 'heptagon', 'octagon', 'vee', 'rhomboid' 
-            ]; // At least 10 shapes
+                'hexagon', 'heptagon', 'octagon', 'vee', 'rhomboid'
+            ];
+            let organismShapes = {};
 
-            let organismShapes = {};  // Stores mapping from organism to shape
-
-            // Identify unique organisms
+            // Determine unique organisms
             let uniqueOrganisms = [...new Set(cy.nodes().map(node => node.data('organism')))];
-            
-            // Assign shapes to organisms cyclically
+            // Assign shapes cyclically
             uniqueOrganisms.forEach((organism, index) => {
                 organismShapes[organism] = availableShapes[index % availableShapes.length];
             });
@@ -85,6 +150,29 @@ document.addEventListener('DOMContentLoaded', function() {
                     let newShape = organismShapes[organism] || 'ellipse';
                     node.style('shape', newShape);
                 });
+            });
+
+            // Dynamically build species legend with SVG symbols, a space, and italic species names
+            let speciesLegendList = document.getElementById('species-legend-list');
+            speciesLegendList.innerHTML = ''; // Clear the list
+            Object.keys(organismShapes).forEach(species => {
+                let shape = organismShapes[species];
+
+                let li = document.createElement('li');
+                li.style.marginBottom = '5px';
+
+                // Create SVG icon for the respective shape
+                let svgElement = createShapeSVG(shape);
+                svgElement.classList.add('legend-shape');
+                li.appendChild(svgElement);
+
+                // Add species name
+                let speciesSpan = document.createElement('span');
+                speciesSpan.classList.add('legend-species');
+                speciesSpan.textContent = species;
+                li.appendChild(speciesSpan);
+
+                speciesLegendList.appendChild(li);
             });
         }
 
@@ -291,18 +379,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Toggle Legend
     document.getElementById('toggle-legend').addEventListener('click', function() {
-        if (legend.style.display === 'none' || legend.style.visibility === 'hidden' || legend.style.opacity === '0') {
-            legend.style.display = 'block';
-            legend.style.opacity = '1';
-            legend.style.visibility = 'visible';
-            this.classList.add('active');
-        } else {
-            legend.style.display = 'none';
-            legend.style.opacity = '0';
-            legend.style.visibility = 'hidden';
-            this.classList.remove('active');
-        }
-    });
+        var legend = document.getElementById('legend');
+        legend.classList.toggle('hidden');
+        this.classList.toggle('active');
+      });
 
     /* Highlight Button */
 

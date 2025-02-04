@@ -58,15 +58,24 @@
     <div id="button-tooltip"></div>
 
     <!-- Legend -->
-    <div id="legend" style="display: none;">
-        <p><b>Edge Weight (TOM Value)</b></p>
-        <div style="display: flex; align-items: center;">
-            <div style="width: 100px; height: 10px; background: linear-gradient(to right, #440154, #3b528b, #21918c, #5dc962, #fde725);" id="legend-gradient"></div>
-            <span style="margin-left: 10px;" id="minTOM"></span>
-            <span style="margin-left: 5px; margin-right: 5px;">→</span>
+    <div id="legend" class="hidden">
+        <!-- Edge Weight (TOM Value) -->
+        <div id="edge-legend">
+          <p><b>TOM Value</b></p>
+          <div style="display: flex; align-items: center;">
+            <div id="legend-gradient" style="width: 100px; height: 10px; background: linear-gradient(to right, #440154, #3b528b, #21918c, #5dc962, #fde725);"></div>
+            <span id="minTOM" style="margin-left: 10px;"></span>
+            <span style="margin: 0 5px;">→</span>
             <span id="maxTOM"></span>
+          </div>
         </div>
-    </div>
+        
+        <!-- Species Legend -->
+        <div id="species-legend">
+            <p><b>Species</b></p>
+            <ul id="species-legend-list" style="list-style: none; padding: 0; margin: 0;"></ul>
+          </div>
+      </div>
       
     <script>
         {{ js_content | safe }}

@@ -117,6 +117,30 @@ html, body {
     transition: opacity 0.5s ease, visibility 0.5s ease, top 0.5s ease;
 }
 
+.hidden {
+    display: none;
+    opacity: 0;
+    visibility: hidden;
+  }
+  
+#legend > div {
+    margin-bottom: 10px;
+}
+
+#legend > div:last-child {
+    margin-bottom: 0;
+}
+
+.legend-species {
+    font-style: italic;
+    margin-left: 5px;
+}
+
+#species-legend-list li {
+    display: flex;
+    align-items: center;
+}
+
 #button-tooltip {
     position: absolute;
     display: none;
