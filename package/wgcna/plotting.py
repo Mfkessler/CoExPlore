@@ -2717,7 +2717,7 @@ def plot_eigengene_expression_bokeh(df: pd.DataFrame, config, custom_filename: s
     # Create the figure
     p = figure(
         x_range=FactorRange(*x_factors),
-        title='Eigengene Expression Across Tissues and Clusters',
+        title='Eigengene Expression Across Traits and Clusters',
         toolbar_location="above",
         sizing_mode="stretch_both"
     )
@@ -2726,7 +2726,7 @@ def plot_eigengene_expression_bokeh(df: pd.DataFrame, config, custom_filename: s
 
     # Add HoverTool for bars
     hover_bars = HoverTool(tooltips=[
-        ('Tissue', '@Tissue'),
+        ('Trait', '@Tissue'),
         ('Cluster', '@Cluster'),
         ('Mean Expression', '@Expression'),
         ('Std Dev', '@std')
@@ -2735,7 +2735,7 @@ def plot_eigengene_expression_bokeh(df: pd.DataFrame, config, custom_filename: s
 
     # Add HoverTool for individual points
     hover_points = HoverTool(tooltips=[
-        ('Tissue', '@Tissue'),
+        ('Trait', '@Tissue'),
         ('Cluster', '@Cluster'),
         ('Expression', '@Expression'),
         ('Sample', '@Sample'),
@@ -2788,7 +2788,7 @@ def plot_eigengene_expression_bokeh(df: pd.DataFrame, config, custom_filename: s
     hover_points.renderers.append(points)
 
     # MultiSelect for tissues
-    tissue_multiselect = MultiSelect(title="Select Tissues:", value=default_selected_tissues, options=tissues, size=8)
+    tissue_multiselect = MultiSelect(title="Select Traits:", value=default_selected_tissues, options=tissues, size=8)
 
     # CustomJS callback for MultiSelect
     callback = CustomJS(args=dict(

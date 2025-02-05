@@ -445,8 +445,6 @@ def process_eigengenes(adata: Union[AnnData, List[AnnData]], cluster_map: dict, 
         progress_callback(f"Plotting combined eigengene expression")
     combined_plot_path = plot_eigengene_expression_bokeh(combined_eigengene_data, config,
                                                     custom_filename=f"{custom_filename}_combined_bokeh")
-    combined_plot_path_old = plot_eigengene_expression(combined_eigengene_data, config, height=None, width=None, 
-                                                    custom_filename=f"{custom_filename}_combined")
     
     # Combine all module info DataFrames if needed
     combined_module_info_df = pd.concat(all_module_info_dfs, ignore_index=False)
