@@ -942,25 +942,43 @@ document.addEventListener('DOMContentLoaded', function() {
         cy.fit(boundingBox);
     });
 
-    /* Export Graph (PNG) */
-
-    // Event listener for the export button (PNG)
     document.getElementById('export-png').addEventListener('click', function() {
-        var png = cy.png({ 
-            output: 'blob', //  Export as a blob URL
-            full: true,     //  Export the whole graph
-            scale: 3,       //  Increase the resolution (adjust as needed)
-            bg: '#fff'      //  Set the background color
-        }); 
-
-        // Create a link element to trigger the download
-        var link = document.createElement('a');
-        link.href = URL.createObjectURL(png);
-        link.download = 'cyto_network.png'; 
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        var exportScale = 2; // Higher resolution (2x)
+        var cyImageData = cy.png({ full: false, scale: exportScale }); // Only visible area!
+    
+        var cyImage = new Image();
+        cyImage.src = cyImageData;
+    
+        cyImage.onload = function() {
+            createExportImage(cyImage);
+        };
     });
+    
+    /* Export Image */
+    function createExportImage(cyImage) {
+        var exportCanvas = document.createElement('canvas');
+        var ctx = exportCanvas.getContext('2d');
+    
+        // Define canvas size based on Cytoscape container
+        var width = cy.container().clientWidth * 2;
+        var height = cy.container().clientHeight * 2;
+    
+        exportCanvas.width = width;
+        exportCanvas.height = height;
+    
+        // Set background color
+        ctx.fillStyle = 'white';
+        ctx.fillRect(0, 0, width, height);
+    
+        // Draw Cytoscape graph
+        ctx.drawImage(cyImage, 0, 0, width, height);
+    
+        // Save as PNG
+        var link = document.createElement('a');
+        link.download = 'cytoscape_export.png';
+        link.href = exportCanvas.toDataURL('image/png');
+        link.click();
+    }             
 
     // Hide the loading spinner when the layout is complete
     cy.on('render', function(){
