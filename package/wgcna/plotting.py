@@ -3206,6 +3206,10 @@ def plot_cyto_network(config: PlotConfig, custom_filename: str = "cyto_network",
     Returns:
     - The absolute path to the saved HTML file.
     """
+
+    # If highlight is a string, convert it to a list
+    if isinstance(highlight, str):
+        highlight = [highlight]
     
     # Adding cluster information to each node
     if cluster_info:
@@ -3221,7 +3225,7 @@ def plot_cyto_network(config: PlotConfig, custom_filename: str = "cyto_network",
 
     if highlight:
         for node in network_data['nodes']:
-            if node['data']['id'] in highlight:
+            if node['data']['gene'] in highlight:
                 node['data']['highlighted'] = True
             else:
                 node['data']['highlighted'] = False
