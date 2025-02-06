@@ -22,11 +22,20 @@ def main():
 
     # Create browser table
     df = rortho.transcript_ortho_browser("", adatas)
-    # Add columns if they do not exist
+
+    # Add optional columns if they do not exist
     if 'ortho_id' not in df.columns:
         df['ortho_id'] = ""
     if 'ortho_count' not in df.columns:
         df['ortho_count'] = 0
+    if 'ipr_id' not in df.columns:
+        df['ipr_id'] = ""
+    if 'ipr_desc' not in df.columns:
+        df['ipr_desc'] = ""
+    if 'go_terms' not in df.columns:
+        df['go_terms'] = ""
+    if 'unique_go_terms' not in df.columns:
+        df['unique_go_terms'] = ""
 
     df.to_sql('wgcna_browser', engine, if_exists='replace', index=True)
     print("Table wgcna_browser created successfully!")
