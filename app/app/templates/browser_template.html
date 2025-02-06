@@ -155,19 +155,19 @@
                     }
                 },
                 "columns": [
-                    { "data": "species" },
-                    { "data": "transcript" },
-                    { "data": "modulecolors" },
-                    { "data": "modulelabels" },
-                    { "data": "go_terms" },
-                    { "data": "total_counts" },
-                    { "data": "ortho_id" },
-                    { "data": "module_count" },
-                    { "data": "unique_modules" },
-                    { "data": "unique_go_terms" },
-                    { "data": "ortho_count" },
-                    { "data": "ipr_id" },
-                    { "data": "ipr_desc" }
+                    { "data": "species", autoToggle: true },
+                    { "data": "transcript", autoToggle: true },
+                    { "data": "modulecolors", autoToggle: true },
+                    { "data": "modulelabels", autoToggle: false },
+                    { "data": "go_terms", autoToggle: true },
+                    { "data": "total_counts", autoToggle: false },
+                    { "data": "ortho_id", autoToggle: true },
+                    { "data": "module_count", autoToggle: false },
+                    { "data": "unique_modules", autoToggle: false },
+                    { "data": "unique_go_terms", autoToggle: false },
+                    { "data": "ortho_count", autoToggle: false },
+                    { "data": "ipr_id", autoToggle: true },
+                    { "data": "ipr_desc", autoToggle: true }
                 ],
                 responsive: true,
                 dom: 'Bfrtip',
@@ -246,7 +246,10 @@
                     { targets: [2, 3, 5, 7, 8, 9, 10], visible: false }
                 ],
                 initComplete: function() {
+                    toggleEmptyColumns(this.api());
+
                     $('#browserRes').on('draw.dt', function() {
+                        toggleEmptyColumns(table);
                         sendHeight();
                     });
 
@@ -283,6 +286,26 @@
                     }
                 }
             });
+
+            function toggleEmptyColumns(api) {
+                api.columns().every(function() {
+                    var column = this;
+                    // Get the column settings (including custom properties)
+                    var colSettings = column.settings()[0].aoColumns[column.index()];
+                    // Skip if autoToggle is explicitly disabled
+                    if (colSettings.autoToggle === false) {
+                        return;
+                    }
+                    // Check if all values in the column are empty (for the current page)
+                    var isEmpty = column.data().toArray().every(function(value) {
+                        return value === null ||
+                            value === undefined ||
+                            (typeof value === 'string' && value.trim() === '');
+                    });
+                    // Hide the column if it is empty, otherwise show it
+                    column.visible(!isEmpty);
+                });
+            }
 
             function sendHeight() {
                 var height = document.body.scrollHeight;
