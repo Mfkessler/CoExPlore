@@ -666,6 +666,11 @@ def add_ortho_id_to_anndata(adata: AnnData, mapping_file: str, column_name: str)
     - column_name (str): Name of the column in the mapping file that contains the identifiers to be mapped.
     """
 
+    if not os.path.exists(mapping_file):
+        print(f"Warning: Mapping file '{mapping_file}' not found. Filling 'ortho_ID' with empty strings.")
+        adata.var['ortho_ID'] = ''
+        return
+
     ortho_df = pd.read_csv(mapping_file, sep="\t", usecols=["HOG", column_name], index_col="HOG")
     
     adata.var['ortho_ID'] = None
@@ -2230,6 +2235,11 @@ def add_go_terms_to_adata(adata: AnnData, go_mapping_file: str) -> AnnData:
     - AnnData: Updated AnnData object with a new 'go_terms' column in var.
     """
     
+    if not os.path.exists(go_mapping_file):
+        print(f"Warning: GO mapping file '{go_mapping_file}' not found. Filling 'go_terms' with empty strings.")
+        adata.var["go_terms"] = ''
+        return adata
+    
     # Load GO term mapping file into a DataFrame
     go_df = pd.read_csv(go_mapping_file, sep="\t", header=None, names=["transcript", "go_terms"])
     
@@ -2245,7 +2255,7 @@ def add_go_terms_to_adata(adata: AnnData, go_mapping_file: str) -> AnnData:
     # Map GO terms to adata.var.index
     adata.var["go_terms"] = adata.var.index.map(go_dict)
     
-    # Replace missing mappings with NaN
+    # Replace missing mappings with empty strings
     adata.var["go_terms"] = adata.var["go_terms"].fillna('')
     
     return adata
@@ -2262,6 +2272,12 @@ def add_ipr_columns(adata: AnnData, ipr_mapping_file: str) -> AnnData:
     Returns:
     - AnnData: Updated AnnData object with new 'ipr_id' and 'ipr_desc' columns.
     """
+    
+    if not os.path.exists(ipr_mapping_file):
+        print(f"Warning: IPR mapping file '{ipr_mapping_file}' not found. Filling 'ipr_id' and 'ipr_desc' with empty strings.")
+        adata.var["ipr_id"] = ''
+        adata.var["ipr_desc"] = ''
+        return adata
     
     # Load the IPR mapping file
     ipr_df = pd.read_csv(ipr_mapping_file, sep="\t", header=None, names=["transcript", "ipr_id", "ipr_desc"])
