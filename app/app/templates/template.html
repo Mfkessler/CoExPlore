@@ -170,13 +170,14 @@
                                 </div>
                             </div>
 
-                            <!-- Settings Card -->
-                            <div id="settingsCard" style="display: none;">
-                                <div class="card-body">
-                                    <h5 class="card-title">Settings</h5>
+                            <!-- Settings Card using details/summary for toggle with arrow and fade-in effect -->
+                            <details id="settingsCard" class="card">
+                                <!-- The summary element acts as the clickable header -->
+                                <summary class="card-header">Settings</summary>
+                                <!-- Toggle content will be hidden by default and shown on toggle -->
+                                <div class="toggle-content">
                                     <div class="row justify-content-center mt-3">
                                         <div class="col-md-4 col-lg-6">
-
                                             <!-- Output Prefix Control -->
                                             <div class="control-group mb-3">
                                                 <label for="outputPrefix" class="control-label">Output Prefix</label>
@@ -184,7 +185,6 @@
                                                     <input type="text" class="form-control" id="outputPrefix" placeholder="Enter output prefix">
                                                 </div>
                                             </div>
-
                                             <!-- Display in New Window Control -->
                                             <div class="control-group mb-3">
                                                 <label for="displayInNewWindow" class="control-label">Display Results in New Window</label>
@@ -198,7 +198,7 @@
                                         </div>
                                     </div>
                                 </div>
-                            </div>
+                            </details>
                         </div>
                     </div>
                 </div>

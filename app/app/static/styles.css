@@ -302,3 +302,53 @@ html, body {
     max-width: 100%;
     padding: 0 15px;
 }
+
+.card {
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    margin: 10px 0;
+}
+
+.card-header {
+    background-color: #f7f7f7;
+    padding: 10px 15px;
+    font-size: 1.25rem;
+    border-bottom: 1px solid #ddd;
+    cursor: pointer;
+    position: relative;
+    list-style: none;
+}
+
+.card-header:hover {
+    background-color: #eaeaea;
+}
+
+summary::after {
+    content: "\25BC";
+    position: absolute;
+    right: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    transition: transform 0.3s ease;
+}
+
+details[open] summary::after {
+    transform: translateY(-50%) rotate(180deg);
+}
+
+summary::-webkit-details-marker {
+    display: none;
+}
+
+.toggle-content {
+    max-height: 0;
+    opacity: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease, opacity 0.3s ease;
+}
+
+details[open] .toggle-content {
+    max-height: 500px;
+    opacity: 1;
+    padding: 15px;
+}
