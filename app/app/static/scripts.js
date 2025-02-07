@@ -945,6 +945,7 @@ $(document).ready(function() {
     function updateInputFields(){
         var shapeLabel = document.getElementById("useShapesLabel");
         var selectedAnalysis = getAnalysisTypeWithoutSuffix();
+        var hasParameters = false;
 
         $(".general-analysis-description").hide();
         $("#generalHelpIcon").show();
@@ -973,14 +974,17 @@ $(document).ready(function() {
         switch (selectedAnalysis) {
             case 'plot_co_expression_network':
                 $('#thresholdGroup').show();
+                hasParameters = true;
                 break;
             case 'highest_expr_genes':
                 $('#nTopGroup').show();
+                hasParameters = true;
                 break;
             case 'plot_correlation_network':
                 $('#thresholdGroup').show();
                 $('#useShapesGroup').show();
                 $('#useColorsGroup').show();
+                hasParameters = true;
                 break;
             case 'plot_species_correlation_network':
                 $('#thresholdGroup').show();
@@ -989,28 +993,40 @@ $(document).ready(function() {
                 $('#useShapesGroup').show();
                 $('#useColorsGroup').show();
                 $('#interSpeciesOnlyGroup').show();
+                hasParameters = true;
                 break;
             case 'plot_module_goea':
                 $('#maxPvalGroup').show();
                 $('#minFeGroup').show();
                 $('#minDepthGroup').show();
                 $('#nTopPercentGroup').show();
+                hasParameters = true;
                 break;
             case 'plot_jaccard_tissues':
                 $('#nTopGroup').show();
                 $('#thresholdGroup').show();
                 $('#useShapesGroup').show();
                 $('#interSpeciesOnlyGroup').show();
+                hasParameters = true;
                 break;
             case 'plot_tissues_corr':
                 $('#nTopGroup').show();
+                hasParameters = true;
                 break;
             case 'plot_jaccard_modules':
                 $('#thresholdGroup').show();
                 $('#useShapesGroup').show();
                 $('#useColorsGroup').show();
                 $('#interSpeciesOnlyGroup').show();
+                hasParameters = true;
                 break;
+            default:
+                hasParameters = false;
+        }
+        if (hasParameters) {
+            $('#wholeParametersToggle').show();
+        } else {
+            $('#wholeParametersToggle').hide();
         }
     }
 
@@ -1022,6 +1038,7 @@ $(document).ready(function() {
     function updateBrowserInputFields(){
         var selectedAnalysis = getBrowserAnalysisTypeWithoutSuffix();
         var browserButton = $('#runBrowserAnalysis');
+        var hasParameters = false;
 
         $(".analysis-description").hide();
         $("#browserHelpIcon").show();
@@ -1055,12 +1072,14 @@ $(document).ready(function() {
                 $('#useShapesSpeciesGroupBrowser').show();
                 $('#useColorsGroupBrowser').show();
                 $('#plotOnlyGroupBrowser').show();
+                hasParameters = true;
                 break;
             case 'plot_go_terms':
                 $('#maxPvalGroupBrowser').show();
                 $('#minFeGroupBrowser').show();
                 $('#minDepthGroupBrowser').show();
                 $('#nTopPercentGroupBrowser').show();
+                hasParameters = true;
                 break;
             case 'plot_filtered_jaccard_modules':
                 $('#thresholdGroupBrowser').show();
@@ -1068,15 +1087,26 @@ $(document).ready(function() {
                 $('#useColorsGroupBrowser').show();
                 $('#interSpeciesOnlyGroupBrowser').show();
                 $('#minOrthosGroupBrowser').show();
+                hasParameters = true;
                 break;
             case 'plot_filtered_jaccard_species':
                 $('#thresholdGroupBrowser').show();
                 $('#useShapesSpeciesGroupBrowser').show();
                 $('#minOrthosGroupBrowser').show();
+                hasParameters = true;
                 break;
             case 'not_implemented':
+                hasParameters = false;
                 console.log("Analysis not implemented yet");
                 browserButton.prop('disabled', true);
+                break;
+            default:
+                hasParameters = false;
+        }
+        if (hasParameters) {
+            $('#browserParametersToggle').show();
+        } else {
+            $('#browserParametersToggle').hide();
         }
     }
 
@@ -1184,7 +1214,7 @@ $(document).ready(function() {
         updatePlantSelection();
         $("#plant").prop("disabled", false);
     }
-    
+        
     handleSelectionChange();
 
     $('#selectPlantsCard').fadeIn();
