@@ -323,32 +323,44 @@ html, body {
     background-color: #eaeaea;
 }
 
-summary::after {
-    content: "\25BC";
-    position: absolute;
-    right: 15px;
-    top: 50%;
-    transform: translateY(-50%);
-    transition: transform 0.3s ease;
+/* Toggle Section Styling */
+details > summary {
+    list-style: none;
+    outline: none;
+    cursor: pointer;
 }
 
-details[open] summary::after {
-    transform: translateY(-50%) rotate(180deg);
-}
-
-summary::-webkit-details-marker {
+details > summary::-webkit-details-marker {
     display: none;
 }
 
+.toggle-header {
+    font-size: 1.25rem;
+    display: inline-flex;
+    align-items: center;
+    padding: 0;
+    background: none;
+    border: none;
+}
+
+.toggle-header::after {
+    content: "\25BC";
+    margin-left: 5px;
+    transition: transform 0.3s ease;
+}
+
+details[open] .toggle-header::after {
+    transform: rotate(180deg);
+}
+
 .toggle-content {
-    max-height: 0;
     opacity: 0;
-    overflow: hidden;
-    transition: max-height 0.3s ease, opacity 0.3s ease;
+    transform: translateY(-10px);
+    transition: opacity 0.3s ease, transform 0.3s ease;
 }
 
 details[open] .toggle-content {
-    max-height: 500px;
     opacity: 1;
-    padding: 15px;
+    transform: translateY(0);
+    margin-top: 10px;
 }

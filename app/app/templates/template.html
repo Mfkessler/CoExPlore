@@ -171,9 +171,9 @@
                             </div>
 
                             <!-- Settings Card using details/summary for toggle with arrow and fade-in effect -->
-                            <details id="settingsCard" class="card">
+                            <details id="settingsCard">
                                 <!-- The summary element acts as the clickable header -->
-                                <summary class="card-header">Settings</summary>
+                                <summary class="toggle-header">Settings</summary>
                                 <!-- Toggle content will be hidden by default and shown on toggle -->
                                 <div class="toggle-content">
                                     <div class="row justify-content-center mt-3">
@@ -295,132 +295,126 @@
                                         </div>                     
                                     </div>
 
-                                    <!-- Browser Analysis Controls -->
-                                    <div class="row justify-content-center mt-3">
-                                        <div class="col-md-6 col-lg-8">
-                                            <!-- Form Groups -->
-                                            
-                                            <div class="control-group mb-3" id="plotTypeGroupBrowser" style="display: none;">
-                                                <label class="control-label">Select Tool</label>
-                                                <div class="control-input">
-                                                    <div class="form-check form-check-inline">
-                                                        <input class="form-check-input" type="radio" name="plotType" id="plotTypePlotly" value="plotly">
-                                                        <label class="form-check-label" for="plotTypePlotly">Plotly</label>
+                                    <!-- Analysis Parameters Toggle without Box -->
+                                    <details id="parametersToggle">
+                                        <!-- Toggle header: only text with arrow indicator -->
+                                        <summary class="toggle-header">Parameters</summary>
+                                        <!-- Toggle content: parameter controls -->
+                                        <div class="toggle-content">
+                                            <!-- Browser Analysis Controls -->
+                                            <div class="row justify-content-center mt-3">
+                                                <div class="col-md-6 col-lg-8">
+                                                    <!-- Form Groups -->
+                                                    <div class="control-group mb-3" id="plotTypeGroupBrowser" style="display: none;">
+                                                        <label class="control-label">Select Tool</label>
+                                                        <div class="control-input">
+                                                            <div class="form-check form-check-inline">
+                                                                <input class="form-check-input" type="radio" name="plotType" id="plotTypePlotly" value="plotly">
+                                                                <label class="form-check-label" for="plotTypePlotly">Plotly</label>
+                                                            </div>
+                                                            <div class="form-check form-check-inline">
+                                                                <input class="form-check-input" type="radio" name="plotType" id="plotTypeCytoscape" value="cytoscape" checked>
+                                                                <label class="form-check-label" for="plotTypeCytoscape">Cytoscape</label>
+                                                            </div>
+                                                        </div>
                                                     </div>
-                                                    <div class="form-check form-check-inline">
-                                                        <input class="form-check-input" type="radio" name="plotType" id="plotTypeCytoscape" value="cytoscape" checked>
-                                                        <label class="form-check-label" for="plotTypeCytoscape">Cytoscape</label>
+                                                    <div class="control-group mb-3" id="nTopPercentGroupBrowser" style="display: none;">
+                                                        <label for="nTopPercentBrowser" class="control-label">Percentage of Highest Expressed Transcripts</label>
+                                                        <div class="control-input">
+                                                            <input type="number" class="form-control" id="nTopPercentBrowser" placeholder="Enter top percentage" step="0.1" value="1.0" min="0.1" max="100" required>
+                                                        </div>
                                                     </div>
-                                                </div>
-                                            </div>                            
-                                        
-                                            <div class="control-group mb-3" id="nTopPercentGroupBrowser" style="display: none;">
-                                                <label for="nTopPercentBrowser" class="control-label">Percentage of Highest Expressed Transcripts</label>
-                                                <div class="control-input">
-                                                    <input type="number" class="form-control" id="nTopPercentBrowser" placeholder="Enter top percentage" step="0.1" value="1.0" min="0.1" max="100" required>
-                                                </div>
-                                            </div>
-                                        
-                                            <div class="control-group mb-3" id="nTopGroupBrowser" style="display: none;">
-                                                <label for="nTopBrowser" class="control-label">Top n of Highest Expressed Transcripts</label>
-                                                <div class="control-input">
-                                                    <input type="number" class="form-control" id="nTopBrowser" placeholder="Enter top n" step="1" value="10" min="1" required>
-                                                </div>
-                                            </div>
-                                        
-                                            <div class="control-group mb-3" id="thresholdGroupBrowser" style="display:none;">
-                                                <label for="thresholdBrowser" class="control-label">Threshold</label>
-                                                <div class="control-input">
-                                                    <input type="number" class="form-control" id="thresholdBrowser" placeholder="Enter threshold value" step="0.05" value="0.3" min="0.0" max="1.0" required>
-                                                </div>
-                                            </div>
-                                        
-                                            <div class="control-group mb-3" id="maxPvalGroupBrowser" style="display:none;">
-                                                <label for="maxPvalBrowser" class="control-label">Maximum P-Value</label>
-                                                <div class="control-input">
-                                                    <input type="number" class="form-control" id="maxPvalBrowser" placeholder="Enter max p-value" step="0.01" value="0.05" min="0.0" max="1.0" required>
-                                                </div>
-                                            </div>
-                                        
-                                            <div class="control-group mb-3" id="minFeGroupBrowser" style="display:none;">
-                                                <label for="minFeBrowser" class="control-label">Minimum Fold Enrichment</label>
-                                                <div class="control-input">
-                                                    <input type="number" class="form-control" id="minFeBrowser" placeholder="Enter min fold enrichment" step="0.01" value="0.2" min="0.0" max="1.0" required>
-                                                </div>
-                                            </div>
-                                        
-                                            <div class="control-group mb-3" id="minDepthGroupBrowser" style="display:none;">
-                                                <label for="minDepthBrowser" class="control-label">Minimum Depth</label>
-                                                <div class="control-input">
-                                                    <input type="number" class="form-control" id="minDepthBrowser" placeholder="Enter min depth" value="2" min="0" required>
-                                                </div>
-                                            </div>
-
-                                            <div class="control-group mb-3" id="minOrthosGroupBrowser" style="display:none;">
-                                                <label for="minOrthosBrowser" class="control-label">Minimum Number of Orthogroups</label>
-                                                <div class="control-input">
-                                                    <input type="number" class="form-control" id="minOrthosBrowser" placeholder="Enter min orthogroups" value="10" min="1" required>
-                                                </div>
-                                            </div>                                
-                                        
-                                            <div class="control-group mb-3" id="highlightListGroupBrowser" style="display:none;">
-                                                <label for="highlightListBrowser" class="control-label">Highlight Nodes</label>
-                                                <div class="control-input">
-                                                    <input type="text" class="form-control" id="highlightListBrowser" placeholder="Enter list of transcripts">
-                                                </div>
-                                            </div>
-                                        
-                                            <div class="control-group mb-3" id="useShapesGroupBrowser" style="display:none;">
-                                                <label for="useShapesBrowser" class="control-label">Use Shapes for Modules</label>
-                                                <div class="control-input">
-                                                    <div class="form-check">
-                                                        <input type="checkbox" class="form-check-input large-checkbox" id="useShapesBrowser">
-                                                        <label class="form-check-label" for="useShapesBrowser"></label>
+                                                    <div class="control-group mb-3" id="nTopGroupBrowser" style="display: none;">
+                                                        <label for="nTopBrowser" class="control-label">Top n of Highest Expressed Transcripts</label>
+                                                        <div class="control-input">
+                                                            <input type="number" class="form-control" id="nTopBrowser" placeholder="Enter top n" step="1" value="10" min="1" required>
+                                                        </div>
                                                     </div>
-                                                </div>
-                                            </div>
-                                        
-                                            <div class="control-group mb-3" id="useColorsGroupBrowser" style="display:none;">
-                                                <label for="useColorsBrowser" class="control-label">Use Colors for Modules</label>
-                                                <div class="control-input">
-                                                    <div class="form-check">
-                                                        <input type="checkbox" class="form-check-input large-checkbox" id="useColorsBrowser">
-                                                        <label class="form-check-label" for="useColorsBrowser"></label>
+                                                    <div class="control-group mb-3" id="thresholdGroupBrowser" style="display:none;">
+                                                        <label for="thresholdBrowser" class="control-label">Threshold</label>
+                                                        <div class="control-input">
+                                                            <input type="number" class="form-control" id="thresholdBrowser" placeholder="Enter threshold value" step="0.05" value="0.3" min="0.0" max="1.0" required>
+                                                        </div>
                                                     </div>
-                                                </div>
-                                            </div>
-                                        
-                                            <div class="control-group mb-3" id="plotOnlyGroupBrowser" style="display:none;">
-                                                <label for="plotOnlyBrowser" class="control-label">Plot only</label>
-                                                <div class="control-input">
-                                                    <div class="form-check">
-                                                        <input type="checkbox" class="form-check-input large-checkbox" id="plotOnlyBrowser" >
-                                                        <label class="form-check-label" for="plotOnlyBrowser"></label>
+                                                    <div class="control-group mb-3" id="maxPvalGroupBrowser" style="display:none;">
+                                                        <label for="maxPvalBrowser" class="control-label">Maximum P-Value</label>
+                                                        <div class="control-input">
+                                                            <input type="number" class="form-control" id="maxPvalBrowser" placeholder="Enter max p-value" step="0.01" value="0.05" min="0.0" max="1.0" required>
+                                                        </div>
                                                     </div>
-                                                </div>
-                                            </div>
-                                        
-                                            <div class="control-group mb-3" id="useShapesSpeciesGroupBrowser" style="display:none;">
-                                                <label for="useShapesSpeciesBrowser" class="control-label">Use Shapes for Species</label>
-                                                <div class="control-input">
-                                                    <div class="form-check">
-                                                        <input type="checkbox" class="form-check-input large-checkbox" id="useShapesSpeciesBrowser">
-                                                        <label class="form-check-label" for="useShapesSpeciesBrowser"></label>
+                                                    <div class="control-group mb-3" id="minFeGroupBrowser" style="display:none;">
+                                                        <label for="minFeBrowser" class="control-label">Minimum Fold Enrichment</label>
+                                                        <div class="control-input">
+                                                            <input type="number" class="form-control" id="minFeBrowser" placeholder="Enter min fold enrichment" step="0.01" value="0.2" min="0.0" max="1.0" required>
+                                                        </div>
                                                     </div>
-                                                </div>
-                                            </div>
-                                        
-                                            <div class="control-group mb-3" id="interSpeciesOnlyGroupBrowser" style="display:none;">
-                                                <label for="interSpeciesOnlyBrowser" class="control-label">Inter Species Only</label>
-                                                <div class="control-input">
-                                                    <div class="form-check">
-                                                        <input type="checkbox" class="form-check-input large-checkbox" id="interSpeciesOnlyBrowser" checked>
-                                                        <label class="form-check-label" for="interSpeciesOnlyBrowser"></label>
+                                                    <div class="control-group mb-3" id="minDepthGroupBrowser" style="display:none;">
+                                                        <label for="minDepthBrowser" class="control-label">Minimum Depth</label>
+                                                        <div class="control-input">
+                                                            <input type="number" class="form-control" id="minDepthBrowser" placeholder="Enter min depth" value="2" min="0" required>
+                                                        </div>
+                                                    </div>
+                                                    <div class="control-group mb-3" id="minOrthosGroupBrowser" style="display:none;">
+                                                        <label for="minOrthosBrowser" class="control-label">Minimum Number of Orthogroups</label>
+                                                        <div class="control-input">
+                                                            <input type="number" class="form-control" id="minOrthosBrowser" placeholder="Enter min orthogroups" value="10" min="1" required>
+                                                        </div>
+                                                    </div>
+                                                    <div class="control-group mb-3" id="highlightListGroupBrowser" style="display:none;">
+                                                        <label for="highlightListBrowser" class="control-label">Highlight Nodes</label>
+                                                        <div class="control-input">
+                                                            <input type="text" class="form-control" id="highlightListBrowser" placeholder="Enter list of transcripts">
+                                                        </div>
+                                                    </div>
+                                                    <div class="control-group mb-3" id="useShapesGroupBrowser" style="display:none;">
+                                                        <label for="useShapesBrowser" class="control-label">Use Shapes for Modules</label>
+                                                        <div class="control-input">
+                                                            <div class="form-check">
+                                                                <input type="checkbox" class="form-check-input large-checkbox" id="useShapesBrowser">
+                                                                <label class="form-check-label" for="useShapesBrowser"></label>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div class="control-group mb-3" id="useColorsGroupBrowser" style="display:none;">
+                                                        <label for="useColorsBrowser" class="control-label">Use Colors for Modules</label>
+                                                        <div class="control-input">
+                                                            <div class="form-check">
+                                                                <input type="checkbox" class="form-check-input large-checkbox" id="useColorsBrowser">
+                                                                <label class="form-check-label" for="useColorsBrowser"></label>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div class="control-group mb-3" id="plotOnlyGroupBrowser" style="display:none;">
+                                                        <label for="plotOnlyBrowser" class="control-label">Plot only</label>
+                                                        <div class="control-input">
+                                                            <div class="form-check">
+                                                                <input type="checkbox" class="form-check-input large-checkbox" id="plotOnlyBrowser">
+                                                                <label class="form-check-label" for="plotOnlyBrowser"></label>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div class="control-group mb-3" id="useShapesSpeciesGroupBrowser" style="display:none;">
+                                                        <label for="useShapesSpeciesBrowser" class="control-label">Use Shapes for Species</label>
+                                                        <div class="control-input">
+                                                            <div class="form-check">
+                                                                <input type="checkbox" class="form-check-input large-checkbox" id="useShapesSpeciesBrowser">
+                                                                <label class="form-check-label" for="useShapesSpeciesBrowser"></label>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div class="control-group mb-3" id="interSpeciesOnlyGroupBrowser" style="display:none;">
+                                                        <label for="interSpeciesOnlyBrowser" class="control-label">Inter Species Only</label>
+                                                        <div class="control-input">
+                                                            <div class="form-check">
+                                                                <input type="checkbox" class="form-check-input large-checkbox" id="interSpeciesOnlyBrowser" checked>
+                                                                <label class="form-check-label" for="interSpeciesOnlyBrowser"></label>
+                                                            </div>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>
-                                        </div>                            
-                                    </div>
+                                        </div>
+                                    </details>
 
                                     <!-- Run Browser Analysis Button -->
                                     <div class="d-flex justify-content-center">                                    
@@ -526,94 +520,101 @@
                                     </div>
                                 </div>
 
-                                <!-- Whole Analysis Controls -->
-                                <div class="row justify-content-center mt-3">
-                                    <div class="col-md-6 col-lg-8">
-                                        <!-- Form Groups -->
-                                        <div class="control-group mb-3" id="nTopPercentGroup" style="display: none;">
-                                            <label for="nTopPercent" class="control-label">Percentage of Highest Expressed Transcripts</label>
-                                            <div class="control-input">
-                                                <input type="number" class="form-control" id="nTopPercent" placeholder="Enter top percentage" step="0.1" value="1.0" min="0.1" max="100" required>
-                                            </div>
-                                        </div>
-
-                                        <div class="control-group mb-3" id="nTopGroup" style="display: none;">
-                                            <label for="nTop" class="control-label">Top n of Highest Expressed Transcripts</label>
-                                            <div class="control-input">
-                                                <input type="number" class="form-control" id="nTop" placeholder="Enter top n" step="1" value="10" min="1" required>
-                                            </div>
-                                        </div>
-
-                                        <div class="control-group mb-3" id="thresholdGroup" style="display: none;">
-                                            <label for="threshold" class="control-label">Threshold</label>
-                                            <div class="control-input">
-                                                <input type="number" class="form-control" id="threshold" placeholder="Enter threshold value" step="0.01" value="0.1" min="0.0" max="1.0" required>
-                                            </div>
-                                        </div>
-
-                                        <div class="control-group mb-3" id="maxPvalGroup" style="display: none;">
-                                            <label for="maxPval" class="control-label">Maximum P-Value</label>
-                                            <div class="control-input">
-                                                <input type="number" class="form-control" id="maxPval" placeholder="Enter max p-value" step="0.01" value="0.05" min="0.0" max="1.0" required>
-                                            </div>
-                                        </div>
-
-                                        <div class="control-group mb-3" id="minFeGroup" style="display: none;">
-                                            <label for="minFe" class="control-label">Minimum Fold Enrichment</label>
-                                            <div class="control-input">
-                                                <input type="number" class="form-control" id="minFe" placeholder="Enter min fold enrichment" step="0.01" value="0.2" min="0.0" max="1.0" required>
-                                            </div>
-                                        </div>
-
-                                        <div class="control-group mb-3" id="minDepthGroup" style="display: none;">
-                                            <label for="minDepth" class="control-label">Minimum Depth</label>
-                                            <div class="control-input">
-                                                <input type="number" class="form-control" id="minDepth" placeholder="Enter min depth" value="2" min="0" required>
-                                            </div>
-                                        </div>
-
-                                        <div class="control-group mb-3" id="positiveGroup" style="display: none;">
-                                            <label for="positive" class="control-label">Positive Correlation</label>
-                                            <div class="control-input">
-                                                <div class="form-check">
-                                                    <input type="checkbox" class="form-check-input large-checkbox" id="positive" checked>
-                                                    <label class="form-check-label" for="positive"></label>
+                                <!-- Analysis Parameters Toggle without Box -->
+                                <details id="parametersToggle">
+                                    <!-- Toggle header: only text with arrow indicator -->
+                                    <summary class="toggle-header">Parameters</summary>
+                                    <!-- Toggle content: parameter controls -->
+                                    <div class="toggle-content">
+                                        <!-- Whole Analysis Controls -->
+                                        <div class="row justify-content-center mt-3">
+                                            <div class="col-md-6 col-lg-8">
+                                                <!-- Form Groups -->
+                                                <div class="control-group mb-3" id="nTopPercentGroup" style="display: none;">
+                                                    <label for="nTopPercent" class="control-label">Percentage of Highest Expressed Transcripts</label>
+                                                    <div class="control-input">
+                                                        <input type="number" class="form-control" id="nTopPercent" placeholder="Enter top percentage" step="0.1" value="1.0" min="0.1" max="100" required>
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        </div>
 
-                                        <div class="control-group mb-3" id="useShapesGroup" style="display: none;">
-                                            <label for="useShapes" class="control-label" id="useShapesLabel">Use Shapes for Species</label>
-                                            <div class="control-input">
-                                                <div class="form-check">
-                                                    <input type="checkbox" class="form-check-input large-checkbox" id="useShapes">
-                                                    <label class="form-check-label" for="useShapes"></label>
+                                                <div class="control-group mb-3" id="nTopGroup" style="display: none;">
+                                                    <label for="nTop" class="control-label">Top n of Highest Expressed Transcripts</label>
+                                                    <div class="control-input">
+                                                        <input type="number" class="form-control" id="nTop" placeholder="Enter top n" step="1" value="10" min="1" required>
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        </div>
 
-                                        <div class="control-group mb-3" id="useColorsGroup" style="display: none;">
-                                            <label for="useColors" class="control-label">Use Colors for Modules</label>
-                                            <div class="control-input">
-                                                <div class="form-check">
-                                                    <input type="checkbox" class="form-check-input large-checkbox" id="useColors">
-                                                    <label class="form-check-label" for="useColors"></label>
+                                                <div class="control-group mb-3" id="thresholdGroup" style="display: none;">
+                                                    <label for="threshold" class="control-label">Threshold</label>
+                                                    <div class="control-input">
+                                                        <input type="number" class="form-control" id="threshold" placeholder="Enter threshold value" step="0.01" value="0.1" min="0.0" max="1.0" required>
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        </div>
 
-                                        <div class="control-group mb-3" id="interSpeciesOnlyGroup" style="display: none;">
-                                            <label for="interSpeciesOnly" class="control-label">Inter Species Only</label>
-                                            <div class="control-input">
-                                                <div class="form-check">
-                                                    <input type="checkbox" class="form-check-input large-checkbox" id="interSpeciesOnly" checked>
-                                                    <label class="form-check-label" for="interSpeciesOnly"></label>
+                                                <div class="control-group mb-3" id="maxPvalGroup" style="display: none;">
+                                                    <label for="maxPval" class="control-label">Maximum P-Value</label>
+                                                    <div class="control-input">
+                                                        <input type="number" class="form-control" id="maxPval" placeholder="Enter max p-value" step="0.01" value="0.05" min="0.0" max="1.0" required>
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        </div>
 
-                                    </div>                        
-                                </div>
+                                                <div class="control-group mb-3" id="minFeGroup" style="display: none;">
+                                                    <label for="minFe" class="control-label">Minimum Fold Enrichment</label>
+                                                    <div class="control-input">
+                                                        <input type="number" class="form-control" id="minFe" placeholder="Enter min fold enrichment" step="0.01" value="0.2" min="0.0" max="1.0" required>
+                                                    </div>
+                                                </div>
+
+                                                <div class="control-group mb-3" id="minDepthGroup" style="display: none;">
+                                                    <label for="minDepth" class="control-label">Minimum Depth</label>
+                                                    <div class="control-input">
+                                                        <input type="number" class="form-control" id="minDepth" placeholder="Enter min depth" value="2" min="0" required>
+                                                    </div>
+                                                </div>
+
+                                                <div class="control-group mb-3" id="positiveGroup" style="display: none;">
+                                                    <label for="positive" class="control-label">Positive Correlation</label>
+                                                    <div class="control-input">
+                                                        <div class="form-check">
+                                                            <input type="checkbox" class="form-check-input large-checkbox" id="positive" checked>
+                                                            <label class="form-check-label" for="positive"></label>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div class="control-group mb-3" id="useShapesGroup" style="display: none;">
+                                                    <label for="useShapes" class="control-label" id="useShapesLabel">Use Shapes for Species</label>
+                                                    <div class="control-input">
+                                                        <div class="form-check">
+                                                            <input type="checkbox" class="form-check-input large-checkbox" id="useShapes">
+                                                            <label class="form-check-label" for="useShapes"></label>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div class="control-group mb-3" id="useColorsGroup" style="display: none;">
+                                                    <label for="useColors" class="control-label">Use Colors for Modules</label>
+                                                    <div class="control-input">
+                                                        <div class="form-check">
+                                                            <input type="checkbox" class="form-check-input large-checkbox" id="useColors">
+                                                            <label class="form-check-label" for="useColors"></label>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div class="control-group mb-3" id="interSpeciesOnlyGroup" style="display: none;">
+                                                    <label for="interSpeciesOnly" class="control-label">Inter Species Only</label>
+                                                    <div class="control-input">
+                                                        <div class="form-check">
+                                                            <input type="checkbox" class="form-check-input large-checkbox" id="interSpeciesOnly" checked>
+                                                            <label class="form-check-label" for="interSpeciesOnly"></label>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>                        
+                                        </div>
+                                    </div>
+                                </details>
                                 
                                 <div class="d-flex justify-content-center">  
                                     <button type="button" class="btn btn-primary" id="runAnalysis">Run Analysis</button>
