@@ -183,6 +183,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 speciesLegendList.appendChild(li);
             });
+        } else {
+            // Hide the species legend if shapes are not used
+            document.getElementById('species-legend').style.display = 'none';
         }
 
         /* Edge Filtering */
