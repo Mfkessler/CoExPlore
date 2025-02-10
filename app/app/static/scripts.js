@@ -1192,11 +1192,11 @@ $(document).ready(function () {
         $("#interSpeciesOnlyGroupBrowser").hide();
         $("#minOrthosGroupBrowser").hide();
         $("#highlightListGroupBrowser").hide();
-        $("#plotTypeGroupBrowser").hide();
+        // $("#plotTypeGroupBrowser").hide();
 
         switch (selectedAnalysis) {
             case "plot_co_expression_network":
-                $("#plotTypeGroupBrowser").show();
+                // $("#plotTypeGroupBrowser").show();
                 $("#thresholdGroupBrowser").show();
                 $("#highlightListGroupBrowser").show();
                 $("#useShapesSpeciesGroupBrowser").show();
