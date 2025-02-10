@@ -1,3 +1,5 @@
+# Persistent app und package
+
 # Use Miniconda as the base image
 FROM continuumio/miniconda3:latest
 

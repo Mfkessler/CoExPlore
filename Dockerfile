@@ -1,3 +1,5 @@
+# Persistent package, mount app directory as volume
+
 # Use Miniconda as the base image
 FROM continuumio/miniconda3:latest
 

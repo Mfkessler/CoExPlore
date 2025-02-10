@@ -14,7 +14,7 @@ services:
       - app-network
 
   db_setup:
-    image: coexplore:latest
+    image: coexplore:dev
     container_name: db_setup
     env_file:
       - .env
@@ -23,6 +23,7 @@ services:
       - ./output:/output
       - ./scripts/generate_db.py:/generate_db.py
       - ./scripts/wait_for_postgres.py:/wait_for_postgres.py
+      - ./package:/CoExPlore/package
     working_dir: /
     command: >
       bash -c "python wait_for_postgres.py && python generate_db.py && touch /output/db_done.txt"
@@ -33,13 +34,14 @@ services:
       - app-network
 
   web:
-    image: coexplore:latest
+    image: coexplore:dev
     container_name: flask_app
     env_file:
       - .env
     volumes:
       - ./app:/app
       - ./output:/output
+      - ./package:/CoExPlore/package
     working_dir: /app
     command: >
       bash -c "
@@ -58,13 +60,14 @@ services:
       - app-network
 
   worker:
-    image: coexplore:latest
+    image: coexplore:dev
     container_name: celery_worker
     env_file:
       - .env
     volumes:
       - ./app:/app
       - ./output:/output
+      - ./package:/CoExPlore/package
     working_dir: /app
     command: >
       bash -c "
