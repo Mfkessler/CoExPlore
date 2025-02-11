@@ -214,6 +214,8 @@ h6 {
   height: 1.5rem;
   vertical-align: middle;
   margin-top: 0;
+  /* use same border color as text box */
+  border-color: #ced4da;
 }
 
 .form-check-input.large-checkbox+.form-check-label {
