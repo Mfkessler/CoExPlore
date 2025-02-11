@@ -1,7 +1,6 @@
 // events.js
 import { downloadResults, clearSessionFiles } from "./api.js";
 import {
-    updateFileListUI,
     loadImageDataUI,
     runBrowserAnalysisHandler,
     runGeneralAnalysisHandler,
@@ -9,7 +8,8 @@ import {
     handleMessageEvent,
     handleSelectionChange,
     updateInputFields,
-    updateBrowserInputFields
+    updateBrowserInputFields,
+    updateFileListBasedOnExtension
 } from "./ui.js";
 
 /**
@@ -18,13 +18,6 @@ import {
  * @param {string} sessionId The session ID.
  */
 export function bindEvents(baseUrl, sessionId) {
-    // File type dropdown change
-    document
-        .getElementById("fileTypeSelect")
-        .addEventListener("change", () => {
-            updateFileListUI(baseUrl, sessionId);
-        });
-
     // Help icon toggles
     document.getElementById("helpIconBrowser").addEventListener("click", () => {
         $("#userGuideCardBrowser").toggle();
@@ -32,6 +25,14 @@ export function bindEvents(baseUrl, sessionId) {
     document.getElementById("helpIconDataset").addEventListener("click", () => {
         $("#userGuideCardDataset").toggle();
     });
+
+    // File type dropdown change
+    const fileTypeSelect = document.getElementById("fileTypeSelect");
+    if (fileTypeSelect) {
+      fileTypeSelect.addEventListener("change", () => {
+        updateFileListBasedOnExtension(baseUrl);
+      });
+    }
 
     // Image category change event
     $("#imageCategory").change(function () {

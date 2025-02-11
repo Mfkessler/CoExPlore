@@ -10,39 +10,92 @@ import {
 let previousPlantSelection = [];
 
 /**
+ * Populate the file type dropdown with available file extensions.
+ * @param {string} baseUrl The base URL.
+ */
+export function populateFileTypeDropdown(baseUrl) {
+    const sessionId = sessionStorage.getItem("session_id");
+    fetch(`${baseUrl}/api/list_file_extensions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session_id: sessionId }),
+    })
+        .then((response) => response.json())
+        .then((response) => {
+            if (response.status === "success") {
+                const selectElement = document.getElementById("fileTypeSelect");
+                if (!selectElement) return;
+                selectElement.innerHTML = "";
+                // Create the "All Results" option
+                const allOption = document.createElement("option");
+                allOption.value = "all";
+                allOption.text = "All Results";
+                selectElement.appendChild(allOption);
+                // Add unique extensions
+                const uniqueExtensions = new Set(response.extensions);
+                uniqueExtensions.forEach((extension) => {
+                    const option = document.createElement("option");
+                    option.value = extension;
+                    option.text = extension;
+                    selectElement.appendChild(option);
+                });
+                // If ".html" is present, select it by default
+                if (uniqueExtensions.has(".html")) {
+                    selectElement.value = ".html";
+                    updateFileListBasedOnExtension(baseUrl);
+                } else {
+                    selectElement.selectedIndex = 0;
+                }
+            }
+        })
+        .catch((error) => {
+            console.error("Error fetching file extensions:", error);
+        });
+}
+
+/**
  * Update the file list UI based on the selected extension.
  * @param {string} baseUrl The base URL.
- * @param {string} sessionId The session ID.
  */
-export function updateFileListUI(baseUrl, sessionId) {
+export function updateFileListBasedOnExtension(baseUrl) {
     const selectElement = document.getElementById("fileTypeSelect");
+    if (!selectElement) return;
     const selectedExtension = selectElement.value;
-    // Verwende die importierte Funktion
-    import("./api.js").then(({ fetchFilteredFiles }) => {
-        fetchFilteredFiles(baseUrl, sessionId, selectedExtension)
-            .then((response) => {
-                if (response.status === "success") {
-                    let fileListHtml = '<ul class="list-group">';
-                    response.files.forEach((file) => {
-                        const filePath = `${BASE_URL}/${OUTPUT_DIR}/${sessionId}/${file}`;
-                        fileListHtml += `<li class="list-group-item"><a href="${filePath}" target="_blank">${file}</a></li>`;
-                    });
-                    fileListHtml += "</ul>";
-                    document.getElementById("analysisList").innerHTML = fileListHtml;
-                    $("#downloadResultsButton").prop("disabled", false);
-                    $("#clearFilesButton").prop("disabled", false);
-                } else {
-                    document.getElementById("analysisList").innerHTML =
-                        "<p>No files found.</p>";
-                }
-            })
-            .catch((error) => {
-                console.error("Error fetching filtered files:", error);
-                document.getElementById("analysisList").innerHTML =
-                    "<p>Error retrieving files.</p>";
-            });
-    });
-}
+    const sessionId = sessionStorage.getItem("session_id");
+    fetch(`${baseUrl}/api/list_filtered_files`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            session_id: sessionId,
+            extension: selectedExtension,
+        }),
+    })
+        .then((response) => response.json())
+        .then((response) => {
+            const analysisListEl = document.getElementById("analysisList");
+            if (!analysisListEl) return;
+            if (response.status === "success") {
+                let fileListHtml = '<ul class="list-group">';
+                response.files.forEach((file) => {
+                    const filePath = `${BASE_URL}/${OUTPUT_DIR}/${sessionId}/${file}`;
+                    fileListHtml += `<li class="list-group-item"><a href="${filePath}" target="_blank">${file}</a></li>`;
+                });
+                fileListHtml += "</ul>";
+                analysisListEl.innerHTML = fileListHtml;
+                $("#downloadResultsButton").prop("disabled", false);
+                $("#clearFilesButton").prop("disabled", false);
+            } else {
+                analysisListEl.innerHTML = "<p>No files found.</p>";
+            }
+        })
+        .catch((error) => {
+            console.error("Error fetching filtered files:", error);
+            const analysisListEl = document.getElementById("analysisList");
+            if (analysisListEl) {
+                analysisListEl.innerHTML = "<p>Error retrieving files.</p>";
+            }
+        });
+}  
 
 /**
  * Load image data and display images.
@@ -527,8 +580,8 @@ export function displayResultUI(result, type, text) {
     }
 
     if (sessionStorage.getItem("session_id")) {
-        const sessionId = sessionStorage.getItem("session_id");
-        updateFileListUI(BASE_URL, sessionId);
+        populateFileTypeDropdown(BASE_URL);
+        updateFileListBasedOnExtension(BASE_URL);
     }
 
     $(loadingBar).hide();
