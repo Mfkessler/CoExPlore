@@ -23,6 +23,7 @@ from jinja2 import Environment, FileSystemLoader
 from collections import defaultdict
 from scipy.spatial.distance import squareform
 
+
 def create_dir(path: str) -> None:
     """
     Creates a directory at the specified path if it does not already exist.
@@ -41,38 +42,39 @@ def create_dir(path: str) -> None:
 def find_species_by_initials(species: str, file_path: str = "../info/species") -> str:
     """
     Finds and returns the full name of a species based on the initial letters of its name provided in a single string.
-    
+
     Parameters:
     - species (str): A string containing the initial letters of the first and second word of the species name.
     - file_path (str): The path to the file containing the species names.
-    
+
     Returns:
     - str: The full name of the species that matches the given initials. If no match is found, returns None.
     """
 
     if len(species) != 2:
         return species
-    
+
     first_letter, second_letter = species[0].upper(), species[1].upper()
-    
+
     with open(file_path, 'r') as file:
         for line in file:
             words = line.strip().split()
             if len(words) >= 2 and words[0][0].upper() == first_letter and words[1][0].upper() == second_letter:
                 return line.strip()
-    
-    raise ValueError(f"No species found with the provided initials. Please check the species file: {os.path.abspath(file_path)}")
+
+    raise ValueError(
+        f"No species found with the provided initials. Please check the species file: {os.path.abspath(file_path)}")
 
 
 def remove_column_if_exists(df: pd.DataFrame, column_name: str) -> None:
     """
     Removes a specified column from a pandas DataFrame if it exists.
-    
+
     Parameters:
     - df (pd.DataFrame): DF from which the column will be removed.
     - column_name (str): Name of the column to be removed.
     """
-    
+
     if column_name in df.columns:
         df.drop(columns=[column_name], inplace=True)
         print(f"Column '{column_name}' was removed.")
@@ -84,45 +86,46 @@ def transform_count_matrix(file_path: str) -> pd.DataFrame:
     """
     Transforms a count matrix from a format where transcripts are rows and samples are columns
     to a format where each row represents a sample and columns represent transcripts.
-    
+
     The input file should be a tab-separated values (TSV) file with transcripts as rows and samples as columns.
     The first row should contain sample names, and the first column should contain identifiers.
-    
+
     The transformed data frame is saved as a CSV file at the specified output path without the index.
-    
+
     Parameters:
     - file_path (str): The path to the input TSV file containing the count matrix.
 
     Returns:
     - pd.DataFrame: Table with samples as rows and transcripts as columns.
     """
-    
+
     df = pd.read_csv(file_path, sep='\t')
     transformed_df = df.T
     transformed_df.columns = transformed_df.iloc[0]
     transformed_df = transformed_df.drop(transformed_df.index[0])
     transformed_df.reset_index(inplace=True)
     transformed_df.rename(columns={'index': 'sample'}, inplace=True)
-    
+
     return transformed_df
 
 
 def remove_random_columns(df: pd.DataFrame, percentage: float = 0.9, seed: int = 0) -> pd.DataFrame:
     """
     Removes a random percentage of columns from a pandas DataFrame, excluding the first column.
-    
+
     Parameters:
     - df (pd.DataFrame): DataFrame from which columns will be removed.
     - percentage (float): The fraction of columns to remove, between 0 and 1.
     - seed (int): Seed for the random number generator for reproducibility.
-    
+
     Returns:
     - pd.DataFrame: Table with the specified percentage of columns removed.
     """
 
     np.random.seed(seed)
     num_cols_to_remove = int(np.ceil((len(df.columns) - 1) * percentage))
-    cols_to_remove = np.random.choice(df.columns[1:], size=num_cols_to_remove, replace=False)
+    cols_to_remove = np.random.choice(
+        df.columns[1:], size=num_cols_to_remove, replace=False)
 
     return df.drop(columns=cols_to_remove)
 
@@ -162,7 +165,7 @@ def get_tissue_map(metadata: str = "RanOmics") -> Dict[str, str]:
         }
     elif metadata == "Ceratopteris":
         tissue_map = {
-            #TODO: Add tissue mapping for Ceratopteris
+            # TODO: Add tissue mapping for Ceratopteris
         }
 
     return tissue_map
@@ -178,33 +181,34 @@ def map_tissue_types(df: pd.DataFrame, sample_col: str = "sample", tissue_col: s
     - df (pd.DataFrame): The input DataFrame.
     - sample_col (str): The name of the column to read from the input DataFrame.
     - tissue_col (str): The name of the new column to be added to the output DataFrame.
-    
+
     Returns:
     - pd.DataFrame: A new table with only the specified and the mapped 'tissue' column.
     """
-    
+
     tissue_map = get_tissue_map()
-    
+
     def map_sample_to_tissue(sample):
         for key in tissue_map.keys():
             if f"_{key}_" in sample:
                 return tissue_map[key]
-        return "Unknown" 
- 
+        return "Unknown"
+
     mapped_tissues = df[sample_col].apply(map_sample_to_tissue)
-    new_df = pd.DataFrame({sample_col: df[sample_col], tissue_col: mapped_tissues})
-    
+    new_df = pd.DataFrame(
+        {sample_col: df[sample_col], tissue_col: mapped_tissues})
+
     return new_df
 
 
 def get_general_info(adata: AnnData, obs_col: str = "tissue") -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
     This function calculates the number of samples, genes, and tissues in an AnnData object.
-    
+
     Parameters:
     - adata (AnnData): The AnnData object to analyze.
     - obs_col (str): The name of the column in adata.obs containing tissue information.
-    
+
     Returns:
     - pd.DataFrame: A DataFrame containing the number of samples, genes, tissues, and other info.
     """
@@ -218,7 +222,7 @@ def get_general_info(adata: AnnData, obs_col: str = "tissue") -> Tuple[pd.DataFr
 
     # numbers of samples per tissue
     samples_per_tissue = adata.obs[obs_col].value_counts().to_dict()
-    
+
     data = {
         "Species": [species],
         "Samples": [num_samples],
@@ -227,9 +231,10 @@ def get_general_info(adata: AnnData, obs_col: str = "tissue") -> Tuple[pd.DataFr
         "Modules": [num_modules],
         "Tissues": [num_tissues],
     }
-    
+
     df_info = pd.DataFrame(data)
-    df_samples_per_tissue = pd.DataFrame(list(samples_per_tissue.items()), columns=["Tissue", "Samples"])
+    df_samples_per_tissue = pd.DataFrame(
+        list(samples_per_tissue.items()), columns=["Tissue", "Samples"])
 
     return df_info, df_samples_per_tissue
 
@@ -237,11 +242,11 @@ def get_general_info(adata: AnnData, obs_col: str = "tissue") -> Tuple[pd.DataFr
 def get_info_for_list(adatas: List[AnnData], obs_col: str = "tissue") -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
     This function applies get_general_info to each AnnData object in a list.
-    
+
     Parameters:
     - adatas (List[AnnData]): The list of AnnData objects to analyze.
     - obs_col (str): The name of the column in adata.obs containing tissue information.
-    
+
     Returns:
     - pd.DataFrame: A DataFrame containing the combined info for each AnnData object.
     """
@@ -258,10 +263,11 @@ def get_info_for_list(adatas: List[AnnData], obs_col: str = "tissue") -> Tuple[p
         df_info, df_samples_per_tissue = get_general_info(adata, temp_obs_col)
         all_info.append(df_info)
         all_samples_per_tissue.append(df_samples_per_tissue)
-            
+
     combined_info = pd.concat(all_info).reset_index(drop=True)
-    combined_samples_per_tissue = pd.concat(all_samples_per_tissue).reset_index(drop=True)
-    
+    combined_samples_per_tissue = pd.concat(
+        all_samples_per_tissue).reset_index(drop=True)
+
     return combined_info, combined_samples_per_tissue
 
 
@@ -277,7 +283,7 @@ def compute_sample_statistics_df(adata: AnnData) -> pd.DataFrame:
     - pd.DataFrame: Table containing the calculated statistical measures,
       with samples as rows and statistical measures as columns.
     """
-    
+
     X = adata.X
 
     # Check if X is a sparse matrix and convert to a dense matrix if needed
@@ -319,11 +325,11 @@ def generate_stage_color_dict(custom_stages: List[str] = None) -> Dict[str, str]
     if not custom_stages:
         stages = [
             "Bud stage 1", "Bud stage 2", "Bud stage 3", "Bud stage 4",
-            "Sepals at anthesis", "Petals at anthesis", "Stamens at anthesis", 
-            "Gynoecia at anthesis", "Shoot apex", "Petal early stage", 
-            "Petal mid stage", "Petal late stage", "Young fruits", 
-            "Mid-stage fruit", "Seeds 5 dap", "Root", "Young leaf", 
-            "Mature leaf", "Seedling", "Mature petal nectary part", 
+            "Sepals at anthesis", "Petals at anthesis", "Stamens at anthesis",
+            "Gynoecia at anthesis", "Shoot apex", "Petal early stage",
+            "Petal mid stage", "Petal late stage", "Young fruits",
+            "Mid-stage fruit", "Seeds 5 dap", "Root", "Young leaf",
+            "Mature leaf", "Seedling", "Mature petal nectary part",
             "Mature petal no nectary part", "Non-spurred Petal", "Unknown"
         ]
     # Custom stages
@@ -331,10 +337,12 @@ def generate_stage_color_dict(custom_stages: List[str] = None) -> Dict[str, str]
         stages = custom_stages
 
     if len(stages) > 30:
-        raise ValueError("This function supports up to 30 distinct categories.")
+        raise ValueError(
+            "This function supports up to 30 distinct categories.")
 
     # Generate colors from matplotlib colormaps
-    colors_tab20 = cm.tab20(np.linspace(0, 1, 20))  # First 20 colors from tab20
+    # First 20 colors from tab20
+    colors_tab20 = cm.tab20(np.linspace(0, 1, 20))
     colors_set3 = cm.Set3(np.linspace(0, 1, 12))    # First 12 colors from Set3
 
     # Combine the two colormaps and take only as many colors as needed
@@ -359,7 +367,6 @@ def process_anndata(
     ortho_id: bool = True,
     qc_metrics: bool = True
 ) -> None:
-    
     """
     Enhances an AnnData object with additional genomic annotations and recalculates QC metrics.
     If decimal_places is specified, the float columns in the AnnData object are rounded to the specified number of decimal places.
@@ -385,11 +392,13 @@ def process_anndata(
     if go_terms and gaf_gz_path:
         add_go_terms_to_anndata(adata, gaf_gz_path=gaf_gz_path)
     if ortho_id and ortho_column_name:
-        add_ortho_ids_to_anndata(adata, column_name=ortho_column_name, base_path=ortho_dir)
+        add_ortho_ids_to_anndata(
+            adata, column_name=ortho_column_name, base_path=ortho_dir)
         update_ortho_ID(adata)
     if qc_metrics:
         sc.pp.calculate_qc_metrics(adata, inplace=True)
-        adata.var.rename(columns={"n_cells_by_counts": "n_samples_by_counts"}, inplace=True)
+        adata.var.rename(
+            columns={"n_cells_by_counts": "n_samples_by_counts"}, inplace=True)
     if decimal_places:
         float_cols = adata.var.select_dtypes(include=['float64']).columns
         adata.var[float_cols] = adata.var[float_cols].round(decimal_places)
@@ -414,29 +423,35 @@ def add_go_terms_to_anndata(adata: AnnData, gaf_gz_path: str, hog: bool = False)
     """
 
     if hog:
-        mapping_df = pd.read_csv(gaf_gz_path, sep='\t', header=None, names=['hog_id', 'go_terms'])
-        hog_to_go_dict = pd.Series(mapping_df.go_terms.values, index=mapping_df.hog_id).to_dict()
+        mapping_df = pd.read_csv(gaf_gz_path, sep='\t', header=None, names=[
+                                 'hog_id', 'go_terms'])
+        hog_to_go_dict = pd.Series(
+            mapping_df.go_terms.values, index=mapping_df.hog_id).to_dict()
         adata.var['go_terms'] = adata.var.index.map(hog_to_go_dict).fillna('')
     else:
         # Read GAF file and extract necessary columns
         gaf_df = pd.read_csv(gaf_gz_path, sep='\t', header=None, comment='!', compression='gzip',
-                            usecols=[1, 4], names=['Transcript', 'GO_ID'])
-        
+                             usecols=[1, 4], names=['Transcript', 'GO_ID'])
+
         # Group by transcript and aggregate GO terms into a comma-separated string
-        gene_go_df = gaf_df.groupby('Transcript')['GO_ID'].agg(lambda x: ','.join(x)).reset_index()
-        gene_go_df.columns = ['Transcript', 'go_terms']  # Rename the 'GO_ID' column to 'go_terms'
-        
+        gene_go_df = gaf_df.groupby('Transcript')['GO_ID'].agg(
+            lambda x: ','.join(x)).reset_index()
+        # Rename the 'GO_ID' column to 'go_terms'
+        gene_go_df.columns = ['Transcript', 'go_terms']
+
         # Merge the GO terms into the '.var' table of AnnData
-        adata.var = adata.var.merge(gene_go_df, left_index=True, right_on='Transcript', how='left').set_index('Transcript')
+        adata.var = adata.var.merge(
+            gene_go_df, left_index=True, right_on='Transcript', how='left').set_index('Transcript')
 
         # Count the number of GO terms for each transcript
-        adata.var['n_go_terms'] = adata.var['go_terms'].apply(lambda x: 0 if pd.isna(x) else x.count(',') + 1)
+        adata.var['n_go_terms'] = adata.var['go_terms'].apply(
+            lambda x: 0 if pd.isna(x) else x.count(',') + 1)
 
 
 def aggregate_go_terms(series: pd.Series) -> str:
     """
     Aggregate GO terms, remove duplicates, and return them as a comma-separated string.
-    
+
     Parameters:
     - pd.Series: A pandas Series containing GO terms as a comma-separated string.
 
@@ -445,7 +460,8 @@ def aggregate_go_terms(series: pd.Series) -> str:
     """
 
     terms = series.dropna().astype(str).str.split(',')
-    all_terms = [term.strip() for sublist in terms for term in sublist if term.strip()]
+    all_terms = [term.strip()
+                 for sublist in terms for term in sublist if term.strip()]
     unique_terms = np.unique(all_terms)
 
     return ','.join(unique_terms) if unique_terms.size > 0 else ""
@@ -482,7 +498,8 @@ def filter_adata_by_obs(adata: AnnData, obs_column: str = "tissue", expr_thresho
         tissue_mask = adata.obs[obs_column] == value
         filtered_adata = adata[tissue_mask, :]
 
-        current_expr_threshold = calculate_expr_threshold(filtered_adata) if expr_threshold is None else expr_threshold
+        current_expr_threshold = calculate_expr_threshold(
+            filtered_adata) if expr_threshold is None else expr_threshold
         is_expressed = filtered_adata.X.sum(axis=0) > current_expr_threshold
 
         # Update exclusion counts and set non-expressed counts to zero
@@ -505,7 +522,8 @@ def filter_adata_by_obs(adata: AnnData, obs_column: str = "tissue", expr_thresho
         'Percentage excluded': np.mean(all_zero_mask) * 100
     }
 
-    exclusion_df = pd.DataFrame(exclusion_stats).T  # Transpose for better readability
+    # Transpose for better readability
+    exclusion_df = pd.DataFrame(exclusion_stats).T
 
     if display_stats:
         print(exclusion_df)
@@ -516,28 +534,29 @@ def filter_adata_by_obs(adata: AnnData, obs_column: str = "tissue", expr_thresho
 def calculate_expr_threshold(adata: AnnData, std_multiplier: float = 1) -> float:
     """
     Calculate the expression threshold for 'safely expressed' transcripts based on the median and standard deviation of expression values.
-    
+
     Parameters:
     - adata (AnnData): The AnnData object containing expression data.
     - std_multiplier (float): The multiplier for the standard deviation to adjust the threshold.
-    
+
     Returns:
     - float: The calculated expression threshold.
     """
-    
+
     # Ensure that the data is in a dense format for computation
     if not isinstance(adata.X, np.ndarray):
         X_dense = adata.X.toarray()
     else:
         X_dense = adata.X
-    
+
     # Calculate the median and standard deviation of the expression values across all cells
     median_expression = np.median(X_dense, axis=0)
     std_expression = np.std(X_dense, axis=0)
-    
+
     # Calculate the threshold for 'safely expressed'
-    threshold = np.median(median_expression) + std_multiplier * np.std(std_expression)
-    
+    threshold = np.median(median_expression) + \
+        std_multiplier * np.std(std_expression)
+
     return threshold
 
 
@@ -568,7 +587,7 @@ def add_goea_to_anndata(adata: AnnData, obo_path: str = "../go-basic.obo", resul
         with redirect_stdout(fnull), redirect_stderr(fnull):
             go_dag = GODag(obo_path)
             os.makedirs(results_dir, exist_ok=True)
-            
+
             # Prepare the GO background set
             if go_background_set is None:
                 go_background_set = set(adata.var.index)
@@ -579,7 +598,7 @@ def add_goea_to_anndata(adata: AnnData, obo_path: str = "../go-basic.obo", resul
                 go_ids = go_ids_str.split(",")
                 assoc[transcript_id] = set(go_ids)
 
-            # Initialize GOEA object 
+            # Initialize GOEA object
             goea_obj = GOEnrichmentStudyNS(
                 pop=go_background_set,
                 ns2assoc={"generic_namespace": assoc},
@@ -590,30 +609,36 @@ def add_goea_to_anndata(adata: AnnData, obo_path: str = "../go-basic.obo", resul
 
             # Iterate over modules
             for module_label in adata.var[column].unique():
-                module_transcripts = adata.var.loc[adata.var[column] == module_label]
-                
+                module_transcripts = adata.var.loc[adata.var[column]
+                                                   == module_label]
+
                 # Select top percentage of transcripts based on mean expression
-                top_cutoff = int(len(module_transcripts) * (top_percentage / 100))
-                top_transcripts = module_transcripts.nlargest(top_cutoff, 'mean_counts')
+                top_cutoff = int(len(module_transcripts)
+                                 * (top_percentage / 100))
+                top_transcripts = module_transcripts.nlargest(
+                    top_cutoff, 'mean_counts')
 
                 # Get all transcript IDs for the current module after filtering
                 module_transcript_ids = top_transcripts.index.tolist()
-                
+
                 if not module_transcript_ids:
                     continue
-                
+
                 # Perform GOEA
                 goea_results = goea_obj.run_study(module_transcript_ids)
 
                 # Filter significant results and extract additional information
-                goea_results_sig = [(r.GO, r.name, r.p_fdr_bh, r.ratio_in_study[0]/r.ratio_in_study[1], r.ratio_in_study[0], go_dag[r.GO].depth) for r in goea_results if r.p_fdr_bh < 0.05]
-                
+                goea_results_sig = [(r.GO, r.name, r.p_fdr_bh, r.ratio_in_study[0]/r.ratio_in_study[1],
+                                     r.ratio_in_study[0], go_dag[r.GO].depth) for r in goea_results if r.p_fdr_bh < 0.05]
+
                 # Plot and save results if there are significant findings
                 if goea_results_sig:
-                    plot_path = os.path.join(results_dir, f'goea_plot_{module_label}.png')
+                    plot_path = os.path.join(
+                        results_dir, f'goea_plot_{module_label}.png')
                     significant_go_terms = [r[0] for r in goea_results_sig]
-                    plot_gos(plot_path, significant_go_terms, go_dag, title=f"{adata.uns['name']}: GO Terms for {module_label}")
-                    
+                    plot_gos(plot_path, significant_go_terms, go_dag,
+                             title=f"{adata.uns['name']}: GO Terms for {module_label}")
+
                     adata.uns[uns_key][module_label] = {
                         'significant_terms': goea_results_sig,
                         'plot_path': plot_path
@@ -623,19 +648,19 @@ def add_goea_to_anndata(adata: AnnData, obo_path: str = "../go-basic.obo", resul
 def get_goea_df(adata: AnnData, key: str = 'goea_results', column_name: str = "Tissue") -> pd.DataFrame:
     """
     Extracts GOEA results from an AnnData object and returns a DataFrame with detailed results.
-    
+
     Parameters:
     - adata (AnnData): The AnnData object containing GOEA results in adata.uns[key].
     - key (str): The key in adata.uns where the GOEA results are stored.
     - column_name (str): The name of the column to use for the module labels in the resulting DataFrame.
-    
+
     Returns:
     - pd.DataFrame: A DataFrame with detailed GOEA results.
     """
-    
+
     goea_results = adata.uns[key]
     goea_results_list = []
-    
+
     for module_label, data in goea_results.items():
         for term in data['significant_terms']:
             go_id, term_name, p_value, fold_enrichment, num_genes, depth = term
@@ -647,9 +672,10 @@ def get_goea_df(adata: AnnData, key: str = 'goea_results', column_name: str = "T
                 "Fold Enrichment": fold_enrichment,
                 "Num Genes": num_genes,
                 "Depth": depth,
-                "Plot Path": data.get('plot_path', 'N/A')  # Add plot path if needed
+                # Add plot path if needed
+                "Plot Path": data.get('plot_path', 'N/A')
             })
-    
+
     return pd.DataFrame(goea_results_list)
 
 
@@ -665,12 +691,14 @@ def add_ortho_id_to_anndata(adata: AnnData, mapping_file: str, column_name: str)
     """
 
     if not os.path.exists(mapping_file):
-        print(f"Warning: Mapping file '{mapping_file}' not found. Filling 'ortho_ID' with empty strings.")
+        print(
+            f"Warning: Mapping file '{mapping_file}' not found. Filling 'ortho_ID' with empty strings.")
         adata.var['ortho_ID'] = ''
         return
 
-    ortho_df = pd.read_csv(mapping_file, sep="\t", usecols=["HOG", column_name], index_col="HOG")
-    
+    ortho_df = pd.read_csv(mapping_file, sep="\t", usecols=[
+                           "HOG", column_name], index_col="HOG")
+
     adata.var['ortho_ID'] = None
 
     id_to_ortho = {}
@@ -696,8 +724,9 @@ def add_ortho_ids_to_anndata(adata: AnnData, column_name: str, base_path: str = 
     for level in range(7):
         node_key = f"N{level}_ortho"
         mapping_file = f"{base_path}/N{level}.tsv"
-        ortho_df = pd.read_csv(mapping_file, sep="\t", usecols=["HOG", column_name], index_col="HOG")
-        
+        ortho_df = pd.read_csv(mapping_file, sep="\t", usecols=[
+                               "HOG", column_name], index_col="HOG")
+
         id_to_ortho = {}
         for ortho_id, identifiers in ortho_df[column_name].dropna().items():
             for identifier in identifiers.split(", "):
@@ -705,7 +734,8 @@ def add_ortho_ids_to_anndata(adata: AnnData, column_name: str, base_path: str = 
                     id_to_ortho[identifier] = []
                 id_to_ortho[identifier].append(ortho_id)
 
-        adata.var[node_key] = adata.var.index.map(lambda x: ','.join(id_to_ortho.get(x, []))).fillna("")
+        adata.var[node_key] = adata.var.index.map(
+            lambda x: ','.join(id_to_ortho.get(x, []))).fillna("")
 
     adata.var['ortho_ID'] = adata.var['N0_ortho']
     add_ortho_count(adata)
@@ -714,24 +744,26 @@ def add_ortho_ids_to_anndata(adata: AnnData, column_name: str, base_path: str = 
 def analyze_adata_by_obs_and_module(adata: AnnData, obs_column: str = None) -> Dict[str, pd.DataFrame]:
     """
     Analyze AnnData by module for each unique value in a specified .obs column or for the entire adata if obs_column is None.
-    
+
     Parameters:
     - adata (AnnData): AnnData containing .var, .obs, and .X (expression matrix) attributes.
     - obs_column (str): The name of the .obs column to analyze by (e.g., 'tissue').
-    
+
     Returns:
     - A dictionary of DataFrames, each key is a unique value from the obs_column or 'all_data' if obs_column is None,
       and each value is a DataFrame with 'moduleColors' as the index and two columns:
       'transcripts_per_module' and 'unique_GO_terms_per_module'.
     """
-    
+
     results = {}
-    adata.var['GO_ID'] = adata.var['GO_ID'].apply(lambda x: eval(x) if isinstance(x, str) else x)
-    
+    adata.var['GO_ID'] = adata.var['GO_ID'].apply(
+        lambda x: eval(x) if isinstance(x, str) else x)
+
     def calculate_module_stats(adata: AnnData) -> pd.DataFrame:
         return adata.var.groupby('moduleColors').agg(
             transcripts_per_module=('moduleColors', 'size'),
-            unique_GO_terms_per_module=('GO_ID', lambda x: len(set().union(*[set(item) for item in x.dropna()])))
+            unique_GO_terms_per_module=('GO_ID', lambda x: len(
+                set().union(*[set(item) for item in x.dropna()])))
         ).reset_index()
 
     if obs_column and obs_column in adata.obs:
@@ -739,16 +771,18 @@ def analyze_adata_by_obs_and_module(adata: AnnData, obs_column: str = None) -> D
         for value in unique_values:
             # Filter AnnData object for each unique value in .obs column and calculate module stats
             filtered_adata = adata[adata.obs[obs_column] == value].copy()
-            is_expressed = np.asarray(filtered_adata.X.sum(axis=0) > calculate_expr_threshold(filtered_adata)).flatten()
+            is_expressed = np.asarray(filtered_adata.X.sum(
+                axis=0) > calculate_expr_threshold(filtered_adata)).flatten()
             filtered_adata = filtered_adata[:, is_expressed].copy()
             results[value] = calculate_module_stats(filtered_adata)
 
     else:
         # Filter and Calculate statistics for the entire adata
-        is_expressed = np.asarray(adata.X.sum(axis=0) > calculate_expr_threshold(adata)).flatten()
+        is_expressed = np.asarray(adata.X.sum(
+            axis=0) > calculate_expr_threshold(adata)).flatten()
         adata = adata[:, is_expressed].copy()
         results['all_data'] = calculate_module_stats(adata)
-    
+
     return results
 
 
@@ -764,22 +798,24 @@ def filter_single_sample_groups(adata: AnnData, obs_column: str = "tissue") -> A
     Returns:
     - AnnData: The filtered anndata object with groups having more than one sample.
     """
-    
+
     if obs_column not in adata.obs:
         obs_column = "Combined_Trait"
         if obs_column not in adata.obs:
             raise ValueError(f"{obs_column} not found in adata.obs")
 
     groups_with_single_sample = adata.obs[obs_column].value_counts() == 1
-    groups_with_single_sample = groups_with_single_sample[groups_with_single_sample].index.tolist()
-    
+    groups_with_single_sample = groups_with_single_sample[groups_with_single_sample].index.tolist(
+    )
 
-    indices_to_remove = adata.obs.index[adata.obs[obs_column].isin(groups_with_single_sample)]
+    indices_to_remove = adata.obs.index[adata.obs[obs_column].isin(
+        groups_with_single_sample)]
     adata_filtered = adata[~adata.obs.index.isin(indices_to_remove)].copy()
-    
+
     # Print the number of removed samples and their indices
-    print(f"Removed {len(indices_to_remove)} samples: {indices_to_remove.tolist()}")
-    
+    print(
+        f"Removed {len(indices_to_remove)} samples: {indices_to_remove.tolist()}")
+
     return adata_filtered
 
 
@@ -799,15 +835,20 @@ def update_adata_with_dge_info(adata: AnnData, rank_df: pd.DataFrame = None, uns
         rank_df = sc.get.rank_genes_groups_df(adata, group=None)
 
     # Sort and deduplicate the rank DataFrame
-    rank_df_sorted = rank_df.sort_values(by=["names", "scores"], ascending=[True, False])
-    rank_df_dedup = rank_df_sorted.drop_duplicates(subset=["names"], keep="first")
+    rank_df_sorted = rank_df.sort_values(
+        by=["names", "scores"], ascending=[True, False])
+    rank_df_dedup = rank_df_sorted.drop_duplicates(
+        subset=["names"], keep="first")
 
     # Map groups and scores to the var names
-    names_to_group = pd.Series(rank_df_dedup.group.values, index=rank_df_dedup.names).to_dict()
-    names_to_scores = pd.Series(rank_df_dedup.scores.values, index=rank_df_dedup.names).to_dict()
+    names_to_group = pd.Series(
+        rank_df_dedup.group.values, index=rank_df_dedup.names).to_dict()
+    names_to_scores = pd.Series(
+        rank_df_dedup.scores.values, index=rank_df_dedup.names).to_dict()
 
     # Update the anndata var DataFrame with DGE group and score
-    adata.var[uns_group_key] = adata.var.index.map(names_to_group).fillna('No group')
+    adata.var[uns_group_key] = adata.var.index.map(
+        names_to_group).fillna('No group')
     adata.var[uns_score_key] = adata.var.index.map(names_to_scores).fillna(0)
 
 
@@ -836,12 +877,12 @@ def get_top_expressed_genes_by_tissue(adatas: List[AnnData], n: int = 1, column:
             trait = "Combined_Trait"
             if trait not in adata.obs:
                 raise ValueError(f"{trait} not found in adata.obs")
-            
+
         species_name = adata.uns['species']
-        
+
         tissue_genes = {}
         tissues = adata.obs[trait].unique()
-        
+
         for tissue in tissues:
             tissue_data = adata[adata.obs[trait] == tissue]
             # Sort genes based on mean expression and select the top N
@@ -852,17 +893,17 @@ def get_top_expressed_genes_by_tissue(adatas: List[AnnData], n: int = 1, column:
             else:
                 # Retrieve the index if column is None
                 top_genes = adata.var.iloc[top_gene_indices].index.tolist()
-            
+
             key = f"{tissue}_{species_name}"
             tissue_genes[key] = top_genes
-        
+
         gene_dicts.append(tissue_genes)
 
     return gene_dicts
 
 
-def create_mapping_dict(adata: AnnData, mapping_column: str = "moduleColors", value_column: str = None, 
-    transcripts: Dict[str, List[str]] = None, min_count: int = None) -> dict:
+def create_mapping_dict(adata: AnnData, mapping_column: str = "moduleColors", value_column: str = None,
+                        transcripts: Dict[str, List[str]] = None, min_count: int = None) -> dict:
     """
     Creates a dictionary mapping entries from the specified mapping column in adata.var to a list of associated transcripts
     or values from another specified column. Only the specified transcripts for each species are considered.
@@ -891,7 +932,8 @@ def create_mapping_dict(adata: AnnData, mapping_column: str = "moduleColors", va
     # Filter based on species-specific transcripts if provided
     species = adata.uns['species']
     if transcripts is not None and species in transcripts:
-        adata_var_filtered = adata.var.loc[adata.var.index.isin(transcripts[species])]
+        adata_var_filtered = adata.var.loc[adata.var.index.isin(
+            transcripts[species])]
     else:
         adata_var_filtered = adata.var
 
@@ -920,14 +962,14 @@ def create_mapping_dict(adata: AnnData, mapping_column: str = "moduleColors", va
 
     else:
         for transcript, row in adata_var_filtered.iterrows():
-            if pd.notna(row[mapping_column]): 
+            if pd.notna(row[mapping_column]):
                 elements = row[mapping_column].split(',')
                 for element in elements:
                     # Include species in the element key
                     element = f"{element}_{species}"
                     if element not in mapping_dict:
                         mapping_dict[element] = []
-                    
+
                     if value_column:
                         if pd.notna(row[value_column]):
                             value = row[value_column].strip()
@@ -946,7 +988,8 @@ def create_mapping_dict(adata: AnnData, mapping_column: str = "moduleColors", va
 
     # Filter dictionary by min_count if specified
     if min_count:
-        mapping_dict = {key: value for key, value in mapping_dict.items() if len(value) >= min_count}
+        mapping_dict = {key: value for key,
+                        value in mapping_dict.items() if len(value) >= min_count}
 
     return mapping_dict
 
@@ -991,11 +1034,13 @@ def get_jaccard_df(dicts: List[Dict[str, List[str]]], suffixes: List[str] = None
     if suffixes is None:
         suffixes = []
         for dic in dicts:
-            suffix = next(iter(dic)).split('_')[-1]  # Extract the suffix from the first key
+            # Extract the suffix from the first key
+            suffix = next(iter(dic)).split('_')[-1]
             suffixes.append(suffix)
 
     if len(dicts) != len(suffixes):
-        raise ValueError("The number of dictionaries must match the number of suffixes.")
+        raise ValueError(
+            "The number of dictionaries must match the number of suffixes.")
 
     # Create a combined dictionary with module colors as keys
     module_colors = {}
@@ -1007,7 +1052,8 @@ def get_jaccard_df(dicts: List[Dict[str, List[str]]], suffixes: List[str] = None
     flat_module_colors = list(module_colors.keys())
 
     # Initialize an empty DataFrame for Jaccard indices
-    jaccard_df = pd.DataFrame(0, index=flat_module_colors, columns=flat_module_colors, dtype=float)
+    jaccard_df = pd.DataFrame(
+        0, index=flat_module_colors, columns=flat_module_colors, dtype=float)
 
     # Calculate Jaccard index for each pair of module colors from each dictionary combination
     for color1 in flat_module_colors:
@@ -1023,17 +1069,17 @@ def get_jaccard_df(dicts: List[Dict[str, List[str]]], suffixes: List[str] = None
 def extract_top_similarities(jaccard_df: pd.DataFrame, top_n: int = 5, threshold: float = 0.4, inter_species_only: bool = False) -> pd.DataFrame:
     """
     Extracts the top N highest similarities from a Jaccard similarity DataFrame, with optional filtering to exclude intra-species comparisons.
-    
+
     Parameters:
     - jaccard_df (pd.DataFrame): The input DataFrame containing the Jaccard similarity indices.
     - top_n (int): Number of top similarities to return.
     - threshold (float): Minimum similarity value to consider.
     - inter_species_only (bool): If True, only inter-species comparisons are considered.
-    
+
     Returns:
     - pd.DataFrame: A DataFrame of the top N similarities, excluding intra-species comparisons if specified.
     """
-    
+
     # Create a mask to identify values above the threshold and off the diagonal
     mask = np.triu(np.ones_like(jaccard_df, dtype=bool), k=1)
     mask &= jaccard_df > threshold
@@ -1043,9 +1089,11 @@ def extract_top_similarities(jaccard_df: pd.DataFrame, top_n: int = 5, threshold
 
     if inter_species_only:
         # Extract species from row and column names
-        row_species = filtered_series.index.get_level_values(0).map(lambda x: x.split('_')[-1])
-        col_species = filtered_series.index.get_level_values(1).map(lambda x: x.split('_')[-1])
-        
+        row_species = filtered_series.index.get_level_values(
+            0).map(lambda x: x.split('_')[-1])
+        col_species = filtered_series.index.get_level_values(
+            1).map(lambda x: x.split('_')[-1])
+
         # Filter out intra-species comparisons
         filtered_series = filtered_series[row_species != col_species]
 
@@ -1057,7 +1105,7 @@ def extract_top_similarities(jaccard_df: pd.DataFrame, top_n: int = 5, threshold
     return result_df.reset_index()
 
 
-def prepare_and_save_wgcna(pyWGCNA_obj: object, output_path: str, gaf_path: str = None, ortho_file: str = None, 
+def prepare_and_save_wgcna(pyWGCNA_obj: object, output_path: str, gaf_path: str = None, ortho_file: str = None,
                            save_tom: bool = False, save_adjacency_matrix: bool = False, save_WGCNA: bool = False,
                            n: bool = 2, qc_metrics: bool = True) -> None:
     """
@@ -1088,7 +1136,8 @@ def prepare_and_save_wgcna(pyWGCNA_obj: object, output_path: str, gaf_path: str 
     adata = pyWGCNA_obj.datExpr
     name = pyWGCNA_obj.name
     hub_genes = pyWGCNA_obj.top_n_hub_genes(n=100)
-    hub_dict = {color: data for color, data in hub_genes.groupby('moduleColors')}
+    hub_dict = {color: data for color,
+                data in hub_genes.groupby('moduleColors')}
     for color, df in hub_dict.items():
         df.index = df.index.get_level_values(1)
 
@@ -1106,7 +1155,8 @@ def prepare_and_save_wgcna(pyWGCNA_obj: object, output_path: str, gaf_path: str 
     adata.uns["min_module_size"] = pyWGCNA_obj.minModuleSize
     adata.uns["sft"] = pyWGCNA_obj.sft.astype(float)
     adata.uns["gene_tree"] = pyWGCNA_obj.geneTree
-    adata.uns["metadata_corr"] = {"module_corr": pyWGCNA_obj.moduleTraitCor, "module_p": pyWGCNA_obj.moduleTraitPvalue}
+    adata.uns["metadata_corr"] = {
+        "module_corr": pyWGCNA_obj.moduleTraitCor, "module_p": pyWGCNA_obj.moduleTraitPvalue}
     adata.uns["hub_genes"] = hub_dict
     adata.uns["num_transcripts"] = pyWGCNA_obj.geneExpr.shape[1]
 
@@ -1117,8 +1167,9 @@ def prepare_and_save_wgcna(pyWGCNA_obj: object, output_path: str, gaf_path: str 
         add_ortho_id_to_anndata(adata, ortho_file, column_name=name)
     if qc_metrics:
         sc.pp.calculate_qc_metrics(adata, inplace=True)
-        adata.var.rename(columns={"n_cells_by_counts": "n_samples_by_counts"}, inplace=True)
-    
+        adata.var.rename(
+            columns={"n_cells_by_counts": "n_samples_by_counts"}, inplace=True)
+
     # Round float columns to n decimal places
     float_cols = adata.var.select_dtypes(include=['float64']).columns
     adata.var[float_cols] = adata.var[float_cols].round(n)
@@ -1129,12 +1180,14 @@ def prepare_and_save_wgcna(pyWGCNA_obj: object, output_path: str, gaf_path: str 
     if save_tom:
         # Save TOM outside of adata
         print("Saving topological overlap...")
-        save_matrix_to_hdf5(pyWGCNA_obj.TOM, f"{output_path}tom_matrix.h5", save_sym_only=False, include_diagonal=True)
+        save_matrix_to_hdf5(
+            pyWGCNA_obj.TOM, f"{output_path}tom_matrix.h5", save_sym_only=False, include_diagonal=True)
 
     if save_adjacency_matrix:
         # Save adjacency matrix outside of adata
         print("Saving adjacency matrix...")
-        save_matrix_to_hdf5(pyWGCNA_obj.adjacency, f"{output_path}adjacency_matrix.h5")
+        save_matrix_to_hdf5(pyWGCNA_obj.adjacency,
+                            f"{output_path}adjacency_matrix.h5")
 
 
 def get_adatas_info_df(adatas: List[AnnData], adatas_ortho: List[AnnData], trait: str = "tissue") -> pd.DataFrame:
@@ -1149,7 +1202,6 @@ def get_adatas_info_df(adatas: List[AnnData], adatas_ortho: List[AnnData], trait
     Returns:
     - pd.DataFrame: A DataFrame containing information from both the original and orthologous AnnData objects.
     """
-    
 
     combined_data = []
 
@@ -1197,12 +1249,13 @@ def reduce_tom_matrix(TOM: pd.DataFrame, reduction_percentage: float) -> pd.Data
     Returns:
     - pd.DataFrame: The reduced TOM matrix.
     """
-    
+
     num_genes = TOM.shape[0]
     num_to_remove = int(num_genes * reduction_percentage / 100)
     genes_to_remove = random.sample(list(TOM.index), num_to_remove)
 
-    reduced_TOM = TOM.drop(genes_to_remove, axis=0).drop(genes_to_remove, axis=1)
+    reduced_TOM = TOM.drop(genes_to_remove, axis=0).drop(
+        genes_to_remove, axis=1)
 
     return reduced_TOM
 
@@ -1251,7 +1304,8 @@ def save_matrix_to_hdf5(table: pd.DataFrame, filename: str, save_sym_only: bool 
             # Save the full data matrix
             f.create_dataset('data', data=table.values)
             f.attrs['save_sym_only'] = False
-            f.attrs['include_diagonal'] = True  # Not applicable when saving full matrix
+            # Not applicable when saving full matrix
+            f.attrs['include_diagonal'] = True
 
 
 def load_subset_from_hdf5(filename: str, rows: list, cols: list = None, threshold: float = None,
@@ -1262,7 +1316,7 @@ def load_subset_from_hdf5(filename: str, rows: list, cols: list = None, threshol
     Optionally, if include_neighbours is True, for each transcript in rows, the function
     checks for neighbors with a connection value >= threshold and adds up to max_neighbors
     (sorted by connection strength). After that, nodes without any valid connection are removed.
-    
+
     Parameters:
     - filename (str): HDF5 file name.
     - rows (list): List of transcript labels (for both rows and columns).
@@ -1273,7 +1327,7 @@ def load_subset_from_hdf5(filename: str, rows: list, cols: list = None, threshol
     - use_symmetry (bool): If True, uses symmetry (not supported with include_neighbours).
     - include_neighbours (bool): If True, add neighbors with connection >= threshold.
     - max_neighbors (int): Maximum number of neighbors to add per transcript.
-    
+
     Returns:
     - pd.DataFrame: The filtered TOM subset.
     """
@@ -1287,16 +1341,19 @@ def load_subset_from_hdf5(filename: str, rows: list, cols: list = None, threshol
 
     if include_neighbours:
         if threshold is None:
-            raise ValueError("A threshold must be provided if include_neighbours is True.")
+            raise ValueError(
+                "A threshold must be provided if include_neighbours is True.")
         if use_symmetry:
-            raise NotImplementedError("include_neighbours is not supported with use_symmetry=True.")
+            raise NotImplementedError(
+                "include_neighbours is not supported with use_symmetry=True.")
         # Load index maps if not provided
         if index_map is None or columns_map is None:
             with h5py.File(filename, 'r') as f:
                 file_index = [s.decode('utf-8') for s in f['index'][:]]
                 file_columns = [s.decode('utf-8') for s in f['columns'][:]]
             index_map = {label: idx for idx, label in enumerate(file_index)}
-            columns_map = {label: idx for idx, label in enumerate(file_columns)}
+            columns_map = {label: idx for idx,
+                           label in enumerate(file_columns)}
 
         new_transcripts = set(rows)
         inv_columns_map = {v: k for k, v in columns_map.items()}
@@ -1315,7 +1372,8 @@ def load_subset_from_hdf5(filename: str, rows: list, cols: list = None, threshol
                 neighbor_idxs = neighbor_idxs[neighbor_idxs != r_idx]
                 # If more than max_neighbors, select the strongest
                 if len(neighbor_idxs) > max_neighbors:
-                    sorted_idx = neighbor_idxs[np.argsort(row_data[neighbor_idxs])[::-1]]
+                    sorted_idx = neighbor_idxs[np.argsort(
+                        row_data[neighbor_idxs])[::-1]]
                     neighbor_idxs = sorted_idx[:max_neighbors]
                 for col_idx in neighbor_idxs:
                     neighbor = inv_columns_map.get(col_idx)
@@ -1350,8 +1408,10 @@ def load_subset_from_hdf5(filename: str, rows: list, cols: list = None, threshol
                 n = f.attrs['n']
                 full_matrix = squareform(data_upper)
                 if full_matrix.shape[0] < n:
-                    full_matrix = np.pad(full_matrix, ((0, 1), (0, 1)), mode='constant', constant_values=0)
-                block_data = full_matrix[np.ix_(row_indices_sorted, col_indices_sorted)]
+                    full_matrix = np.pad(
+                        full_matrix, ((0, 1), (0, 1)), mode='constant', constant_values=0)
+                block_data = full_matrix[np.ix_(
+                    row_indices_sorted, col_indices_sorted)]
             else:
                 data = f['data']
                 data_rows = data[row_indices_sorted, :]
@@ -1369,7 +1429,8 @@ def load_subset_from_hdf5(filename: str, rows: list, cols: list = None, threshol
         np.fill_diagonal(df_subset.values, np.nan)
         mask = df_subset > threshold
         df_subset = df_subset.where(mask, other=np.nan)
-        df_subset = df_subset.dropna(how='all', axis=0).dropna(how='all', axis=1)
+        df_subset = df_subset.dropna(
+            how='all', axis=0).dropna(how='all', axis=1)
 
     return df_subset
 
@@ -1400,7 +1461,8 @@ def convert_hdf5_to_upper_triangle(old_filename, new_filename):
         f_new.create_dataset('data_upper', data=upper_triangle)
         f_new.attrs['n'] = n
         f_new.create_dataset('index', data=np.array(index_labels, dtype='S'))
-        f_new.create_dataset('columns', data=np.array(column_labels, dtype='S'))
+        f_new.create_dataset(
+            'columns', data=np.array(column_labels, dtype='S'))
 
 
 def get_tom_maps(file_path: str) -> Tuple[Dict[str, List[str]], Dict[str, List[str]]]:
@@ -1427,25 +1489,26 @@ def get_tom_maps(file_path: str) -> Tuple[Dict[str, List[str]], Dict[str, List[s
 def add_MADS(adatas: Union[AnnData, List[AnnData]], path: str = "../info/MADS") -> None:
     """
     Add a 'MADS' column to the var attribute of AnnData objects.
-    
+
     Parameters:
     - adatas (Union[AnnData, List[AnnData]]): Single AnnData object or list of AnnData objects.
     - path (str): Path to the MADS TSV file containing the plant names and transcripts.
-    
+
     Returns:
     - None
     """
 
-    mads_df = pd.read_csv(path, sep='\t', header=None, names=['Plant', 'Transcript'])
-    
+    mads_df = pd.read_csv(path, sep='\t', header=None,
+                          names=['Plant', 'Transcript'])
+
     if isinstance(adatas, AnnData):
         adatas = [adatas]
-    
+
     # Process each AnnData object
     for adata in adatas:
         if 'MADS' not in adata.var.columns:
             adata.var['MADS'] = False
-        
+
         plant_name = adata.uns['name']
         plant_mads = mads_df[mads_df['Plant'] == plant_name]['Transcript']
         adata.var['MADS'] = adata.var.index.isin(plant_mads).astype(bool)
@@ -1454,11 +1517,11 @@ def add_MADS(adatas: Union[AnnData, List[AnnData]], path: str = "../info/MADS") 
 def load_comparison(adatas: List[AnnData], directory: str) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """
     Loads the matrices and returns only the subsets that pertain to the species in the provided adatas.
-    
+
     Parameters:
     - adatas (List[AnnData]): List of AnnData objects.
     - directory (str): Directory from which the files will be loaded.
-    
+
     Returns:
     - Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]: Filtered correlation matrix, p-value matrix, and combined DataFrame.
     """
@@ -1471,25 +1534,29 @@ def load_comparison(adatas: List[AnnData], directory: str) -> Tuple[pd.DataFrame
     combined_df = pd.read_csv(f"{directory}/combined_df.csv", index_col=0)
 
     # Filter columns based on species names
-    filtered_columns_corr_pvals = [col for col in corr.columns if any(species in col for species in species_list)]
-    filtered_columns_combined = [col for col in combined_df.columns if any(species in col for species in species_list)]
+    filtered_columns_corr_pvals = [col for col in corr.columns if any(
+        species in col for species in species_list)]
+    filtered_columns_combined = [col for col in combined_df.columns if any(
+        species in col for species in species_list)]
 
     # Filter rows and columns for correlation and p-value matrices
-    corr_filtered = corr.loc[filtered_columns_corr_pvals, filtered_columns_corr_pvals]
-    pvals_filtered = pvals.loc[filtered_columns_corr_pvals, filtered_columns_corr_pvals]
-    
+    corr_filtered = corr.loc[filtered_columns_corr_pvals,
+                             filtered_columns_corr_pvals]
+    pvals_filtered = pvals.loc[filtered_columns_corr_pvals,
+                               filtered_columns_corr_pvals]
+
     # Filter columns for combined DataFrame
     combined_df_filtered = combined_df[filtered_columns_combined]
-    
+
     return corr_filtered, pvals_filtered, combined_df_filtered
 
 
-def identify_network_clusters(G: nx.Graph, cluster_name: str, 
-                              node_threshold: int = None, node_threshold_percent: float = 0.02, 
+def identify_network_clusters(G: nx.Graph, cluster_name: str,
+                              node_threshold: int = None, node_threshold_percent: float = 0.02,
                               print_info: bool = False) -> Dict[str, str]:
     """
     Assigns nodes to clusters based on the graph object and returns a mapping of nodes to cluster assignments.
-    
+
     Parameters:
     - G (nx.Graph): The graph object.
     - cluster_name (str): Prefix for cluster assignment.
@@ -1500,7 +1567,7 @@ def identify_network_clusters(G: nx.Graph, cluster_name: str,
     Returns:
     - Dict[str, str]: Mapping of transcript IDs to cluster assignments.
     """
-    
+
     if not isinstance(cluster_name, str):
         raise TypeError("cluster_name must be a string")
 
@@ -1509,12 +1576,14 @@ def identify_network_clusters(G: nx.Graph, cluster_name: str,
 
     if not node_threshold:
         if not node_threshold_percent:
-            raise ValueError("Either node_threshold or node_threshold_percent must be provided")
-        
+            raise ValueError(
+                "Either node_threshold or node_threshold_percent must be provided")
+
         node_threshold = int(len(G.nodes) * node_threshold_percent)
 
     # Assign clusters to transcripts if they meet the node_threshold
-    filtered_clusters = [cluster for cluster in clusters if len(cluster) >= node_threshold]
+    filtered_clusters = [
+        cluster for cluster in clusters if len(cluster) >= node_threshold]
 
     cluster_map = {}
     for new_cluster_id, cluster in enumerate(filtered_clusters, start=1):
@@ -1529,9 +1598,11 @@ def identify_network_clusters(G: nx.Graph, cluster_name: str,
     if print_info:
         cluster_counts = pd.Series(cluster_map).value_counts().sort_index()
         for cluster_id, count in cluster_counts.items():
-            cluster_transcripts = [t for t, c in cluster_map.items() if c == cluster_id]
-            print(f"{cluster_id}: {count} transcripts - {', '.join(cluster_transcripts)}")
-    
+            cluster_transcripts = [
+                t for t, c in cluster_map.items() if c == cluster_id]
+            print(
+                f"{cluster_id}: {count} transcripts - {', '.join(cluster_transcripts)}")
+
     return cluster_map
 
 
@@ -1544,9 +1615,9 @@ def add_at_id(adata: AnnData, filename: str = "/vol/ranomics/mads-box/N0.tsv") -
     - adata (AnnData): The AnnData object containing the data.
     - filename (str): The path to the mapping file.
     """
-    
+
     name = adata.uns['name']
-    
+
     def parse_mapping_line(line: str) -> dict:
         parts = line.split('\t')
         orthogroup = parts[1]
@@ -1578,11 +1649,14 @@ def add_at_id(adata: AnnData, filename: str = "/vol/ranomics/mads-box/N0.tsv") -
                 parsed_line = parse_mapping_line(line)
                 for orthogroup, transcripts in parsed_line.items():
                     for plant_transcript in transcripts[name]:
-                        plant_transcript_no_prefix = remove_prefix(plant_transcript)
+                        plant_transcript_no_prefix = remove_prefix(
+                            plant_transcript)
                         if plant_transcript_no_prefix not in mapping_dict:
                             mapping_dict[plant_transcript_no_prefix] = []
-                        gene_names = [extract_gene(remove_prefix(at_transcript)) for at_transcript in transcripts['AT']]
-                        mapping_dict[plant_transcript_no_prefix].extend(gene_names)
+                        gene_names = [extract_gene(remove_prefix(
+                            at_transcript)) for at_transcript in transcripts['AT']]
+                        mapping_dict[plant_transcript_no_prefix].extend(
+                            gene_names)
 
     def map_transcripts(plant_transcript):
         if plant_transcript in mapping_dict:
@@ -1591,15 +1665,18 @@ def add_at_id(adata: AnnData, filename: str = "/vol/ranomics/mads-box/N0.tsv") -
         return None
 
     adata.var['AT_ID'] = adata.var.index.map(map_transcripts)
-    adata.var['AT_ID'] = adata.var['AT_ID'].str.replace(r'\.Araport[^\s,]*', '', regex=True)
+    adata.var['AT_ID'] = adata.var['AT_ID'].str.replace(
+        r'\.Araport[^\s,]*', '', regex=True)
 
 # Based on moduleEigengenes function from PyWGCNA "https://github.com/mortazavilab/PyWGCNA/blob/main/PyWGCNA/wgcna.py"
-def calculate_eigengenes(adata: AnnData, cluster_map: Dict[str, str], column: str = "clusters", exclude: List[str] = None, 
-                         impute: bool = True, nPC: int = 1, align: str = "along average", scaleVar: bool = True, 
+
+
+def calculate_eigengenes(adata: AnnData, cluster_map: Dict[str, str], column: str = "clusters", exclude: List[str] = None,
+                         impute: bool = True, nPC: int = 1, align: str = "along average", scaleVar: bool = True,
                          store_in_obsm: bool = False) -> dict:
     """
     Calculates module eigengenes (1st principal component) of modules in a given single dataset.
-    
+
     Parameters:
     - adata (AnnData): Annotated data matrix.
     - cluster_map (Dict[str, str]): Mapping of genes to module assignments.
@@ -1610,18 +1687,21 @@ def calculate_eigengenes(adata: AnnData, cluster_map: Dict[str, str], column: st
     - align (str): Align eigengenes with average expression.
     - scaleVar (bool): Scale expression data before SVD.
     - store_in_obsm (bool): Whether to store eigengenes in adata.obsm.
-    
+
     Returns:
     - dict: Dictionary containing "eigengenes", "averageExpr", "varExplained", and "moduleInfo".
     """
 
-    expr = pd.DataFrame(adata.X, index=adata.obs_names, columns=adata.var_names)
+    expr = pd.DataFrame(adata.X, index=adata.obs_names,
+                        columns=adata.var_names)
     module_colors = adata.var['moduleColors']
 
     # Remove alle Keys of the cluster_map that are not in the adata.var.index
-    cluster_map = {key: value for key, value in cluster_map.items() if key in expr.columns}
-    
-    clusters = pd.Series(expr.columns.map(cluster_map).fillna("No clusters"), index=expr.columns, name=column)
+    cluster_map = {key: value for key,
+                   value in cluster_map.items() if key in expr.columns}
+
+    clusters = pd.Series(expr.columns.map(cluster_map).fillna(
+        "No clusters"), index=expr.columns, name=column)
     modules = pd.Categorical(clusters).categories
 
     if exclude:
@@ -1650,7 +1730,8 @@ def calculate_eigengenes(adata: AnnData, cluster_map: Dict[str, str], column: st
             expr_mod = imputer.fit_transform(expr_mod)
 
         if scaleVar and expr_mod.size > 0:
-            expr_mod = pd.DataFrame(scale(expr_mod, axis=0), index=expr.index, columns=module_genes)
+            expr_mod = pd.DataFrame(
+                scale(expr_mod, axis=0), index=expr.index, columns=module_genes)
 
         # Calculate SVD and align eigengene
         if expr_mod.size > 0:
@@ -1685,10 +1766,12 @@ def calculate_eigengenes(adata: AnnData, cluster_map: Dict[str, str], column: st
 
     if total_transcripts_all > 0:
         color_counts_all = module_colors[included_genes].value_counts()
-        most_common_module_all = color_counts_all.idxmax() if not color_counts_all.empty else None
-        most_common_module_count_all = color_counts_all.max() if not color_counts_all.empty else 0
+        most_common_module_all = color_counts_all.idxmax(
+        ) if not color_counts_all.empty else None
+        most_common_module_count_all = color_counts_all.max(
+        ) if not color_counts_all.empty else 0
         unique_modules_all = color_counts_all[color_counts_all > 0].count()
-        
+
         moduleInfo["All Clusters"] = {
             "species": adata.uns['species'],
             "total_transcripts": total_transcripts_all,
@@ -1696,14 +1779,16 @@ def calculate_eigengenes(adata: AnnData, cluster_map: Dict[str, str], column: st
             "most_common_module_percentage": round((most_common_module_count_all / total_transcripts_all) * 100, 2) if total_transcripts_all > 0 else 0,
             "unique_modules": unique_modules_all
         }
-    
+
         # Impute and scale if applicable
         if impute and not all_dataModule.empty:
-            imputer = KNNImputer(n_neighbors=min(10, all_dataModule.shape[0] - 1))
+            imputer = KNNImputer(n_neighbors=min(
+                10, all_dataModule.shape[0] - 1))
             all_dataModule = imputer.fit_transform(all_dataModule)
-        
+
     if scaleVar and all_dataModule.size > 0:
-        all_dataModule = pd.DataFrame(scale(all_dataModule, axis=0), index=expr.index, columns=included_genes)
+        all_dataModule = pd.DataFrame(
+            scale(all_dataModule, axis=0), index=expr.index, columns=included_genes)
 
     # Calculate SVD and align eigengene for all clusters
     if all_dataModule.size > 0:
@@ -1715,8 +1800,9 @@ def calculate_eigengenes(adata: AnnData, cluster_map: Dict[str, str], column: st
                 eigengene = -eigengene
         PrinComps[f"{adata.uns['name']}: All Clusters"] = eigengene
         averExpr[f"{adata.uns['name']}: AE_All"] = all_dataModule.mean(axis=1)
-        varExpl[f"{adata.uns['name']}: All Clusters"] = (s[:nPC]**2) / np.sum(s**2)
-    
+        varExpl[f"{adata.uns['name']}: All Clusters"] = (
+            s[:nPC]**2) / np.sum(s**2)
+
     # Store results in adata.obsm if specified
     if store_in_obsm:
         adata.obsm[column] = PrinComps
@@ -1728,7 +1814,7 @@ def calculate_eigengenes(adata: AnnData, cluster_map: Dict[str, str], column: st
     # Remove the "No clusters" key if it exists
     PrinComps = PrinComps.drop(f"No clusters", axis=1, errors='ignore')
     moduleInfo_df = moduleInfo_df.drop(f"No clusters", axis=0, errors='ignore')
-        
+
     return {
         "eigengenes": PrinComps,
         "averageExpr": averExpr,
@@ -1737,6 +1823,8 @@ def calculate_eigengenes(adata: AnnData, cluster_map: Dict[str, str], column: st
     }
 
 # Based on getDatTraits function from PyWGCNA "https://github.com/mortazavilab/PyWGCNA/blob/main/PyWGCNA/wgcna.py"
+
+
 def get_data_trait_df(adata: AnnData, meta_data: str) -> pd.DataFrame:
     """
     Converts metadata from an AnnData object to a DataFrame with binary traits.
@@ -1761,7 +1849,7 @@ def get_data_trait_df(adata: AnnData, meta_data: str) -> pd.DataFrame:
             org = np.unique(data.iloc[:, i]).tolist()
             rep = list(range(len(org)))
             datTraits.replace(to_replace=org, value=rep,
-                                inplace=True)
+                              inplace=True)
         elif len(np.unique(data.iloc[:, i])) > 2:
             for name in np.unique(data.iloc[:, i]):
                 datTraits[name] = data.iloc[:, i]
@@ -1775,8 +1863,8 @@ def get_data_trait_df(adata: AnnData, meta_data: str) -> pd.DataFrame:
     return datTraits
 
 
-def generate_html_from_df(df: pd.DataFrame, title: str = "Data table", table_id: str = "dataTable", output_path: str = ".", 
-                                         template_path: str = "../flask/app_dev/templates", col_names: List[str] = None) -> str:
+def generate_html_from_df(df: pd.DataFrame, title: str = "Data table", table_id: str = "dataTable", output_path: str = ".",
+                          template_path: str = "../flask/app_dev/templates", col_names: List[str] = None) -> str:
     """
     Generate an HTML file from a DataFrame for displaying the analysis table.
 
@@ -1794,30 +1882,31 @@ def generate_html_from_df(df: pd.DataFrame, title: str = "Data table", table_id:
 
     if col_names:
         df.columns = col_names
-    
+
     df = df.reset_index(drop=True)
-    table_html = df.to_html(classes='display dataTable no-border', index=False, border=0, header=True, table_id=table_id)
-    
+    table_html = df.to_html(classes='display dataTable no-border',
+                            index=False, border=0, header=True, table_id=table_id)
+
     # Load the Jinja2 environment
     env = Environment(loader=FileSystemLoader(searchpath=template_path))
-    
+
     # Load the template
     template = env.get_template("table.html")
-    
+
     # Render the template with the required dynamic data
     rendered_html = template.render(
         title=title,
         table_html=table_html,
         table_id=table_id
     )
-    
+
     # Output file path
     output_file = os.path.join(output_path, f"{table_id}.html")
-    
+
     # Write the rendered HTML to a file
     with open(output_file, "w") as f:
         f.write(rendered_html)
-    
+
     return output_file
 
 
@@ -1827,7 +1916,6 @@ def export_co_expression_network_to_cytoscape(
     selected_module_colors: List[str] = None,
     threshold: float = 0.5
 ) -> dict:
-    
     """
     Exports the co-expression network(s) in a format compatible with Cytoscape.js.
 
@@ -1844,12 +1932,14 @@ def export_co_expression_network_to_cytoscape(
     # Check if both tom and adata are lists
     if isinstance(tom, list) and isinstance(adata, list):
         if len(tom) != len(adata):
-            raise ValueError("The number of TOMs and AnnData objects must be the same.")
+            raise ValueError(
+                "The number of TOMs and AnnData objects must be the same.")
         tom_adata_pairs = zip(tom, adata)
     elif isinstance(tom, pd.DataFrame) and isinstance(adata, AnnData):
         tom_adata_pairs = [(tom, adata)]
     else:
-        raise TypeError("Both tom and adata must be either lists or single objects of their respective types.")
+        raise TypeError(
+            "Both tom and adata must be either lists or single objects of their respective types.")
 
     nodes = []
     edges = []
@@ -1859,7 +1949,8 @@ def export_co_expression_network_to_cytoscape(
         gene_metadata = current_adata.var
 
         if selected_module_colors:
-            mod_genes = gene_metadata[gene_metadata['moduleColors'].isin(selected_module_colors)].index
+            mod_genes = gene_metadata[gene_metadata['moduleColors'].isin(
+                selected_module_colors)].index
         else:
             mod_genes = gene_metadata.index
 
@@ -1888,7 +1979,8 @@ def export_co_expression_network_to_cytoscape(
                 }
             }
             # Replace all NaN values with empty strings
-            node_data['data'] = {k: v if not pd.isna(v) else "" for k, v in node_data['data'].items()}
+            node_data['data'] = {k: v if not pd.isna(
+                v) else "" for k, v in node_data['data'].items()}
             nodes.append(node_data)
 
         # Add edges
@@ -1911,12 +2003,12 @@ def export_co_expression_network_to_cytoscape(
     return {'nodes': nodes, 'edges': edges}
 
 
-def identify_network_clusters_from_json(network_data: dict, cluster_name: str, 
-                                        node_threshold: int = None, node_threshold_percent: float = 0.02, 
+def identify_network_clusters_from_json(network_data: dict, cluster_name: str,
+                                        node_threshold: int = None, node_threshold_percent: float = 0.02,
                                         print_info: bool = False) -> Dict[str, str]:
     """
     Assigns nodes to clusters based on the network data in Cytoscape.js format and returns a mapping of nodes to cluster assignments.
-    
+
     Parameters:
     - network_data (dict): The network data in Cytoscape.js format (contains 'nodes' and 'edges').
     - cluster_name (str): Prefix for cluster assignment.
@@ -1927,7 +2019,7 @@ def identify_network_clusters_from_json(network_data: dict, cluster_name: str,
     Returns:
     - Dict[str, str]: Mapping of transcript IDs to cluster assignments.
     """
-    
+
     if not isinstance(cluster_name, str):
         raise TypeError("cluster_name must be a string")
 
@@ -1962,11 +2054,14 @@ def identify_network_clusters_from_json(network_data: dict, cluster_name: str,
     # Apply node_threshold based on percentage
     if not node_threshold:
         if not node_threshold_percent:
-            raise ValueError("Either node_threshold or node_threshold_percent must be provided")
-        node_threshold = int(len(network_data['nodes']) * node_threshold_percent)
+            raise ValueError(
+                "Either node_threshold or node_threshold_percent must be provided")
+        node_threshold = int(
+            len(network_data['nodes']) * node_threshold_percent)
 
     # Filter clusters based on the node_threshold
-    filtered_clusters = [cluster for cluster in clusters if len(cluster[0]) >= node_threshold]
+    filtered_clusters = [cluster for cluster in clusters if len(
+        cluster[0]) >= node_threshold]
 
     # Assign clusters to transcripts
     cluster_map = {}
@@ -1985,9 +2080,11 @@ def identify_network_clusters_from_json(network_data: dict, cluster_name: str,
     if print_info:
         cluster_counts = pd.Series(cluster_map).value_counts().sort_index()
         for cluster_id, count in cluster_counts.items():
-            cluster_transcripts = [t for t, c in cluster_map.items() if c == cluster_id]
-            print(f"{cluster_id}: {count} transcripts - {', '.join(cluster_transcripts)}")
-    
+            cluster_transcripts = [
+                t for t, c in cluster_map.items() if c == cluster_id]
+            print(
+                f"{cluster_id}: {count} transcripts - {', '.join(cluster_transcripts)}")
+
     return cluster_map
 
 
@@ -2013,7 +2110,8 @@ def calculate_tom_metrics(tom: pd.DataFrame) -> pd.DataFrame:
             sub_tom = tom.loc[neighbors, neighbors]
             actual_edges = (sub_tom > 0).sum().sum() / 2
             possible_edges = len(neighbors) * (len(neighbors) - 1) / 2
-            clustering_coefficient.append(actual_edges / possible_edges if possible_edges > 0 else 0)
+            clustering_coefficient.append(
+                actual_edges / possible_edges if possible_edges > 0 else 0)
 
     connected_components = (degrees > 0).astype(int)
 
@@ -2042,7 +2140,8 @@ def calculate_graph_metrics_from_clusters(tom: pd.DataFrame, cluster_info: dict)
     G.add_vertices(tom.index.tolist())
 
     # Add edges with weights (no self-loops)
-    edges = [(i, j) for i in range(tom.shape[0]) for j in range(i + 1, tom.shape[1]) if tom.iat[i, j] > 0]
+    edges = [(i, j) for i in range(tom.shape[0])
+             for j in range(i + 1, tom.shape[1]) if tom.iat[i, j] > 0]
     weights = [tom.iat[i, j] for i, j in edges]
     G.add_edges(edges)
     G.es['weight'] = weights
@@ -2051,8 +2150,10 @@ def calculate_graph_metrics_from_clusters(tom: pd.DataFrame, cluster_info: dict)
     missing_nodes = [node for node in cluster_info if node not in G.vs['name']]
     if missing_nodes:
         # Print missing nodes and filter them out from `cluster_info`
-        print(f"The following nodes are missing from the graph and will be excluded: {missing_nodes}")
-        cluster_info = {node: cluster for node, cluster in cluster_info.items() if node not in missing_nodes}
+        print(
+            f"The following nodes are missing from the graph and will be excluded: {missing_nodes}")
+        cluster_info = {node: cluster for node,
+                        cluster in cluster_info.items() if node not in missing_nodes}
 
     # Divide cluster information into subgraphs
     cluster_to_nodes = {}
@@ -2073,13 +2174,16 @@ def calculate_graph_metrics_from_clusters(tom: pd.DataFrame, cluster_info: dict)
             num_nodes = len(component_subgraph.vs)
 
             # Betweenness Centrality, normalized to [0, 1] for the component
-            betweenness_centrality = component_subgraph.betweenness(weights='weight')
+            betweenness_centrality = component_subgraph.betweenness(
+                weights='weight')
             if num_nodes > 2:
-                betweenness_centrality = [b / ((num_nodes - 1) * (num_nodes - 2) / 2) for b in betweenness_centrality]
+                betweenness_centrality = [
+                    b / ((num_nodes - 1) * (num_nodes - 2) / 2) for b in betweenness_centrality]
 
             # Closeness Centrality and Eccentricity
             closeness_centrality = component_subgraph.closeness()
-            eccentricity = [int(e) if e is not None else None for e in component_subgraph.eccentricity()]
+            eccentricity = [
+                int(e) if e is not None else None for e in component_subgraph.eccentricity()]
 
             # Assign metrics to node names
             for i, node in enumerate(component_subgraph.vs['name']):
@@ -2094,7 +2198,7 @@ def calculate_graph_metrics_from_clusters(tom: pd.DataFrame, cluster_info: dict)
     return pd.DataFrame(metrics_list)
 
 
-def calculate_all_tom_metrics(tom: Union[pd.DataFrame, List[pd.DataFrame]], adata: Union[AnnData, List[AnnData]], 
+def calculate_all_tom_metrics(tom: Union[pd.DataFrame, List[pd.DataFrame]], adata: Union[AnnData, List[AnnData]],
                               cluster_info: Dict[str, str], tool: str, progress_callback: Callable[[str], None] = None) -> pd.DataFrame:
     """
     Combines TOM-based metrics, cluster-based graph metrics, connectivity, and average TOM value into a single table.
@@ -2111,57 +2215,67 @@ def calculate_all_tom_metrics(tom: Union[pd.DataFrame, List[pd.DataFrame]], adat
     - pd.DataFrame: A combined table containing TOM metrics.
       Each node appears only once, and metrics are calculated based on the TOM it belongs to.
     """
-    
+
     def calculate_metrics_single(tom_single: pd.DataFrame, adata: AnnData, cluster_info_single: Dict[str, str]) -> pd.DataFrame:
         if tool == "cytoscape":
             # Keep everything after the first "_"
-            cluster_info_single = {"_".join(key.split("_")[1:]): value for key, value in cluster_info_single.items()}
+            cluster_info_single = {"_".join(
+                key.split("_")[1:]): value for key, value in cluster_info_single.items()}
 
         if progress_callback:
-            progress_callback(f"Calculating TOM metrics for dataset {adata.uns['name']}")
+            progress_callback(
+                f"Calculating TOM metrics for dataset {adata.uns['name']}")
 
         # Fill NaN values with 0
         tom_filled = tom_single.fillna(0)
 
         # Get species name
         tom_species = adata.uns['species']
-        
+
         # Calculate TOM-based metrics
         tom_metrics = calculate_tom_metrics(tom_filled)
-        
+
         # Calculate graph-based metrics from clusters
-        graph_metrics = calculate_graph_metrics_from_clusters(tom_filled, cluster_info_single)
-        
+        graph_metrics = calculate_graph_metrics_from_clusters(
+            tom_filled, cluster_info_single)
+
         # Calculate Connectivity (sum over rows minus self-loops)
         connectivity = tom_filled.sum(axis=1) - tom_filled.values.diagonal()
-        
+
         # Calculate average TOM value for each node (excluding self-loops)
-        average_tom = (tom_filled.sum(axis=1) - tom_filled.values.diagonal()) / ((tom_filled > 0).sum(axis=1))
-        average_tom = average_tom.fillna(0)  # Handle NaN values for isolated nodes
-        
+        average_tom = (tom_filled.sum(
+            axis=1) - tom_filled.values.diagonal()) / ((tom_filled > 0).sum(axis=1))
+        # Handle NaN values for isolated nodes
+        average_tom = average_tom.fillna(0)
+
         # Set indices for merging
         graph_metrics.set_index('node', inplace=True)
         tom_metrics.index.name = 'node'
         tom_metrics['connectivity'] = connectivity
         tom_metrics['average_tom'] = average_tom
-        
+
         # Merge TOM metrics and graph metrics
-        combined_metrics = pd.merge(tom_metrics, graph_metrics, left_index=True, right_index=True)
+        combined_metrics = pd.merge(
+            tom_metrics, graph_metrics, left_index=True, right_index=True)
         combined_metrics['species'] = tom_species
 
-        ortho_ID = adata.var['ortho_ID'] if 'ortho_ID' in adata.var.columns else pd.Series([""] * len(adata.var), index=adata.var.index)
+        ortho_ID = adata.var['ortho_ID'] if 'ortho_ID' in adata.var.columns else pd.Series(
+            [""] * len(adata.var), index=adata.var.index)
         combined_metrics['ortho_ID'] = combined_metrics.index.map(ortho_ID)
 
         # Set ortho_ID as the second column
-        combined_metrics = combined_metrics[['ortho_ID'] + [col for col in combined_metrics.columns if col != 'ortho_ID']]
-        combined_metrics['ortho_ID'] = combined_metrics['ortho_ID'].replace('', 'No orthogroup')
+        combined_metrics = combined_metrics[[
+            'ortho_ID'] + [col for col in combined_metrics.columns if col != 'ortho_ID']]
+        combined_metrics['ortho_ID'] = combined_metrics['ortho_ID'].replace(
+            '', 'No orthogroup')
 
         # Set Species as the first column
-        combined_metrics = combined_metrics[['species'] + [col for col in combined_metrics.columns if col != 'species']]
+        combined_metrics = combined_metrics[[
+            'species'] + [col for col in combined_metrics.columns if col != 'species']]
 
         # Set node as index
         combined_metrics.index.name = 'Node'
-        
+
         # Rename columns for consistency
         combined_metrics.columns = [
             'Species', 'Orthogroup', 'Degree', 'Clustering Coefficient', 'Connected Components', 'Connectivity',
@@ -2169,20 +2283,24 @@ def calculate_all_tom_metrics(tom: Union[pd.DataFrame, List[pd.DataFrame]], adat
         ]
 
         # Drop columns Connectivity, Average TOM Value, and Connected Components
-        combined_metrics.drop(columns=['Connectivity', 'Average TOM Value', 'Connected Components'], inplace=True)
-        
+        combined_metrics.drop(
+            columns=['Connectivity', 'Average TOM Value', 'Connected Components'], inplace=True)
+
         return combined_metrics
 
     if isinstance(tom, list):
         if not isinstance(cluster_info, dict):
-            raise ValueError("When 'tom' is a list, 'cluster_info' must be a single dictionary containing cluster assignments for all nodes.")
+            raise ValueError(
+                "When 'tom' is a list, 'cluster_info' must be a single dictionary containing cluster assignments for all nodes.")
         if not isinstance(adata, list):
-            raise ValueError("When 'tom' is a list, 'adata' must be a list of AnnData objects.")
+            raise ValueError(
+                "When 'tom' is a list, 'adata' must be a list of AnnData objects.")
         if not len(tom) == len(adata):
-            raise ValueError("The number of TOMs and AnnData objects must be the same.")
-        
+            raise ValueError(
+                "The number of TOMs and AnnData objects must be the same.")
+
         all_metrics = []
-        
+
         for i, tom_single in enumerate(tom):
             # Check if tom_single is empty
             if tom_single.empty:
@@ -2190,35 +2308,39 @@ def calculate_all_tom_metrics(tom: Union[pd.DataFrame, List[pd.DataFrame]], adat
 
             # Get nodes in this TOM
             nodes = tom_single.index
-            
+
             # Add species prefix to nodes
             nodes = [f"{adata[i].uns['species']}_{node}" for node in nodes]
 
             # Extract cluster_info for these nodes
-            cluster_info_single = {node: cluster_info[node] for node in nodes if node in cluster_info}
-            
+            cluster_info_single = {
+                node: cluster_info[node] for node in nodes if node in cluster_info}
+
             # Calculate metrics for the current TOM
-            metrics_single = calculate_metrics_single(tom_single, adata[i], cluster_info_single)
-            
+            metrics_single = calculate_metrics_single(
+                tom_single, adata[i], cluster_info_single)
+
             # Append to the list
             all_metrics.append(metrics_single)
-        
+
         # Concatenate all metrics into a single DataFrame
         combined_all_metrics = pd.concat(all_metrics)
-        
+
         return combined_all_metrics
 
     elif isinstance(tom, pd.DataFrame):
         if not isinstance(cluster_info, dict):
-            raise ValueError("When 'tom' is a single DataFrame, 'cluster_info' must be a single dictionary containing cluster assignments.")
-        
+            raise ValueError(
+                "When 'tom' is a single DataFrame, 'cluster_info' must be a single dictionary containing cluster assignments.")
+
         # Calculate metrics for the single TOM
         combined_metrics = calculate_metrics_single(tom, adata, cluster_info)
-        
+
         return combined_metrics
 
     else:
-        raise TypeError("'tom' must be either a pandas DataFrame or a list of DataFrames.")
+        raise TypeError(
+            "'tom' must be either a pandas DataFrame or a list of DataFrames.")
 
 
 def add_go_terms_to_adata(adata: AnnData, go_mapping_file: str) -> AnnData:
@@ -2232,30 +2354,33 @@ def add_go_terms_to_adata(adata: AnnData, go_mapping_file: str) -> AnnData:
     Returns:
     - AnnData: Updated AnnData object with a new 'go_terms' column in var.
     """
-    
+
     if not os.path.exists(go_mapping_file):
-        print(f"Warning: GO mapping file '{go_mapping_file}' not found. Filling 'go_terms' with empty strings.")
+        print(
+            f"Warning: GO mapping file '{go_mapping_file}' not found. Filling 'go_terms' with empty strings.")
         adata.var["go_terms"] = ''
         return adata
-    
+
     # Load GO term mapping file into a DataFrame
-    go_df = pd.read_csv(go_mapping_file, sep="\t", header=None, names=["transcript", "go_terms"])
-    
+    go_df = pd.read_csv(go_mapping_file, sep="\t",
+                        header=None, names=["transcript", "go_terms"])
+
     # Ensure GO terms are separated by commas instead of spaces
     go_df["go_terms"] = go_df["go_terms"].str.replace(r"\s+", ",", regex=True)
-    
+
     # Group GO terms by transcript and join them as comma-separated strings
-    go_df = go_df.groupby("transcript")["go_terms"].apply(lambda x: ",".join(x)).reset_index()
-    
+    go_df = go_df.groupby("transcript")["go_terms"].apply(
+        lambda x: ",".join(x)).reset_index()
+
     # Create a dictionary for fast lookup
     go_dict = go_df.set_index("transcript")["go_terms"].to_dict()
-    
+
     # Map GO terms to adata.var.index
     adata.var["go_terms"] = adata.var.index.map(go_dict)
-    
+
     # Replace missing mappings with empty strings
     adata.var["go_terms"] = adata.var["go_terms"].fillna('')
-    
+
     return adata
 
 
@@ -2270,26 +2395,28 @@ def add_ipr_columns(adata: AnnData, ipr_mapping_file: str) -> AnnData:
     Returns:
     - AnnData: Updated AnnData object with new 'ipr_id' and 'ipr_desc' columns.
     """
-    
+
     if not os.path.exists(ipr_mapping_file):
-        print(f"Warning: IPR mapping file '{ipr_mapping_file}' not found. Filling 'ipr_id' and 'ipr_desc' with empty strings.")
+        print(
+            f"Warning: IPR mapping file '{ipr_mapping_file}' not found. Filling 'ipr_id' and 'ipr_desc' with empty strings.")
         adata.var["ipr_id"] = ''
         adata.var["ipr_desc"] = ''
         return adata
-    
+
     # Load the IPR mapping file
-    ipr_df = pd.read_csv(ipr_mapping_file, sep="\t", header=None, names=["transcript", "ipr_id", "ipr_desc"])
-    
+    ipr_df = pd.read_csv(ipr_mapping_file, sep="\t", header=None, names=[
+                         "transcript", "ipr_id", "ipr_desc"])
+
     # Group IPR IDs and descriptions by transcript
     grouped_ipr = ipr_df.groupby("transcript").agg({
         "ipr_id": lambda x: ",".join(x),
         "ipr_desc": lambda x: ",".join(x)
     }).reset_index()
-    
+
     # Create dictionaries for fast mapping
     ipr_dict_ids = grouped_ipr.set_index("transcript")["ipr_id"].to_dict()
     ipr_dict_desc = grouped_ipr.set_index("transcript")["ipr_desc"].to_dict()
-    
+
     # Map the IPR data to adata.var
     adata.var["ipr_id"] = adata.var.index.map(ipr_dict_ids)
     adata.var["ipr_desc"] = adata.var.index.map(ipr_dict_desc)
@@ -2297,7 +2424,7 @@ def add_ipr_columns(adata: AnnData, ipr_mapping_file: str) -> AnnData:
     # Fill missing values with empty strings
     adata.var["ipr_id"] = adata.var["ipr_id"].fillna('')
     adata.var["ipr_desc"] = adata.var["ipr_desc"].fillna('')
-    
+
     return adata
 
 
@@ -2305,7 +2432,7 @@ def add_combined_column(adata: AnnData, columns: List[str] = None, new_column_na
     """
     Adds a new column to adata.obs by combining values from specified or all columns.
     Optionally drops all other columns after adding the combined column.
-    
+
     Parameters:
     - adata (AnnData): The AnnData object containing the obs DataFrame.
     - columns (List[str]): The columns to combine. If None, all columns are used.
@@ -2326,10 +2453,12 @@ def add_combined_column(adata: AnnData, columns: List[str] = None, new_column_na
     adata.obs[new_column_name] = adata.obs[columns].apply(
         lambda row: " ".join(map(str, row)), axis=1
     )
-    
+
     # Drop all other columns if specified
     if drop_others:
         adata.obs = adata.obs[[new_column_name]]
-        print(f"Added combined column '{new_column_name}' and dropped all other columns")
+        print(
+            f"Added combined column '{new_column_name}' and dropped all other columns")
     else:
-        print(f"Added combined column '{new_column_name}', other columns retained")
+        print(
+            f"Added combined column '{new_column_name}', other columns retained")

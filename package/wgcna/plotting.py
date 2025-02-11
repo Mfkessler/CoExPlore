@@ -40,6 +40,7 @@ from bokeh.palettes import Category20, viridis
 
 plt.rcParams['savefig.bbox'] = 'tight'
 
+
 class PlotConfig:
     def __init__(self, save_plots=False, save_raw=False, output_path='./', file_format='png', show=True, dpi=300):
         self.save_plots = save_plots
@@ -49,6 +50,7 @@ class PlotConfig:
         self.show = show
         self.dpi = dpi
 
+
 ###########
 """
 WGCNA OBJECT PLOTS
@@ -56,7 +58,8 @@ Plotting functions for WGCNA objects using large matrices like TOM.
 """
 ###########
 
-def plot_static_TOM_network(tom_path: str, adata: AnnData, config: PlotConfig, transcripts: List[str], selected_module_colors: List[str] = None, 
+
+def plot_static_TOM_network(tom_path: str, adata: AnnData, config: PlotConfig, transcripts: List[str], selected_module_colors: List[str] = None,
                             threshold: float = 0.5, custom_filename: str = None) -> None:
     """
     Plots the co-expression network for large datasets using NetworkX and Matplotlib.
@@ -71,11 +74,13 @@ def plot_static_TOM_network(tom_path: str, adata: AnnData, config: PlotConfig, t
     - custom_filename (str): Custom filename for the plot.
     """
 
-    TOM = load_subset_from_hdf5(filename=tom_path, rows=transcripts, cols=transcripts, threshold=threshold)
+    TOM = load_subset_from_hdf5(
+        filename=tom_path, rows=transcripts, cols=transcripts, threshold=threshold)
     module_info = adata.var
 
     if selected_module_colors:
-        mod_genes = module_info[module_info['moduleColors'].isin(selected_module_colors)].index
+        mod_genes = module_info[module_info['moduleColors'].isin(
+            selected_module_colors)].index
     else:
         mod_genes = module_info.index
 
@@ -99,14 +104,16 @@ def plot_static_TOM_network(tom_path: str, adata: AnnData, config: PlotConfig, t
     nx.draw_networkx_edges(G, pos, width=edge_weights)
     species = f"{adata.uns['species']}" if adata.uns['species'] is not None else ""
     if len(species.split()) > 1:
-        plt.title(f"Co-Expression Network of $\it{{{species.split()[0]}}}$ $\it{{{species.split()[1]}}}$")
+        plt.title(
+            f"Co-Expression Network of $\it{{{species.split()[0]}}}$ $\it{{{species.split()[1]}}}$")
     else:
         plt.title(f"Co-Expression Network")
 
     full_name = f"co_expression_network" if not custom_filename else custom_filename
 
     if config.save_plots:
-        plt.savefig(f"{config.output_path}/{full_name}.{config.file_format}", dpi=config.dpi)
+        plt.savefig(
+            f"{config.output_path}/{full_name}.{config.file_format}", dpi=config.dpi)
         plt.savefig(f"{config.output_path}/{full_name}.png", dpi=config.dpi)
 
     if config.save_raw:
@@ -134,8 +141,8 @@ def generate_shape_dict(traces: List[str], species_list_path: str = "../info/spe
         'circle', 'square', 'triangle-up', 'diamond', 'cross', 'x',
         'triangle-down', 'triangle-left', 'triangle-right', 'pentagon',
         'hexagon', 'hexagram', 'star', 'star-triangle-up', 'star-triangle-down',
-        'star-square', 'star-diamond', 'triangle-ne', 'triangle-se', 'bowtie', 'hourglass', 
-        'triangle-sw', 'triangle-nw', 'hexagon2', 'diamond-tall', 'diamond-wide', 
+        'star-square', 'star-diamond', 'triangle-ne', 'triangle-se', 'bowtie', 'hourglass',
+        'triangle-sw', 'triangle-nw', 'hexagon2', 'diamond-tall', 'diamond-wide',
         'circle-open', 'square-open',
         'diamond-open', 'cross-dot', 'x-dot', 'triangle-up-dot', 'triangle-down-dot',
         'triangle-left-dot', 'triangle-right-dot', 'pentagon-dot', 'hexagon-dot',
@@ -160,7 +167,8 @@ def generate_shape_dict(traces: List[str], species_list_path: str = "../info/spe
     try:
         if species_list_path:
             with open(species_list_path, 'r') as file:
-                species_list = [line.strip() for line in file.readlines() if line.strip()]
+                species_list = [line.strip()
+                                for line in file.readlines() if line.strip()]
         else:
             raise FileNotFoundError("No species file path provided.")
     except (FileNotFoundError, IOError) as e:
@@ -176,7 +184,8 @@ def generate_shape_dict(traces: List[str], species_list_path: str = "../info/spe
     unique_traces = list(set(traces))
     if species_shape_dict:
         shape_dict = {
-            trace: species_shape_dict.get(trace, marker_symbols[i % len(marker_symbols)])
+            trace: species_shape_dict.get(
+                trace, marker_symbols[i % len(marker_symbols)])
             for i, trace in enumerate(unique_traces)
         }
     else:
@@ -186,7 +195,8 @@ def generate_shape_dict(traces: List[str], species_list_path: str = "../info/spe
         }
 
     if len(unique_traces) > len(marker_symbols):
-        print(f"Warning: More than {len(marker_symbols)} unique traces detected. Some traces may share the same marker symbol.")
+        print(
+            f"Warning: More than {len(marker_symbols)} unique traces detected. Some traces may share the same marker symbol.")
 
     return shape_dict
 
@@ -204,8 +214,8 @@ def generate_cyto_shape_dict(traces: List[str], species_list_path: str = "../inf
     """
 
     cyto_shapes = [
-        'ellipse', 'triangle', 'rectangle', 'roundrectangle', 'cutrectangle', 
-        'bottomroundrectangle', 'barrel', 'diamond', 'pentagon', 'hexagon', 
+        'ellipse', 'triangle', 'rectangle', 'roundrectangle', 'cutrectangle',
+        'bottomroundrectangle', 'barrel', 'diamond', 'pentagon', 'hexagon',
         'concavehexagon', 'heptagon', 'octagon', 'star', 'tag', 'vee'
     ]
 
@@ -216,24 +226,28 @@ def generate_cyto_shape_dict(traces: List[str], species_list_path: str = "../inf
             species_list = [line.strip() for line in file.readlines()]
 
         # Ensure consistent mapping of species to symbols
-        species_shape_dict = {species: cyto_shapes[i % len(cyto_shapes)] for i, species in enumerate(species_list)}
+        species_shape_dict = {species: cyto_shapes[i % len(
+            cyto_shapes)] for i, species in enumerate(species_list)}
 
     unique_traces = list(set(traces))
     if species_shape_dict:
-        shape_dict = {trace: species_shape_dict.get(trace, cyto_shapes[i % len(cyto_shapes)]) for i, trace in enumerate(unique_traces)}
+        shape_dict = {trace: species_shape_dict.get(trace, cyto_shapes[i % len(
+            cyto_shapes)]) for i, trace in enumerate(unique_traces)}
     else:
-        shape_dict = {trace: cyto_shapes[i % len(cyto_shapes)] for i, trace in enumerate(unique_traces)}
+        shape_dict = {trace: cyto_shapes[i % len(
+            cyto_shapes)] for i, trace in enumerate(unique_traces)}
 
     if len(unique_traces) > len(cyto_shapes):
-        print(f"Warning: More than {len(cyto_shapes)} unique traces detected. Some traces may have the same shape.")
+        print(
+            f"Warning: More than {len(cyto_shapes)} unique traces detected. Some traces may have the same shape.")
 
     return shape_dict
 
 
 def plot_co_expression_network(tom: pd.DataFrame, adata: AnnData, config: PlotConfig,
-                               selected_module_colors: List[str] = None, reduction_percentage: float = 0, 
-                               threshold: float = 0.5, colorscale: str = 'Viridis', custom_filename: str = None, 
-                               use_shapes: bool = False, use_colors: bool = False, title_suffix: str = None, 
+                               selected_module_colors: List[str] = None, reduction_percentage: float = 0,
+                               threshold: float = 0.5, colorscale: str = 'Viridis', custom_filename: str = None,
+                               use_shapes: bool = False, use_colors: bool = False, title_suffix: str = None,
                                show_symbol_legend: bool = False, node_size: int = 10, show_edge_legend: bool = False,
                                cluster_name: str = None, additional_hover: str = None, width: int = 1200,
                                height: int = 800, identify_clusters: str = None, node_threshold_percent: float = 0.02,
@@ -272,7 +286,8 @@ def plot_co_expression_network(tom: pd.DataFrame, adata: AnnData, config: PlotCo
         tom = reduce_tom_matrix(tom, reduction_percentage)
 
     if selected_module_colors:
-        mod_genes = module_info[module_info['moduleColors'].isin(selected_module_colors)].index
+        mod_genes = module_info[module_info['moduleColors'].isin(
+            selected_module_colors)].index
     else:
         mod_genes = module_info.index
 
@@ -291,7 +306,8 @@ def plot_co_expression_network(tom: pd.DataFrame, adata: AnnData, config: PlotCo
 
     cluster_map = None
     if identify_clusters and not cluster_name:
-        cluster_map = identify_network_clusters(G, cluster_name=identify_clusters, node_threshold_percent=node_threshold_percent)
+        cluster_map = identify_network_clusters(
+            G, cluster_name=identify_clusters, node_threshold_percent=node_threshold_percent)
         cluster_name = identify_clusters
     elif identify_clusters and cluster_name:
         print("Warning: Both identify_clusters and cluster_name are set. Ignoring identify_clusters.")
@@ -301,17 +317,21 @@ def plot_co_expression_network(tom: pd.DataFrame, adata: AnnData, config: PlotCo
     pos = nx.spring_layout(G, k=0.2, iterations=100)
 
     # Manually adjust positions of weakly connected nodes
-    weakly_connected_nodes = [node for node in G.nodes() if G.degree(node) <= 2]
+    weakly_connected_nodes = [
+        node for node in G.nodes() if G.degree(node) <= 2]
     for node in weakly_connected_nodes:
         neighbors = list(G.neighbors(node))
         if neighbors:
-            neighbor_pos = np.mean([pos[neighbor] for neighbor in neighbors], axis=0)
-            pos[node] = 0.5 * pos[node] + 0.8 * neighbor_pos  # Adjust this factor as needed
+            neighbor_pos = np.mean([pos[neighbor]
+                                   for neighbor in neighbors], axis=0)
+            pos[node] = 0.5 * pos[node] + 0.8 * \
+                neighbor_pos  # Adjust this factor as needed
 
     if len(G.edges or nodes_with_edges) == 0:
         fig = go.Figure()
         fig.update_layout(title="There is nothing to display",
-                          xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+                          xaxis=dict(showgrid=False, zeroline=False,
+                                     showticklabels=False),
                           yaxis=dict(showgrid=False, zeroline=False, showticklabels=False))
         if config.show:
             fig.show()
@@ -320,40 +340,46 @@ def plot_co_expression_network(tom: pd.DataFrame, adata: AnnData, config: PlotCo
 
         if config.save_plots:
             if custom_filename:
-                fig.write_image(f"{config.output_path}/{custom_filename}.{config.file_format}", scale=config.dpi/96)
+                fig.write_image(
+                    f"{config.output_path}/{custom_filename}.{config.file_format}", scale=config.dpi/96)
                 fig.write_html(f"{config.output_path}/{custom_filename}.html")
             else:
-                fig.write_image(f"{config.output_path}/{file_name}.{config.file_format}", scale=config.dpi/96)
+                fig.write_image(
+                    f"{config.output_path}/{file_name}.{config.file_format}", scale=config.dpi/96)
                 fig.write_html(f"{config.output_path}/{file_name}.html")
         return
 
-    edge_colors = [tom.loc[edge[0], edge[1]] for edge in G.edges() if tom.loc[edge[0], edge[1]] > threshold]
+    edge_colors = [tom.loc[edge[0], edge[1]]
+                   for edge in G.edges() if tom.loc[edge[0], edge[1]] > threshold]
 
     if edge_colors:
         cmin = min(edge_colors)
         cmax = max(edge_colors)
-        
+
         if cmin == cmax:
-            print("Warning: All edge colors have the same value. Normalized edge colors will be set to 0.5.")
+            print(
+                "Warning: All edge colors have the same value. Normalized edge colors will be set to 0.5.")
             normalized_edge_colors = [0.5] * len(edge_colors)
         else:
-            normalized_edge_colors = [(color - cmin) / (cmax - cmin) for color in edge_colors]
+            normalized_edge_colors = [
+                (color - cmin) / (cmax - cmin) for color in edge_colors]
 
         if any(np.isnan(color) for color in normalized_edge_colors):
             print("Error: Normalized edge colors contain NaN values.")
             return
-        
+
         # Create edge traces with Viridis colors
         edge_traces = []
         for i, edge in enumerate(G.edges()):
             if tom.loc[edge[0], edge[1]] > threshold:
                 x0, y0 = pos[edge[0]]
                 x1, y1 = pos[edge[1]]
-                color = sample_colorscale(colorscale, normalized_edge_colors[i])[0]
+                color = sample_colorscale(
+                    colorscale, normalized_edge_colors[i])[0]
                 edge_trace = go.Scatter(
                     x=[x0, x1, None],
                     y=[y0, y1, None],
-                    line=dict(width=0.5, color=color), 
+                    line=dict(width=0.5, color=color),
                     hoverinfo='none',
                     mode='lines',
                     showlegend=False
@@ -362,9 +388,11 @@ def plot_co_expression_network(tom: pd.DataFrame, adata: AnnData, config: PlotCo
     else:
         edge_traces = []
 
-    remaining_module_colors = list(module_info.loc[list(nodes_with_edges), 'moduleColors'])
+    remaining_module_colors = list(
+        module_info.loc[list(nodes_with_edges), 'moduleColors'])
     shape_dict = generate_shape_dict(remaining_module_colors)
-    node_color_dict = {node: module_info.loc[node, 'moduleColors'] for node in nodes_with_edges}
+    node_color_dict = {
+        node: module_info.loc[node, 'moduleColors'] for node in nodes_with_edges}
 
     if cluster_map:
         cluster_strings = pd.Series(cluster_map).reindex(nodes_with_edges)
@@ -375,22 +403,23 @@ def plot_co_expression_network(tom: pd.DataFrame, adata: AnnData, config: PlotCo
             except ValueError:
                 return 0
 
-        cluster_ids = cluster_strings.apply(extract_cluster_id).dropna().astype(int)
+        cluster_ids = cluster_strings.apply(
+            extract_cluster_id).dropna().astype(int)
         cluster_colors = cluster_ids[cluster_ids != 0]
-        
+
         # keep only nodes with cluster information
         nodes_with_cluster = cluster_colors.index
         unique_clusters = sorted(cluster_colors.unique())
 
         # Calculate average positions for clusters
         cluster_positions = {cluster: np.mean([pos[node] for node in nodes_with_cluster if cluster_colors[node] == cluster], axis=0)
-                            for cluster in unique_clusters}
+                             for cluster in unique_clusters}
 
         # Apply an offset to separate clusters further apart
         offset_magnitude = 1.5  # Adjust this value to increase or decrease separation
-        cluster_offsets = {cluster: np.array([np.random.uniform(-offset_magnitude, offset_magnitude), 
-                                            np.random.uniform(-offset_magnitude, offset_magnitude)])
-                        for cluster in unique_clusters}
+        cluster_offsets = {cluster: np.array([np.random.uniform(-offset_magnitude, offset_magnitude),
+                                              np.random.uniform(-offset_magnitude, offset_magnitude)])
+                           for cluster in unique_clusters}
 
         for node in nodes_with_cluster:
             cluster = cluster_colors[node]
@@ -406,7 +435,7 @@ def plot_co_expression_network(tom: pd.DataFrame, adata: AnnData, config: PlotCo
             edge_trace = go.Scatter(
                 x=[x0, x1, None],
                 y=[y0, y1, None],
-                line=dict(width=0.5, color=color), 
+                line=dict(width=0.5, color=color),
                 hoverinfo='none',
                 mode='lines',
                 showlegend=False
@@ -427,16 +456,17 @@ def plot_co_expression_network(tom: pd.DataFrame, adata: AnnData, config: PlotCo
         if additional_hover and additional_hover in module_info.columns:
             hover_text += f"<br><b>{additional_hover}:</b> {module_info.loc[node, additional_hover]}"
         node_text.append(hover_text)
-        
+
         if highlight and node in highlight:
             node_colors.append(highlight_color)  # Highlight nodes
         elif use_colors:
             node_colors.append(module_info.loc[node, 'moduleColors'])
         else:
             node_colors.append('black')
-        
+
         if use_shapes:
-            node_symbols.append(shape_dict.get(node_color_dict[node], 'circle'))
+            node_symbols.append(shape_dict.get(
+                node_color_dict[node], 'circle'))
         else:
             node_symbols.append('circle')
 
@@ -477,8 +507,10 @@ def plot_co_expression_network(tom: pd.DataFrame, adata: AnnData, config: PlotCo
 
     if cluster_name:
         cluster_trace = go.Scatter(
-            x=[cluster_positions[cluster][0] + cluster_offsets[cluster][0] for cluster in unique_clusters],
-            y=[cluster_positions[cluster][1] + cluster_offsets[cluster][1] for cluster in unique_clusters],
+            x=[cluster_positions[cluster][0] + cluster_offsets[cluster][0]
+                for cluster in unique_clusters],
+            y=[cluster_positions[cluster][1] + cluster_offsets[cluster][1]
+                for cluster in unique_clusters],
             text=[str(cluster) for cluster in unique_clusters],
             mode='text',
             textposition='top center',
@@ -486,7 +518,8 @@ def plot_co_expression_network(tom: pd.DataFrame, adata: AnnData, config: PlotCo
             hoverinfo='none',
             showlegend=False,
         )
-        traces = updated_edge_traces + [node_trace, cluster_trace] + legend_shapes
+        traces = updated_edge_traces + \
+            [node_trace, cluster_trace] + legend_shapes
     else:
         traces = updated_edge_traces + [node_trace] + legend_shapes
 
@@ -498,10 +531,11 @@ def plot_co_expression_network(tom: pd.DataFrame, adata: AnnData, config: PlotCo
                         ),
                         showlegend=show_symbol_legend,
                         hovermode='closest',
-                        xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+                        xaxis=dict(showgrid=False, zeroline=False,
+                                   showticklabels=False),
                         yaxis=dict(showgrid=False, zeroline=False, showticklabels=False))
                     )
-    
+
     colorbar_trace = go.Scatter(
         x=[None], y=[None],
         mode='markers',
@@ -549,7 +583,8 @@ def plot_co_expression_network(tom: pd.DataFrame, adata: AnnData, config: PlotCo
 
     full_name = f"co_expression_network" if not custom_filename else custom_filename
     if config.save_plots:
-        fig.write_image(f"{config.output_path}/{full_name}.{config.file_format}", scale=config.dpi/96, width=1200, height=800)
+        fig.write_image(f"{config.output_path}/{full_name}.{config.file_format}",
+                        scale=config.dpi/96, width=1200, height=800)
         fig.write_html(f"{config.output_path}/{full_name}.html")
 
     if config.save_raw:
@@ -560,6 +595,7 @@ def plot_co_expression_network(tom: pd.DataFrame, adata: AnnData, config: PlotCo
     if identify_clusters:
         return cluster_map
 
+
 #############
 """
 ANNDATA PLOTS
@@ -567,12 +603,13 @@ Plotting functions for AnnData objects using calculated modules from WGCNA.
 """
 #############
 
-def plot_goea(adata: AnnData, config: PlotConfig, transcripts: Dict[str, List[str]], name: str = "PS", 
+
+def plot_goea(adata: AnnData, config: PlotConfig, transcripts: Dict[str, List[str]], name: str = "PS",
               obo_path: str = "../go-basic.obo", go_column: str = "go_terms", top_percentage: int = 1,
               custom_filename: str = None) -> pd.DataFrame:
     """
     Performs and plots a GOEA using the top transcripts based on average expression.
-    
+
     Parameters:
     - adata (AnnData): The AnnData object containing transcripts and their associated GO terms.
     - config (PlotConfig): Configuration object for plot control.
@@ -581,78 +618,84 @@ def plot_goea(adata: AnnData, config: PlotConfig, transcripts: Dict[str, List[st
     - go_column (str): Column in adata.var containing comma separated GO terms for each transcript.
     - top_percentage (int): The top percentage of transcripts to be used for GOEA based on average expression.
     - custom_filename (str): Custom filename for the plot.
-    
+
     Returns:
     - pd.DataFrame: A DataFrame containing significant GO terms and their details.
     """
-    
+
     if top_percentage < 1:
         top_percentage = 1
         print("Top percentage set to 1 to ensure at least one transcript is selected.")
-        
+
     go_dag = GODag(obo_path)
 
     # Get transcripts for the provided species
     transcripts = transcripts.get(adata.uns['species'], [])
-    
+
     # Filter the adata.var to include only the provided transcript_ids
     filtered_var = adata.var.loc[transcripts]
-    
+
     # Get average expression (mean_counts) for each transcript in transcript_ids
     avg_expression = filtered_var['mean_counts']
-    
+
     # Determine the number of top transcripts
     num_top_transcripts = int(len(transcripts) * (top_percentage / 100))
-    
+
     # Get top transcript IDs based on average expression
     top_transcripts = avg_expression.nlargest(num_top_transcripts).index
-    top_transcript_ids = [t_id for t_id in transcripts if t_id in top_transcripts]
-    
+    top_transcript_ids = [
+        t_id for t_id in transcripts if t_id in top_transcripts]
+
     # Prepare the GO background set
     go_background_set = set(adata.var.index)
-    
+
     # Create a dictionary mapping transcript IDs to GO IDs
     assoc = {}
     for transcript_id, go_ids_str in adata.var[go_column].dropna().items():
         go_ids = go_ids_str.split(",")
         assoc[transcript_id] = set(go_ids)
-    
-    # Initialize GOEA object 
+
+    # Initialize GOEA object
     goea_obj = GOEnrichmentStudyNS(
         pop=go_background_set,
         ns2assoc={"generic_namespace": assoc},
         godag=go_dag,
         methods=['fdr_bh']
     )
-    
+
     # Perform GOEA
     goea_results = goea_obj.run_study(top_transcript_ids)
-    
+
     # Filter significant results and extract additional information
     goea_results_sig = [
-        (r.GO, r.name, r.p_fdr_bh, r.ratio_in_study[0]/r.ratio_in_study[1], r.ratio_in_study[0], go_dag[r.GO].depth)
+        (r.GO, r.name, r.p_fdr_bh,
+         r.ratio_in_study[0]/r.ratio_in_study[1], r.ratio_in_study[0], go_dag[r.GO].depth)
         for r in goea_results if r.p_fdr_bh < 0.05
     ]
-    
+
     if goea_results_sig:
         if config.save_plots:
             # Plot significant GO terms
             if custom_filename:
-                plot_path = os.path.join(config.output_path, f'{custom_filename}.{config.file_format}')
+                plot_path = os.path.join(
+                    config.output_path, f'{custom_filename}.{config.file_format}')
             else:
-                plot_path = os.path.join(config.output_path, f'goea_plot_{name}.{config.file_format}')
+                plot_path = os.path.join(
+                    config.output_path, f'goea_plot_{name}.{config.file_format}')
 
             significant_go_terms = [r[0] for r in goea_results_sig]
-            plot_gos(plot_path, significant_go_terms, go_dag, title=f'Significant GO Terms for {name}')
-    
+            plot_gos(plot_path, significant_go_terms, go_dag,
+                     title=f'Significant GO Terms for {name}')
+
         # Create a DataFrame for significant results
-        df_goea_results = pd.DataFrame(goea_results_sig, columns=["GO_ID", "Term", "P-Value", "Fold Enrichment", "Num Genes", "Depth"])
+        df_goea_results = pd.DataFrame(goea_results_sig, columns=[
+                                       "GO_ID", "Term", "P-Value", "Fold Enrichment", "Num Genes", "Depth"])
 
         if config.save_raw:
             raw_data_filename = f"goea_results_{name}"
             raw_data_filepath = f"{config.output_path}/{raw_data_filename}.csv"
             df_goea_results.to_csv(raw_data_filepath, index=False)
-        
+
         return df_goea_results
     else:
         print("No significant GO terms found.")
@@ -662,7 +705,7 @@ def plot_goea(adata: AnnData, config: PlotConfig, transcripts: Dict[str, List[st
 def plot_highest_expr_genes(adata: AnnData, config: PlotConfig, n_top: int = 10, ortho: bool = False, custom_filename: str = None) -> None:
     """
     Wraps the scanpy.pl.highest_expr_genes function to add display and save functionality via a config object.
-    
+
     Parameters:
     - adata (AnnData): The AnnData object containing the gene expression data.
     - config (PlotConfig): Configuration object for plot control.
@@ -678,7 +721,8 @@ def plot_highest_expr_genes(adata: AnnData, config: PlotConfig, n_top: int = 10,
     identifier = "Orthogroups" if ortho else "Transcripts"
 
     if species != "":
-        plt.title(f"Top {n_top} Highest Expressed {identifier} of $\it{{{species.split()[0]}}}$ $\it{{{species.split()[1]}}}$")
+        plt.title(
+            f"Top {n_top} Highest Expressed {identifier} of $\it{{{species.split()[0]}}}$ $\it{{{species.split()[1]}}}$")
     else:
         plt.title(f"Top {n_top} Highest Expressed {identifier}")
 
@@ -688,17 +732,19 @@ def plot_highest_expr_genes(adata: AnnData, config: PlotConfig, n_top: int = 10,
     if config.save_plots:
         species = f"_{species}" if species != "" else ""
         if custom_filename:
-            fig.savefig(f"{config.output_path}/{custom_filename}.{config.file_format}", dpi=config.dpi)
+            fig.savefig(
+                f"{config.output_path}/{custom_filename}.{config.file_format}", dpi=config.dpi)
         else:
-            fig.savefig(f"{config.output_path}/highest_expr_genes{species}.{config.file_format}", dpi=config.dpi)
-    
+            fig.savefig(
+                f"{config.output_path}/highest_expr_genes{species}.{config.file_format}", dpi=config.dpi)
+
     plt.close(fig)
 
 
 def plot_violin(adata: AnnData, keys: List[str], config: PlotConfig, jitter: float = 0.4, groupby: str = None, custom_filename: str = None) -> None:
     """
     Wraps the scanpy.pl.violin function to add display and save functionality via a config object.
-    
+
     Parameters:
     - adata (AnnData): The AnnData object containing the gene expression data.
     - keys (List[str]): Variables for which to plot the violin plots.
@@ -707,7 +753,7 @@ def plot_violin(adata: AnnData, keys: List[str], config: PlotConfig, jitter: flo
     - groupby (str): Key for grouping data points in the plot.
     - custom_filename (str): Custom filename for the plot.
     """
-    
+
     # Generate the plot and capture the figure
     ax = sc.pl.violin(adata, keys, jitter=jitter, groupby=groupby, show=False)
     fig = ax.get_figure()
@@ -717,18 +763,20 @@ def plot_violin(adata: AnnData, keys: List[str], config: PlotConfig, jitter: flo
 
     if config.save_plots:
         if custom_filename:
-            fig.savefig(f"{config.output_path}/{custom_filename}.{config.file_format}", dpi=config.dpi)
+            fig.savefig(
+                f"{config.output_path}/{custom_filename}.{config.file_format}", dpi=config.dpi)
         else:
-            fig.savefig(f"{config.output_path}/violin_plot_{'_'.join(keys)}.{config.file_format}", dpi=config.dpi)
-    
+            fig.savefig(
+                f"{config.output_path}/violin_plot_{'_'.join(keys)}.{config.file_format}", dpi=config.dpi)
+
     plt.close(fig)
 
 
-def plot_rank_genes_groups_matrixplot(adata: AnnData, config: PlotConfig, n_genes: int = 4, groupby: str = "tissue", key: str = "dge_key", 
+def plot_rank_genes_groups_matrixplot(adata: AnnData, config: PlotConfig, n_genes: int = 4, groupby: str = "tissue", key: str = "dge_key",
                                       vmin: int = -5, vmax: int = 5, min_logfoldchange: int = 3, custom_filename: str = None) -> None:
     """
     Wraps the scanpy.pl.rank_genes_groups_matrixplot function to add display and save functionality via a config object.
-    
+
     Parameters:
     - adata (AnnData): The AnnData object containing the gene expression data.
     - config (PlotConfig): Configuration object for plot control.
@@ -767,19 +815,21 @@ def plot_rank_genes_groups_matrixplot(adata: AnnData, config: PlotConfig, n_gene
 
         if config.save_plots:
             if custom_filename:
-                fig.savefig(f"{config.output_path}/{custom_filename}.{config.file_format}", dpi=config.dpi)
+                fig.savefig(
+                    f"{config.output_path}/{custom_filename}.{config.file_format}", dpi=config.dpi)
             else:
-                fig.savefig(f"{config.output_path}/matrixplot_{groupby}_{key}.{config.file_format}", dpi=config.dpi)
+                fig.savefig(
+                    f"{config.output_path}/matrixplot_{groupby}_{key}.{config.file_format}", dpi=config.dpi)
 
         plt.close(fig)
 
 
-def plot_correlation_network(df: pd.DataFrame, config: PlotConfig, threshold: float = 0.1, pvals: pd.DataFrame = None, 
-                             pval_threshold: float = 0.05, seed: int = None, color_map: str = "", 
-                             inter_species_only: bool = False, suffix: str = "", custom_filename: str = None, 
+def plot_correlation_network(df: pd.DataFrame, config: PlotConfig, threshold: float = 0.1, pvals: pd.DataFrame = None,
+                             pval_threshold: float = 0.05, seed: int = None, color_map: str = "",
+                             inter_species_only: bool = False, suffix: str = "", custom_filename: str = None,
                              positive: bool = True, use_shapes: bool = True, weight_label: str = "Edge Weights",
-                             show_symbol_legend: bool = False, title: str = "Correlation Network", 
-                             width: int = 1200, height: int = 800, colorscale: str = 'Viridis', 
+                             show_symbol_legend: bool = False, title: str = "Correlation Network",
+                             width: int = 1200, height: int = 800, colorscale: str = 'Viridis',
                              show_edge_legend: bool = False) -> None:
     """
     Plots a correlation network based on a given dataframe. Optionally displays only inter-species edges.
@@ -805,7 +855,7 @@ def plot_correlation_network(df: pd.DataFrame, config: PlotConfig, threshold: fl
     - colorscale (str): The colorscale to use for the edge colors.
     - show_edge_legend (bool): If True, display a legend for the edge colors.
     """
-    
+
     # Check if the DataFrame is symmetric and set diagonal to zero
     if df.equals(df.T):
         np.fill_diagonal(df.values, 0)
@@ -817,11 +867,13 @@ def plot_correlation_network(df: pd.DataFrame, config: PlotConfig, threshold: fl
 
     # Add edges between nodes with weights if they are above the threshold
     for source in df.index:
-        species_source = source.split('_')[-1]  # Get species name from the node label
+        # Get species name from the node label
+        species_source = source.split('_')[-1]
         for target in df.columns:
-            species_target = target.split('_')[-1]  # Get species name from the node label
+            # Get species name from the node label
+            species_target = target.split('_')[-1]
             weight = df.at[source, target]
-            
+
             # Apply the correlation filter
             if positive and weight <= 0:
                 continue
@@ -848,7 +900,8 @@ def plot_correlation_network(df: pd.DataFrame, config: PlotConfig, threshold: fl
         print("No edges found above the threshold.")
         fig = go.Figure()
         fig.update_layout(title="There is nothing to display",
-                          xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+                          xaxis=dict(showgrid=False, zeroline=False,
+                                     showticklabels=False),
                           yaxis=dict(showgrid=False, zeroline=False, showticklabels=False))
         if config.show:
             fig.show()
@@ -857,24 +910,27 @@ def plot_correlation_network(df: pd.DataFrame, config: PlotConfig, threshold: fl
 
         if config.save_plots:
             if custom_filename:
-                fig.write_image(f"{config.output_path}/{custom_filename}.{config.file_format}", scale=config.dpi/96)
+                fig.write_image(
+                    f"{config.output_path}/{custom_filename}.{config.file_format}", scale=config.dpi/96)
                 fig.write_html(f"{config.output_path}/{custom_filename}.html")
             else:
-                fig.write_image(f"{config.output_path}/{file_name}.{config.file_format}", scale=config.dpi/96)
+                fig.write_image(
+                    f"{config.output_path}/{file_name}.{config.file_format}", scale=config.dpi/96)
                 fig.write_html(f"{config.output_path}/{file_name}.html")
         return
-    
+
     # Handle edge weights
     weights = np.array([data['weight'] for _, _, data in G.edges(data=True)])
     if weights.size > 0:
         max_weight = weights.max()
         min_weight = weights.min()
-        
+
         if min_weight == max_weight:
-            scaled_weights = np.ones_like(weights) * 0.5  # Set to a constant value
+            scaled_weights = np.ones_like(
+                weights) * 0.5  # Set to a constant value
         else:
             scaled_weights = (weights - min_weight) / (max_weight - min_weight)
-        
+
         scaled_weights = np.nan_to_num(scaled_weights, nan=0.5)
         edge_colors = sample_colorscale(colorscale, scaled_weights)
     else:
@@ -890,7 +946,8 @@ def plot_correlation_network(df: pd.DataFrame, config: PlotConfig, threshold: fl
         trace = go.Scatter(
             x=[x0, x1, None], y=[y0, y1, None],
             mode='lines',
-            line=dict(width=1, color=edge_colors[idx]),  # Use color based on weight and set line width
+            # Use color based on weight and set line width
+            line=dict(width=1, color=edge_colors[idx]),
             hoverinfo='none',
             showlegend=False
         )
@@ -984,7 +1041,7 @@ def plot_correlation_network(df: pd.DataFrame, config: PlotConfig, threshold: fl
                     name=f"<i>{species}</i>",
                     showlegend=True
                 ))
-    
+
     fig = go.Figure(data=edge_traces + [node_trace] + legend_shapes,
                     layout=go.Layout(
                         title=dict(
@@ -1002,7 +1059,8 @@ def plot_correlation_network(df: pd.DataFrame, config: PlotConfig, threshold: fl
                         ) if show_symbol_legend else None,
                         hovermode='closest',
                         margin=dict(b=20, l=20, r=20, t=40),
-                        xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+                        xaxis=dict(showgrid=False, zeroline=False,
+                                   showticklabels=False),
                         yaxis=dict(showgrid=False, zeroline=False, showticklabels=False))
                     )
 
@@ -1017,7 +1075,7 @@ def plot_correlation_network(df: pd.DataFrame, config: PlotConfig, threshold: fl
         width=width,
         height=height
     )
-    
+
     if config.show:
         fig.show()
 
@@ -1025,10 +1083,12 @@ def plot_correlation_network(df: pd.DataFrame, config: PlotConfig, threshold: fl
 
     if config.save_plots:
         if custom_filename:
-            fig.write_image(f"{config.output_path}/{custom_filename}.{config.file_format}", scale=config.dpi/96, width=1200, height=800)
+            fig.write_image(f"{config.output_path}/{custom_filename}.{config.file_format}",
+                            scale=config.dpi/96, width=1200, height=800)
             fig.write_html(f"{config.output_path}/{custom_filename}.html")
         else:
-            fig.write_image(f"{config.output_path}/{file_name}.{config.file_format}", scale=config.dpi/96, width=1200, height=800)
+            fig.write_image(f"{config.output_path}/{file_name}.{config.file_format}",
+                            scale=config.dpi/96, width=1200, height=800)
             fig.write_html(f"{config.output_path}/{file_name}.html")
 
     if config.save_raw:
@@ -1052,9 +1112,11 @@ def add_legend_traces(min_weight: float, max_weight: float) -> List[go.Scatter]:
 
     legend_trace = []
     if max_weight > min_weight:
-        weight_scale = np.linspace(min_weight, max_weight, num=8)  # 8 different weight scales
+        # 8 different weight scales
+        weight_scale = np.linspace(min_weight, max_weight, num=8)
         for weight in weight_scale:
-            scaled_weight = (weight - min_weight) / (max_weight - min_weight) * (1 - 0.1) + 0.1
+            scaled_weight = (weight - min_weight) / \
+                (max_weight - min_weight) * (1 - 0.1) + 0.1
             legend_trace.append(go.Scatter(
                 x=[None], y=[None],
                 mode='lines',
@@ -1062,14 +1124,14 @@ def add_legend_traces(min_weight: float, max_weight: float) -> List[go.Scatter]:
                 name=f'{weight:.2f}'
             ))
     else:
-        standard_width = 5 
+        standard_width = 5
         legend_trace.append(go.Scatter(
             x=[None], y=[None],
             mode='lines',
             line=dict(width=standard_width, color='#888'),
             name=f'{round(min_weight, 2)}'
         ))
-        
+
     return legend_trace
 
 
@@ -1101,21 +1163,24 @@ def plot_overlap(overlap_matrix: pd.DataFrame, config: PlotConfig, column: str =
 
     # Perform clustering if enabled and the matrix is not empty
     if row_cluster:
-        if overlap_matrix.shape[0] > 1:  # Ensure there are enough rows for clustering
+        # Ensure there are enough rows for clustering
+        if overlap_matrix.shape[0] > 1:
             row_linkage = linkage(overlap_matrix.values, method='ward')
             row_order = leaves_list(row_linkage)
             overlap_matrix = overlap_matrix.iloc[row_order, :]
         else:
             print("Warning: Not enough rows for row clustering. Skipping row clustering.")
             row_cluster = False
-        
+
     if col_cluster:
-        if overlap_matrix.shape[1] > 1:  # Ensure there are enough columns for clustering
+        # Ensure there are enough columns for clustering
+        if overlap_matrix.shape[1] > 1:
             col_linkage = linkage(overlap_matrix.T.values, method='ward')
             col_order = leaves_list(col_linkage)
             overlap_matrix = overlap_matrix.iloc[:, col_order]
         else:
-            print("Warning: Not enough columns for column clustering. Skipping column clustering.")
+            print(
+                "Warning: Not enough columns for column clustering. Skipping column clustering.")
             col_cluster = False
 
     # Extract species from index and columns by splitting on '_'
@@ -1130,11 +1195,14 @@ def plot_overlap(overlap_matrix: pd.DataFrame, config: PlotConfig, column: str =
     masked_matrix[mask] = np.nan  # Mask intra-species comparisons as NaN
 
     # Determine the min and max of ALL values in the matrix, ignoring NaNs
-    data_min_all = np.nanmin(overlap_matrix.values) if not overlap_matrix.isna().all().all() else 0
-    data_max_all = np.nanmax(overlap_matrix.values) if not overlap_matrix.isna().all().all() else 1
+    data_min_all = np.nanmin(
+        overlap_matrix.values) if not overlap_matrix.isna().all().all() else 0
+    data_max_all = np.nanmax(
+        overlap_matrix.values) if not overlap_matrix.isna().all().all() else 1
 
     # Determine the min and max of the actual data range, ignoring both NaNs and the masked intra-species comparisons
-    masked_values = overlap_matrix.values[~mask]  # Only consider values where the mask is False
+    # Only consider values where the mask is False
+    masked_values = overlap_matrix.values[~mask]
     if masked_values.size > 0:
         data_min = np.nanmin(masked_values)
         data_max = np.nanmax(masked_values)
@@ -1154,7 +1222,7 @@ def plot_overlap(overlap_matrix: pd.DataFrame, config: PlotConfig, column: str =
             raw_data_filename = custom_filename if custom_filename else f"overlap_{column}"
             raw_data_filepath = f"{config.output_path}/{raw_data_filename}.csv"
             overlap_matrix.to_csv(raw_data_filepath)
-            
+
         return
 
     # Build the Plotly figure
@@ -1171,8 +1239,11 @@ def plot_overlap(overlap_matrix: pd.DataFrame, config: PlotConfig, column: str =
         # Colorbar adjustment
         colorbar=dict(
             title=dict(text="Jaccard Index", side="right"),
-            tickvals=[data_min, (data_min + data_max) / 2, data_max],  # Set tick labels dynamically
-            ticktext=[f'{data_min:.2f}', f'{(data_min + data_max) / 2:.2f}', f'{data_max:.2f}'],  # Tick formatting
+            # Set tick labels dynamically
+            tickvals=[data_min, (data_min + data_max) / 2, data_max],
+            # Tick formatting
+            ticktext=[f'{data_min:.2f}',
+                      f'{(data_min + data_max) / 2:.2f}', f'{data_max:.2f}'],
         ),
         hoverongaps=False,  # Don't show tooltips on masked areas
         texttemplate="%{z:.2f}",  # Display values inside the cells
@@ -1182,7 +1253,8 @@ def plot_overlap(overlap_matrix: pd.DataFrame, config: PlotConfig, column: str =
     # Add heatmap for masked intra-species comparisons (with a greyscale)
     # Use the original data for the masked areas to show the values
     fig.add_trace(go.Heatmap(
-        z=np.where(mask, overlap_matrix.values, np.nan),  # Only show values where species match
+        # Only show values where species match
+        z=np.where(mask, overlap_matrix.values, np.nan),
         x=overlap_matrix.columns,
         y=overlap_matrix.index,
         colorscale='Greys',
@@ -1300,20 +1372,27 @@ def plot_stacked_results(results: Dict[str, pd.DataFrame], config: PlotConfig, c
 
     if config.save_plots:
         if custom_filename:
-            fig_transcripts.write_image(f"{config.output_path}/{custom_filename}_transcripts.{config.file_format}", scale=config.dpi/96)
-            fig_go_terms.write_image(f"{config.output_path}/{custom_filename}_go_terms.{config.file_format}", scale=config.dpi/96)
-            fig_transcripts.write_html(f"{config.output_path}/{custom_filename}_transcripts.html")
-            fig_go_terms.write_html(f"{config.output_path}/{custom_filename}_go_terms.html")
+            fig_transcripts.write_image(
+                f"{config.output_path}/{custom_filename}_transcripts.{config.file_format}", scale=config.dpi/96)
+            fig_go_terms.write_image(
+                f"{config.output_path}/{custom_filename}_go_terms.{config.file_format}", scale=config.dpi/96)
+            fig_transcripts.write_html(
+                f"{config.output_path}/{custom_filename}_transcripts.html")
+            fig_go_terms.write_html(
+                f"{config.output_path}/{custom_filename}_go_terms.html")
         else:
-            fig_transcripts.write_image(f"{config.output_path}/transcripts.{config.file_format}", scale=config.dpi/96)
-            fig_go_terms.write_image(f"{config.output_path}/go_terms.{config.file_format}", scale=config.dpi/96)
-            fig_transcripts.write_html(f"{config.output_path}/transcripts.html")
+            fig_transcripts.write_image(
+                f"{config.output_path}/transcripts.{config.file_format}", scale=config.dpi/96)
+            fig_go_terms.write_image(
+                f"{config.output_path}/go_terms.{config.file_format}", scale=config.dpi/96)
+            fig_transcripts.write_html(
+                f"{config.output_path}/transcripts.html")
             fig_go_terms.write_html(f"{config.output_path}/go_terms.html")
 
     return fig_transcripts, fig_go_terms
 
 
-def plot_filtered_go_terms(df: pd.DataFrame, config: PlotConfig, p_value_threshold: float = 0.05, min_fold_enrichment: float = 0.2, min_depth: int = 2, 
+def plot_filtered_go_terms(df: pd.DataFrame, config: PlotConfig, p_value_threshold: float = 0.05, min_fold_enrichment: float = 0.2, min_depth: int = 2,
                            column: str = "Module", custom_filename: str = None) -> go.Figure:
     """
     Creates a bubble plot of Gene Ontology (GO) terms filtered by specified P-value threshold, minimum fold enrichment,
@@ -1340,32 +1419,39 @@ def plot_filtered_go_terms(df: pd.DataFrame, config: PlotConfig, p_value_thresho
         print("No GO terms found.")
         fig = go.Figure()
         fig.update_layout(title="There is nothing to display",
-                          xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+                          xaxis=dict(showgrid=False, zeroline=False,
+                                     showticklabels=False),
                           yaxis=dict(showgrid=False, zeroline=False, showticklabels=False))
         if config.show:
             fig.show()
 
         if config.save_plots:
             if custom_filename:
-                fig.write_image(f"{config.output_path}/{custom_filename}_{column if column else 'GO_Terms'}.{config.file_format}", scale=config.dpi/96)
-                fig.write_html(f"{config.output_path}/{custom_filename}_{column if column else 'GO_Terms'}.html")
+                fig.write_image(
+                    f"{config.output_path}/{custom_filename}_{column if column else 'GO_Terms'}.{config.file_format}", scale=config.dpi/96)
+                fig.write_html(
+                    f"{config.output_path}/{custom_filename}_{column if column else 'GO_Terms'}.html")
             else:
-                fig.write_image(f"{config.output_path}/filtered_go_terms_{column if column else 'GO_Terms'}.{config.file_format}", scale=config.dpi/96)
-                fig.write_html(f"{config.output_path}/filtered_go_terms_{column if column else 'GO_Terms'}.html")
+                fig.write_image(
+                    f"{config.output_path}/filtered_go_terms_{column if column else 'GO_Terms'}.{config.file_format}", scale=config.dpi/96)
+                fig.write_html(
+                    f"{config.output_path}/filtered_go_terms_{column if column else 'GO_Terms'}.html")
             return
 
     # Apply filters based on the specified thresholds and depth
     if min_depth is not None:
-        filtered_df = df[(df['P-Value'] < p_value_threshold) & (df['Fold Enrichment'] >= min_fold_enrichment) & (df['Depth'] >= min_depth)].copy()
+        filtered_df = df[(df['P-Value'] < p_value_threshold) & (df['Fold Enrichment']
+                                                                >= min_fold_enrichment) & (df['Depth'] >= min_depth)].copy()
     else:
-        filtered_df = df[(df['P-Value'] < p_value_threshold) & (df['Fold Enrichment'] >= min_fold_enrichment)].copy()
+        filtered_df = df[(df['P-Value'] < p_value_threshold) &
+                         (df['Fold Enrichment'] >= min_fold_enrichment)].copy()
 
     filtered_df['-log10(P-Value)'] = -np.log10(filtered_df['P-Value'])
 
     hover_data = {"Term": True,
                   "Depth": True,
                   "Num Genes": True,
-                 }
+                  }
 
     if column is not None:
         fig = px.scatter(filtered_df,
@@ -1404,11 +1490,15 @@ def plot_filtered_go_terms(df: pd.DataFrame, config: PlotConfig, p_value_thresho
 
     if config.save_plots:
         if custom_filename:
-            fig.write_image(f"{config.output_path}/{custom_filename}_{column if column else 'GO_Terms'}.{config.file_format}", scale=config.dpi/96)
-            fig.write_html(f"{config.output_path}/{custom_filename}_{column if column else 'GO_Terms'}.html")
+            fig.write_image(
+                f"{config.output_path}/{custom_filename}_{column if column else 'GO_Terms'}.{config.file_format}", scale=config.dpi/96)
+            fig.write_html(
+                f"{config.output_path}/{custom_filename}_{column if column else 'GO_Terms'}.html")
         else:
-            fig.write_image(f"{config.output_path}/filtered_go_terms_{column if column else 'GO_Terms'}.{config.file_format}", scale=config.dpi/96)
-            fig.write_html(f"{config.output_path}/filtered_go_terms_{column if column else 'GO_Terms'}.html")
+            fig.write_image(
+                f"{config.output_path}/filtered_go_terms_{column if column else 'GO_Terms'}.{config.file_format}", scale=config.dpi/96)
+            fig.write_html(
+                f"{config.output_path}/filtered_go_terms_{column if column else 'GO_Terms'}.html")
 
     if config.save_raw:
         raw_data_filename = custom_filename if custom_filename else f"filtered_go_terms_raw_data_{column if column else 'GO_Terms'}"
@@ -1448,13 +1538,15 @@ def plot_umap(adata: AnnData, config: PlotConfig, obs_column: str = "tissue", cu
 
     c_obs = obs_column.capitalize()
 
-    umap_data = pd.DataFrame(adata.obsm['X_umap'], columns=['UMAP-1', 'UMAP-2'])
+    umap_data = pd.DataFrame(
+        adata.obsm['X_umap'], columns=['UMAP-1', 'UMAP-2'])
     umap_data[c_obs] = adata.obs[obs_column].values
     umap_data['Sample'] = adata.obs.index.values
 
     fig = px.scatter(umap_data, x='UMAP-1', y='UMAP-2',
                      color=c_obs,
-                     color_discrete_map={value: custom_colors[i % 30] for i, value in enumerate(adata.obs[obs_column].unique())},
+                     color_discrete_map={value: custom_colors[i % 30] for i, value in enumerate(
+                         adata.obs[obs_column].unique())},
                      hover_name='Sample',
                      hover_data={c_obs: True})
 
@@ -1469,10 +1561,12 @@ def plot_umap(adata: AnnData, config: PlotConfig, obs_column: str = "tissue", cu
 
     if config.save_plots:
         if custom_filename:
-            fig.write_image(f"{config.output_path}/{custom_filename}.{config.file_format}", scale=config.dpi/96)
+            fig.write_image(
+                f"{config.output_path}/{custom_filename}.{config.file_format}", scale=config.dpi/96)
             fig.write_html(f"{config.output_path}/{custom_filename}.html")
         else:
-            fig.write_image(f"{config.output_path}/umap_plot.{config.file_format}", scale=config.dpi/96)
+            fig.write_image(
+                f"{config.output_path}/umap_plot.{config.file_format}", scale=config.dpi/96)
             fig.write_html(f"{config.output_path}/umap_plot.html")
 
     return fig
@@ -1503,9 +1597,11 @@ def plot_pca_overview(adata: AnnData, config: PlotConfig, color: str = "tissue",
         for i, fig in enumerate(plt.get_fignums()):
             fig_obj = plt.figure(fig)
             if custom_filename:
-                fig_obj.savefig(f"{config.output_path}/{custom_filename}_fig{i}.{config.file_format}", dpi=config.dpi)
+                fig_obj.savefig(
+                    f"{config.output_path}/{custom_filename}_fig{i}.{config.file_format}", dpi=config.dpi)
             else:
-                fig_obj.savefig(f"{config.output_path}/pca_overview_{color}_fig{i}.{config.file_format}", dpi=config.dpi)
+                fig_obj.savefig(
+                    f"{config.output_path}/pca_overview_{color}_fig{i}.{config.file_format}", dpi=config.dpi)
             plt.close(fig)
 
     if config.show:
@@ -1539,7 +1635,8 @@ def get_and_plot_explained_variance(adata: AnnData, config: PlotConfig, target_v
     cumulative_explained_variance = np.cumsum(explained_variance_ratio)
 
     # Calculate the number of PCs required to reach the target variance
-    num_pcs_for_target_variance = next(i for i, cum_var in enumerate(cumulative_explained_variance, 1) if cum_var >= target_variance)
+    num_pcs_for_target_variance = next(i for i, cum_var in enumerate(
+        cumulative_explained_variance, 1) if cum_var >= target_variance)
 
     # Create a plot with both explained and cumulative explained variance
     fig = go.Figure()
@@ -1549,7 +1646,8 @@ def get_and_plot_explained_variance(adata: AnnData, config: PlotConfig, target_v
         mode='lines+markers',
         name='Explained Variance per PC',
         hoverinfo='text',
-        text=[f'<b>PC:</b> {i}<br><b>Explained Variance:</b> {var:.2%}' for i, var in enumerate(explained_variance_ratio, 1)]
+        text=[f'<b>PC:</b> {i}<br><b>Explained Variance:</b> {var:.2%}' for i,
+              var in enumerate(explained_variance_ratio, 1)]
     ))
     fig.add_trace(go.Scatter(
         x=list(range(1, len(cumulative_explained_variance) + 1)),
@@ -1557,7 +1655,8 @@ def get_and_plot_explained_variance(adata: AnnData, config: PlotConfig, target_v
         mode='lines+markers',
         name='Cumulative Explained Variance',
         hoverinfo='text',
-        text=[f'<b>PC:</b> {i}<br><b>Cumulative Explained Variance:</b> {cum_var:.2%}' for i, cum_var in enumerate(cumulative_explained_variance, 1)]
+        text=[f'<b>PC:</b> {i}<br><b>Cumulative Explained Variance:</b> {cum_var:.2%}' for i,
+              cum_var in enumerate(cumulative_explained_variance, 1)]
     ))
 
     # Add a vertical line for the target variance
@@ -1582,10 +1681,12 @@ def get_and_plot_explained_variance(adata: AnnData, config: PlotConfig, target_v
 
     if config.save_plots:
         if custom_filename:
-            fig.write_image(f"{config.output_path}/{custom_filename}.{config.file_format}", scale=config.dpi/96)
+            fig.write_image(
+                f"{config.output_path}/{custom_filename}.{config.file_format}", scale=config.dpi/96)
             fig.write_html(f"{config.output_path}/{custom_filename}.html")
         else:
-            fig.write_image(f"{config.output_path}/explained_variance.{config.file_format}", scale=config.dpi/96)
+            fig.write_image(
+                f"{config.output_path}/explained_variance.{config.file_format}", scale=config.dpi/96)
             fig.write_html(f"{config.output_path}/explained_variance.html")
 
     return num_pcs_for_target_variance, fig
@@ -1619,7 +1720,8 @@ def plot_module_gene_proportions(adata: AnnData, config: PlotConfig, custom_file
     sorted_proportions = [module[1] for module in sorted_modules]
 
     # Create sorted bar plot
-    fig = go.Figure(data=[go.Bar(x=sorted_module_colors, y=sorted_proportions, marker_color=sorted_module_colors)])
+    fig = go.Figure(data=[go.Bar(x=sorted_module_colors,
+                    y=sorted_proportions, marker_color=sorted_module_colors)])
     fig.update_layout(
         title='Proportion of Transcripts in Each Module',
         xaxis_title='Module',
@@ -1632,11 +1734,14 @@ def plot_module_gene_proportions(adata: AnnData, config: PlotConfig, custom_file
 
     if config.save_plots:
         if custom_filename:
-            fig.write_image(f"{config.output_path}/{custom_filename}.{config.file_format}", scale=config.dpi/96)
+            fig.write_image(
+                f"{config.output_path}/{custom_filename}.{config.file_format}", scale=config.dpi/96)
             fig.write_html(f"{config.output_path}/{custom_filename}.html")
         else:
-            fig.write_image(f"{config.output_path}/module_gene_proportions.{config.file_format}", scale=config.dpi/96)
-            fig.write_html(f"{config.output_path}/module_gene_proportions.html")
+            fig.write_image(
+                f"{config.output_path}/module_gene_proportions.{config.file_format}", scale=config.dpi/96)
+            fig.write_html(
+                f"{config.output_path}/module_gene_proportions.html")
 
     return fig
 
@@ -1661,8 +1766,10 @@ def plot_transcripts_and_go(data: Dict[str, pd.DataFrame], config: PlotConfig, c
 
     first = True  # Flag to track the first trace
     for i, (stage, df) in enumerate(data.items()):
-        color = colors[i % len(colors)]  # Cyclically select a color from the palette
-        visible = True if first else 'legendonly'  # Only the first trace is visible initially
+        # Cyclically select a color from the palette
+        color = colors[i % len(colors)]
+        # Only the first trace is visible initially
+        visible = True if first else 'legendonly'
 
         # Add lines for transcripts
         fig_transcripts.add_trace(go.Scatter(
@@ -1704,14 +1811,21 @@ def plot_transcripts_and_go(data: Dict[str, pd.DataFrame], config: PlotConfig, c
 
     if config.save_plots:
         if custom_filename:
-            fig_transcripts.write_image(f"{config.output_path}/{custom_filename}_transcripts.{config.file_format}", scale=config.dpi/96)
-            fig_go_terms.write_image(f"{config.output_path}/{custom_filename}_go_terms.{config.file_format}", scale=config.dpi/96)
-            fig_transcripts.write_html(f"{config.output_path}/{custom_filename}_transcripts.html")
-            fig_go_terms.write_html(f"{config.output_path}/{custom_filename}_go_terms.html")
+            fig_transcripts.write_image(
+                f"{config.output_path}/{custom_filename}_transcripts.{config.file_format}", scale=config.dpi/96)
+            fig_go_terms.write_image(
+                f"{config.output_path}/{custom_filename}_go_terms.{config.file_format}", scale=config.dpi/96)
+            fig_transcripts.write_html(
+                f"{config.output_path}/{custom_filename}_transcripts.html")
+            fig_go_terms.write_html(
+                f"{config.output_path}/{custom_filename}_go_terms.html")
         else:
-            fig_transcripts.write_image(f"{config.output_path}/transcripts.{config.file_format}", scale=config.dpi/96)
-            fig_go_terms.write_image(f"{config.output_path}/go_terms.{config.file_format}", scale=config.dpi/96)
-            fig_transcripts.write_html(f"{config.output_path}/transcripts.html")
+            fig_transcripts.write_image(
+                f"{config.output_path}/transcripts.{config.file_format}", scale=config.dpi/96)
+            fig_go_terms.write_image(
+                f"{config.output_path}/go_terms.{config.file_format}", scale=config.dpi/96)
+            fig_transcripts.write_html(
+                f"{config.output_path}/transcripts.html")
             fig_go_terms.write_html(f"{config.output_path}/go_terms.html")
 
 
@@ -1748,12 +1862,15 @@ def plot_hub_connectivity(adata: AnnData, config: PlotConfig, top_n: int = 1, pr
         df['Transcript'] = df.index
         if 'gene_id' in df.columns:
             df = df.set_index('gene_id')
-        needed_var_cols = [col for col in hover_columns if col not in df.columns and col in adata.var.columns]
+        needed_var_cols = [
+            col for col in hover_columns if col not in df.columns and col in adata.var.columns]
         if needed_var_cols:
             df = df.join(adata.var[needed_var_cols], how='left')
-        all_data.append(df.reset_index())  # Reset index to maintain gene_id if needed
+        # Reset index to maintain gene_id if needed
+        all_data.append(df.reset_index())
 
-    combined_df = pd.concat(all_data).sort_values(by=primary_y_column, ascending=False)
+    combined_df = pd.concat(all_data).sort_values(
+        by=primary_y_column, ascending=False)
 
     # Create hover text with rounded values and include the original index
     hover_text = combined_df.apply(lambda row: '<br>'.join([
@@ -1761,7 +1878,8 @@ def plot_hub_connectivity(adata: AnnData, config: PlotConfig, top_n: int = 1, pr
         f'<b>Connectivity</b>: {round(float(row["connectivity"]), 2)}',
         f'<b>Mean counts</b>: {round(float(row["mean_counts"]), 2)}',
         f'<b>Total counts</b>: {round(float(row["total_counts"]), 2)}'] +
-        [f'<b>{col}</b>: {row[col]}' for col in hover_columns if col not in ["connectivity", "mean_counts", "total_counts", "Transcript"]]
+        [f'<b>{col}</b>: {row[col]}' for col in hover_columns if col not in [
+            "connectivity", "mean_counts", "total_counts", "Transcript"]]
     ), axis=1)
 
     fig = make_subplots(specs=[[{"secondary_y": True}]])
@@ -1804,10 +1922,12 @@ def plot_hub_connectivity(adata: AnnData, config: PlotConfig, top_n: int = 1, pr
 
     if config.save_plots:
         if custom_filename:
-            fig.write_image(f"{config.output_path}/{custom_filename}.{config.file_format}", scale=config.dpi/96)
+            fig.write_image(
+                f"{config.output_path}/{custom_filename}.{config.file_format}", scale=config.dpi/96)
             fig.write_html(f"{config.output_path}/{custom_filename}.html")
         else:
-            fig.write_image(f"{config.output_path}/hub_connectivity.{config.file_format}", scale=config.dpi/96)
+            fig.write_image(
+                f"{config.output_path}/hub_connectivity.{config.file_format}", scale=config.dpi/96)
             fig.write_html(f"{config.output_path}/hub_connectivity.html")
 
     return fig
@@ -1830,7 +1950,8 @@ def plot_orthos_and_transcripts_per_module(adata: AnnData, config: PlotConfig, o
     """
 
     df_filtered = adata.var.dropna(subset=[ortho_id_col])
-    ortho_counts = df_filtered.groupby(module_color_col)[ortho_id_col].nunique()
+    ortho_counts = df_filtered.groupby(module_color_col)[
+        ortho_id_col].nunique()
     module_color_counts = adata.var[module_color_col].value_counts()
 
     result_df = pd.DataFrame({
@@ -1838,7 +1959,8 @@ def plot_orthos_and_transcripts_per_module(adata: AnnData, config: PlotConfig, o
         'Number of Transcripts': module_color_counts
     }).fillna(0)
 
-    result_df.sort_values('Number of Transcripts', ascending=False, inplace=True)
+    result_df.sort_values('Number of Transcripts',
+                          ascending=False, inplace=True)
 
     fig = make_subplots(specs=[[{"secondary_y": True}]])
 
@@ -1880,7 +2002,8 @@ def plot_orthos_and_transcripts_per_module(adata: AnnData, config: PlotConfig, o
         barmode='group'
     )
 
-    fig.update_yaxes(title_text='Number of Orthology Groups', secondary_y=False)
+    fig.update_yaxes(title_text='Number of Orthology Groups',
+                     secondary_y=False)
     fig.update_yaxes(title_text='Number of Transcripts', secondary_y=True)
 
     if config.show:
@@ -1888,10 +2011,12 @@ def plot_orthos_and_transcripts_per_module(adata: AnnData, config: PlotConfig, o
 
     if config.save_plots:
         if custom_filename:
-            fig.write_image(f"{config.output_path}/{custom_filename}.{config.file_format}", scale=config.dpi/96)
+            fig.write_image(
+                f"{config.output_path}/{custom_filename}.{config.file_format}", scale=config.dpi/96)
             fig.write_html(f"{config.output_path}/{custom_filename}.html")
         else:
-            fig.write_image(f"{config.output_path}/orthos_transcripts.{config.file_format}", scale=config.dpi/96)
+            fig.write_image(
+                f"{config.output_path}/orthos_transcripts.{config.file_format}", scale=config.dpi/96)
             fig.write_html(f"{config.output_path}/orthos_transcripts.html")
 
     return fig
@@ -1915,9 +2040,9 @@ def plot_eigengenes_correlations(adata: AnnData, config: PlotConfig, custom_file
 
     fig, ax = plt.subplots(figsize=(12, 10))
     max_scale_value = np.max(np.abs(correlation_matrix.values[~mask]))
-    
-    sns.heatmap(correlation_matrix, ax=ax, mask=mask, annot=False, cmap='coolwarm', fmt=".2f", 
-                linewidths=.5, center=0, vmax=max_scale_value, vmin=-max_scale_value, 
+
+    sns.heatmap(correlation_matrix, ax=ax, mask=mask, annot=False, cmap='coolwarm', fmt=".2f",
+                linewidths=.5, center=0, vmax=max_scale_value, vmin=-max_scale_value,
                 cbar_kws={'label': 'Correlation Coefficient'},
                 linecolor='black', square=True)
 
@@ -1926,7 +2051,8 @@ def plot_eigengenes_correlations(adata: AnnData, config: PlotConfig, custom_file
     for i in range(len(mask)):
         for j in range(len(mask)):
             if mask[i, j]:
-                ax.add_patch(plt.Rectangle((j, i), 1, 1, fill=True, color='black'))
+                ax.add_patch(plt.Rectangle(
+                    (j, i), 1, 1, fill=True, color='black'))
 
     if config.show:
         plt.show()
@@ -1946,6 +2072,7 @@ def plot_eigengenes_correlations(adata: AnnData, config: PlotConfig, custom_file
 
     plt.close(fig)
 
+
 ###########
 """
 ORTHO PLOTS
@@ -1953,6 +2080,7 @@ Plotting functions for orthology data.
 Most functions are designed to work with the ortho_df DataFrame which can be generated using "get_ortho_count" function from utils module.
 """
 ###########
+
 
 def plot_histogram(df: pd.DataFrame, config: PlotConfig, column: str = 'Count', bins: int = 40, custom_filename: str = None) -> None:
     """
@@ -1965,29 +2093,31 @@ def plot_histogram(df: pd.DataFrame, config: PlotConfig, column: str = 'Count', 
     - bins (int): The number of bins in the histogram.
     - custom_filename (str): The custom filename for the plot.
     """
-    
+
     plt.figure(figsize=(10, 6))
     plt.hist(df[column], bins=bins, color='skyblue', edgecolor='black')
     plt.title(f'{column} of Orthogroups')
     plt.xlabel(column)
     plt.ylabel('Frequency')
-    
+
     if config.save_plots:
         if custom_filename:
-            plt.savefig(f"{config.output_path}/{custom_filename}.{config.file_format}", dpi=config.dpi)
+            plt.savefig(
+                f"{config.output_path}/{custom_filename}.{config.file_format}", dpi=config.dpi)
         else:
-            plt.savefig(f"{config.output_path}/histogram_{column}.{config.file_format}", dpi=config.dpi)
+            plt.savefig(
+                f"{config.output_path}/histogram_{column}.{config.file_format}", dpi=config.dpi)
 
     if config.show:
         plt.show()
-    
+
     plt.close()
 
 
 def plot_venn(df: pd.DataFrame, config: PlotConfig, species_list: List[str], custom_filename: str = None, italic_labels: bool = True, colors: List[str] = ['skyblue', 'orange', 'green'], alpha: float = 0.7) -> None:
     """
     Plots a Venn diagram for the given species list from the ortho_df DataFrame.
-    
+
     Parameters:
     - df (DataFrame): DataFrame containing ortho data.
     - config (PlotConfig): Configuration object for plot control.
@@ -1997,7 +2127,7 @@ def plot_venn(df: pd.DataFrame, config: PlotConfig, species_list: List[str], cus
     - colors (List[str]): List of colors for the Venn diagram.
     - alpha (float): Transparency of the Venn diagram patches.
     """
-    
+
     if len(species_list) != 3:
         print("Venn diagram can only be plotted for exactly three species.")
         return
@@ -2005,13 +2135,13 @@ def plot_venn(df: pd.DataFrame, config: PlotConfig, species_list: List[str], cus
     sets = [set(df[df[species] > 0].index) for species in species_list]
 
     plt.figure(figsize=(10, 8))
-    
+
     if colors:
         v = venn3(sets, set_labels=species_list, set_colors=colors)
         colors = [to_rgba(color, alpha=alpha) for color in colors]
     else:
         v = venn3(sets, set_labels=species_list)
-    
+
     plt.title('Venn Diagram of Orthogroups', fontsize=20)
 
     for label in v.set_labels:
@@ -2022,20 +2152,22 @@ def plot_venn(df: pd.DataFrame, config: PlotConfig, species_list: List[str], cus
 
     if config.save_plots:
         if custom_filename:
-            plt.savefig(f"{config.output_path}/{custom_filename}.{config.file_format}", dpi=config.dpi)
+            plt.savefig(
+                f"{config.output_path}/{custom_filename}.{config.file_format}", dpi=config.dpi)
         else:
-            plt.savefig(f"{config.output_path}/venn_diagram.{config.file_format}", dpi=config.dpi)
+            plt.savefig(
+                f"{config.output_path}/venn_diagram.{config.file_format}", dpi=config.dpi)
 
     if config.show:
         plt.show()
-    
+
     plt.close()
 
 
 def plot_upset(df: pd.DataFrame, config: PlotConfig, species_list: List[str], custom_filename: str = None, italic_labels: bool = True) -> None:
     """
     Plots an UpSet plot for the given species list using the prepared DataFrame.
-    
+
     Parameters:
     - df (pd.DataFrame): DataFrame containing ortho data in the binary format expected by UpSetPlot.
     - config (PlotConfig): Configuration object for plot control.
@@ -2047,61 +2179,67 @@ def plot_upset(df: pd.DataFrame, config: PlotConfig, species_list: List[str], cu
     df_filtered = df[species_list]
     binary_df = (df_filtered > 0).astype(int)
     binary_df = binary_df.set_index(species_list)
-    
+
     upset = UpSet(binary_df, subset_size='count', sort_by='cardinality')
     plot = upset.plot()
     plt.title('UpSet Plot of Orthogroups', fontsize=20)
     plt.ylabel('Number of Orthogroups', fontsize=12)
-    
+
     if italic_labels:
         for label in plot['matrix'].get_yticklabels():
             label.set_fontstyle('italic')
-    
+
     if config.save_plots:
         if custom_filename:
-            plt.savefig(f"{config.output_path}/{custom_filename}.{config.file_format}", dpi=config.dpi)
+            plt.savefig(
+                f"{config.output_path}/{custom_filename}.{config.file_format}", dpi=config.dpi)
         else:
-            plt.savefig(f"{config.output_path}/upset_plot.{config.file_format}", dpi=config.dpi)
+            plt.savefig(
+                f"{config.output_path}/upset_plot.{config.file_format}", dpi=config.dpi)
 
     if config.show:
         plt.show()
-    
+
     plt.close()
 
 
 def plot_pca(df: pd.DataFrame, config: PlotConfig, custom_filename: str) -> None:
     """
     Plots a PCA of the ortho_df DataFrame.
-    
+
     Parameters:
     - df (pd.DataFrame): DataFrame to plot.
     - config (PlotConfig): Configuration object for plot control.
     - custom_filename (str): Custom filename for the plot.
     """
-    
+
     data = df.drop(columns='Count').T
     pca = PCA(n_components=2)
     principal_components = pca.fit_transform(data)
-    
-    principal_df = pd.DataFrame(data=principal_components, columns=['PC1', 'PC2'])
+
+    principal_df = pd.DataFrame(
+        data=principal_components, columns=['PC1', 'PC2'])
     principal_df['Species'] = data.index
 
     plt.figure(figsize=(10, 8))
-    sns.scatterplot(data=principal_df, x='PC1', y='PC2', hue='Species', palette='tab10')
+    sns.scatterplot(data=principal_df, x='PC1', y='PC2',
+                    hue='Species', palette='tab10')
     plt.title('PCA of Ortho Counts by Species')
     plt.xlabel('Principal Component 1')
     plt.ylabel('Principal Component 2')
     plt.legend(title='Species', bbox_to_anchor=(1.05, 1), loc='upper left')
-    
+
     if config.save_plots:
         if custom_filename:
-            plt.savefig(f"{config.output_path}/{custom_filename}.{config.file_format}", dpi=config.dpi)
+            plt.savefig(
+                f"{config.output_path}/{custom_filename}.{config.file_format}", dpi=config.dpi)
         else:
-            plt.savefig(f"{config.output_path}/pca_plot.{config.file_format}", dpi=config.dpi)
+            plt.savefig(
+                f"{config.output_path}/pca_plot.{config.file_format}", dpi=config.dpi)
 
     if config.show:
         plt.show()
-    
+
     plt.close()
 
 
@@ -2116,10 +2254,10 @@ def plot_top_ortho_groups(df: pd.DataFrame, config: PlotConfig, top_n: int = 20,
     - custom_filename (str): Custom filename for the plot.
     - italic_labels (bool): Whether to italicize the ortho group labels in the plot.
     """
-    
+
     # Sort and select the top N rows
     top_df = df.sort_values(by='Count', ascending=False).head(top_n)
-    
+
     fig = go.Figure()
 
     for column in top_df.columns.drop('Count'):
@@ -2143,22 +2281,25 @@ def plot_top_ortho_groups(df: pd.DataFrame, config: PlotConfig, top_n: int = 20,
 
     if config.save_plots:
         if custom_filename:
-            fig.write_image(f"{config.output_path}/{custom_filename}.{config.file_format}", scale=config.dpi/96)
+            fig.write_image(
+                f"{config.output_path}/{custom_filename}.{config.file_format}", scale=config.dpi/96)
             fig.write_html(f"{config.output_path}/{custom_filename}.html")
         else:
-            fig.write_image(f"{config.output_path}/top_{top_n}_ortho_groups.{config.file_format}", scale=config.dpi/96)
-            fig.write_html(f"{config.output_path}/top_{top_n}_ortho_groups.html")
+            fig.write_image(
+                f"{config.output_path}/top_{top_n}_ortho_groups.{config.file_format}", scale=config.dpi/96)
+            fig.write_html(
+                f"{config.output_path}/top_{top_n}_ortho_groups.html")
 
     if config.show:
         fig.show()
 
 
-def plot_orthogroup_expression(adata: AnnData, config: PlotConfig, ortho_id: str, custom_filename: str = None, 
+def plot_orthogroup_expression(adata: AnnData, config: PlotConfig, ortho_id: str, custom_filename: str = None,
                                trait: str = "tissue") -> None:
     """
     Plots a heatmap of the expression levels of transcripts belonging to a specific orthogroup across different tissues,
     with clustering of columns only.
-    
+
     Parameters:
     - adata (AnnData): AnnData object containing the transcript expression data.
     - config (PlotConfig): Configuration object for plot control.
@@ -2170,30 +2311,35 @@ def plot_orthogroup_expression(adata: AnnData, config: PlotConfig, ortho_id: str
     if trait not in adata.obs.columns:
         trait = "Combined_Trait"
         if trait not in adata.obs.columns:
-            raise ValueError(f"Trait column {trait} not found in the AnnData object.")
-    
+            raise ValueError(
+                f"Trait column {trait} not found in the AnnData object.")
+
     ortho_transcripts = adata.var[adata.var['ortho_ID'] == ortho_id].index
-    
+
     # Get expression data for the orthogroup transcripts
     expression_data = adata[:, ortho_transcripts].to_df()
     expression_data[trait] = adata.obs[trait]
     expression_data = expression_data.groupby(trait).mean()
-    
-    g = sns.clustermap(expression_data.T, cmap='viridis', cbar_kws={'label': 'Expression level', 'orientation': 'vertical'}, 
+
+    g = sns.clustermap(expression_data.T, cmap='viridis', cbar_kws={'label': 'Expression level', 'orientation': 'vertical'},
                        col_cluster=True, row_cluster=True)
-    g.figure.suptitle(f'Expression of Orthogroup {ortho_id} Transcripts Across Tissues', y=1.02)
+    g.figure.suptitle(
+        f'Expression of Orthogroup {ortho_id} Transcripts Across Tissues', y=1.02)
     g.ax_heatmap.set_xlabel('Tissue')
     g.ax_heatmap.set_ylabel('Transcripts')
-    
+
     # Adjust colorbar position to be smaller and to the right corner
-    g.cax.set_position([0.88, 0.88, 0.02, 0.1])  # [left, bottom, width, height]
-    
+    # [left, bottom, width, height]
+    g.cax.set_position([0.88, 0.88, 0.02, 0.1])
+
     if config.save_plots:
         if custom_filename:
-            g.savefig(f"{config.output_path}/{custom_filename}.{config.file_format}", dpi=config.dpi)
+            g.savefig(
+                f"{config.output_path}/{custom_filename}.{config.file_format}", dpi=config.dpi)
         else:
-            g.savefig(f"{config.output_path}/expression_{ortho_id}.{config.file_format}", dpi=config.dpi)
-    
+            g.savefig(
+                f"{config.output_path}/expression_{ortho_id}.{config.file_format}", dpi=config.dpi)
+
     # Show plot if required
     if config.show:
         plt.show()
@@ -2205,11 +2351,11 @@ def plot_orthogroup_expression(adata: AnnData, config: PlotConfig, ortho_id: str
 
     plt.close()
 
-    
+
 def plot_hog_levels(adatas: List[AnnData], config: PlotConfig, custom_filename: str = None) -> None:
     """
     Plots the HOG levels per species and common HOGs using Plotly for interactive visualization.
-    
+
     Parameters:
     - adatas (List[AnnData]): List of AnnData objects containing the HOG data.
     - config (PlotConfig): Configuration object for plot control.
@@ -2223,25 +2369,26 @@ def plot_hog_levels(adatas: List[AnnData], config: PlotConfig, custom_filename: 
     fig = go.Figure()
 
     levels = list(next(iter(species_hog_levels.values())).keys())
-    
+
     for species, hog_levels in species_hog_levels.items():
         num_hogs_per_level = [len(hog_levels[level]) for level in levels]
         fig.add_trace(go.Scatter(
-            x=levels, 
-            y=num_hogs_per_level, 
-            mode='lines+markers', 
+            x=levels,
+            y=num_hogs_per_level,
+            mode='lines+markers',
             name=species
         ))
-    
-    common_num_hogs_per_level = [len(common_hogs_per_level[level]) for level in levels]
+
+    common_num_hogs_per_level = [
+        len(common_hogs_per_level[level]) for level in levels]
     fig.add_trace(go.Scatter(
-        x=levels, 
-        y=common_num_hogs_per_level, 
-        mode='lines+markers', 
-        name='Common', 
+        x=levels,
+        y=common_num_hogs_per_level,
+        mode='lines+markers',
+        name='Common',
         line=dict(dash='dash')
     ))
-    
+
     fig.update_layout(
         title='Hierarchical Orthologous Groups (HOG) Levels per Species',
         xaxis_title='Levels',
@@ -2251,13 +2398,15 @@ def plot_hog_levels(adatas: List[AnnData], config: PlotConfig, custom_filename: 
 
     if config.show:
         fig.show()
-    
+
     if config.save_plots:
         if custom_filename:
-            fig.write_image(f"{config.output_path}/{custom_filename}.{config.file_format}", scale=config.dpi/96)
+            fig.write_image(
+                f"{config.output_path}/{custom_filename}.{config.file_format}", scale=config.dpi/96)
             fig.write_html(f"{config.output_path}/{custom_filename}.html")
         else:
-            fig.write_image(f"{config.output_path}/hog_levels.{config.file_format}", scale=config.dpi/96)
+            fig.write_image(
+                f"{config.output_path}/hog_levels.{config.file_format}", scale=config.dpi/96)
             fig.write_html(f"{config.output_path}/hog_levels.html")
 
 
@@ -2317,19 +2466,21 @@ def plot_hog_eigengenes(adatas: List[AnnData], config: PlotConfig, module: str, 
 
     if config.save_plots:
         if custom_filename:
-            fig.write_image(f"{config.output_path}/{custom_filename}.{config.file_format}", scale=config.dpi/96)
+            fig.write_image(
+                f"{config.output_path}/{custom_filename}.{config.file_format}", scale=config.dpi/96)
             fig.write_html(f"{config.output_path}/{custom_filename}.html")
         else:
-            fig.write_image(f"{config.output_path}/hog_eigengenes.{config.file_format}", scale=config.dpi/96)
+            fig.write_image(
+                f"{config.output_path}/hog_eigengenes.{config.file_format}", scale=config.dpi/96)
             fig.write_html(f"{config.output_path}/hog_eigengenes.html")
 
 
-def plot_cluster_expression(adata: AnnData, config: PlotConfig, cluster_id: int, cluster_name: str, 
+def plot_cluster_expression(adata: AnnData, config: PlotConfig, cluster_id: int, cluster_name: str,
                             custom_filename: str = None, transform: str = None, trait: str = "tissue") -> None:
     """
     Plots a heatmap of the expression levels of transcripts belonging to a specific cluster across different tissues,
     with clustering of columns only.
-    
+
     Parameters:
     - adata (AnnData): AnnData object containing the transcript expression data.
     - config (PlotConfig): Configuration object for plot control.
@@ -2339,14 +2490,16 @@ def plot_cluster_expression(adata: AnnData, config: PlotConfig, cluster_id: int,
     - transform (str): Transformation to apply to the data ('log' or 'z').
     - trait (str): Column name in adata.obs containing the trait information.
     """
-    
+
     if trait not in adata.obs.columns:
         trait = "Combined_Trait"
         if trait not in adata.obs.columns:
-            raise ValueError(f"Trait column {trait} not found in the AnnData object.")
+            raise ValueError(
+                f"Trait column {trait} not found in the AnnData object.")
 
-    cluster_transcripts = adata.var[adata.var[cluster_name] == cluster_id].index
-    
+    cluster_transcripts = adata.var[adata.var[cluster_name]
+                                    == cluster_id].index
+
     # Get expression data for the cluster transcripts
     expression_data = adata[:, cluster_transcripts].to_df()
     expression_data[trait] = adata.obs[trait]
@@ -2362,21 +2515,25 @@ def plot_cluster_expression(adata: AnnData, config: PlotConfig, cluster_id: int,
     else:
         cbar_label = 'Expression level'
 
-    g = sns.clustermap(expression_data.T, cmap='viridis', cbar_kws={'label': cbar_label, 'orientation': 'vertical'}, 
+    g = sns.clustermap(expression_data.T, cmap='viridis', cbar_kws={'label': cbar_label, 'orientation': 'vertical'},
                        col_cluster=True, row_cluster=True)
-    g.figure.suptitle(f'Expression of Cluster {cluster_id} Transcripts Across Tissues', y=1.02)
+    g.figure.suptitle(
+        f'Expression of Cluster {cluster_id} Transcripts Across Tissues', y=1.02)
     g.ax_heatmap.set_xlabel('Tissue')
     g.ax_heatmap.set_ylabel('Transcripts')
-    
+
     # Adjust colorbar position to be smaller and to the right corner
-    g.cax.set_position([0.88, 0.88, 0.02, 0.1])  # [left, bottom, width, height]
-    
+    # [left, bottom, width, height]
+    g.cax.set_position([0.88, 0.88, 0.02, 0.1])
+
     if config.save_plots:
         if custom_filename:
-            g.savefig(f"{config.output_path}/{custom_filename}.{config.file_format}", dpi=config.dpi)
+            g.savefig(
+                f"{config.output_path}/{custom_filename}.{config.file_format}", dpi=config.dpi)
         else:
-            g.savefig(f"{config.output_path}/{cluster_name}_{cluster_id}_heatmap.{config.file_format}", dpi=config.dpi)
-    
+            g.savefig(
+                f"{config.output_path}/{cluster_name}_{cluster_id}_heatmap.{config.file_format}", dpi=config.dpi)
+
     # Show plot if required
     if config.show:
         plt.show()
@@ -2389,11 +2546,13 @@ def plot_cluster_expression(adata: AnnData, config: PlotConfig, cluster_id: int,
     plt.close()
 
 # Based on barplotModuleEigenGene function from PyWGCNA "https://github.com/mortazavilab/PyWGCNA/blob/main/PyWGCNA/wgcna.py"
-def plot_eigengenes(adata: AnnData, eigengenes: pd.DataFrame, config: PlotConfig, column: str = "clusters", 
+
+
+def plot_eigengenes(adata: AnnData, eigengenes: pd.DataFrame, config: PlotConfig, column: str = "clusters",
                     trait: str = "tissue", custom_filename: str = None, custom_stages: List[str] = None) -> None:
     """
     Bar plot of module eigengene figure in given eigengenes DataFrame.
-    
+
     Parameters:
     - adata (AnnData): AnnData object used for static information and traits.
     - eigengenes (pd.DataFrame): DataFrame containing the module eigengenes.
@@ -2410,7 +2569,8 @@ def plot_eigengenes(adata: AnnData, eigengenes: pd.DataFrame, config: PlotConfig
     if trait not in adata.obs.columns:
         trait = "Combined_Trait"
         if trait not in adata.obs.columns:
-            print(f"Trait {trait} not found in adata.obs. Skipping plot_eigengenes function.")
+            print(
+                f"Trait {trait} not found in adata.obs. Skipping plot_eigengenes function.")
             return
 
     # Use the trait information from adata.obs
@@ -2426,15 +2586,18 @@ def plot_eigengenes(adata: AnnData, eigengenes: pd.DataFrame, config: PlotConfig
     cluster_counts = eigengenes.notnull().sum().sort_values()
 
     for module_name in cluster_counts.index:
-        ME = pd.DataFrame(eigengenes[module_name].values, columns=['eigengeneExp'], index=eigengenes.index)
-        
+        ME = pd.DataFrame(eigengenes[module_name].values, columns=[
+                          'eigengeneExp'], index=eigengenes.index)
+
         if module_name.startswith(f"{adata.uns['name']}: "):
             module_name = module_name[len(f"{adata.uns['name']}: "):]
 
         df = ME.copy(deep=True)
         df['all'] = sample_info
-        ybar = df[['all', 'eigengeneExp']].groupby(['all']).mean()['eigengeneExp']
-        ebar = df[['all', 'eigengeneExp']].groupby(['all']).std()['eigengeneExp']
+        ybar = df[['all', 'eigengeneExp']].groupby(['all']).mean()[
+            'eigengeneExp']
+        ebar = df[['all', 'eigengeneExp']].groupby(['all']).std()[
+            'eigengeneExp']
         label = list(ybar.index)
         dot = df[['all', 'eigengeneExp']].copy()
         ind = {val: i for i, val in enumerate(label)}
@@ -2479,17 +2642,21 @@ def plot_eigengenes(adata: AnnData, eigengenes: pd.DataFrame, config: PlotConfig
         if config.show:
             plt.show()
         if config.save_plots:
-            fig.savefig(f"{config.output_path}/{file_name}.{config.file_format}", dpi=config.dpi)
-            file_paths.append(f"{config.output_path}/{file_name}.{config.file_format}")
+            fig.savefig(
+                f"{config.output_path}/{file_name}.{config.file_format}", dpi=config.dpi)
+            file_paths.append(
+                f"{config.output_path}/{file_name}.{config.file_format}")
 
         plt.close(fig)
 
     return file_paths
 
 # Based on module_trait_relationships_heatmap function from PyWGCNA "https://github.com/mortazavilab/PyWGCNA/blob/main/PyWGCNA/wgcna.py"
+
+
 def plot_module_trait_relationships_heatmap(adata: AnnData, eigengenes: pd.DataFrame, module_info: pd.DataFrame,
-                                            config: PlotConfig, meta_data: Union[str, List[str]], topic, 
-                                            alternative: str = 'two-sided', custom_filename = None) -> None:
+                                            config: PlotConfig, meta_data: Union[str, List[str]], topic,
+                                            alternative: str = 'two-sided', custom_filename=None) -> None:
     """
     Plot a heatmap of the correlation between module eigengenes and traits.
 
@@ -2511,12 +2678,15 @@ def plot_module_trait_relationships_heatmap(adata: AnnData, eigengenes: pd.DataF
 
     traits_df = get_data_trait_df(adata, meta_data)
 
-    trait_corr = pd.DataFrame(index=eigengenes.columns, columns=traits_df.columns, dtype="float")
-    trait_pval = pd.DataFrame(index=eigengenes.columns, columns=traits_df.columns, dtype="float")
+    trait_corr = pd.DataFrame(index=eigengenes.columns,
+                              columns=traits_df.columns, dtype="float")
+    trait_pval = pd.DataFrame(index=eigengenes.columns,
+                              columns=traits_df.columns, dtype="float")
 
     for i in eigengenes.columns:
         for j in traits_df.columns:
-            tmp = stats.pearsonr(eigengenes[i], traits_df[j], alternative=alternative)
+            tmp = stats.pearsonr(
+                eigengenes[i], traits_df[j], alternative=alternative)
             trait_corr.loc[i, j] = tmp[0]
             trait_pval.loc[i, j] = tmp[1]
 
@@ -2536,13 +2706,15 @@ def plot_module_trait_relationships_heatmap(adata: AnnData, eigengenes: pd.DataF
         if label.lower() == 'all clusters':
             xlabels.append(f"All Clusters ({all_clusters_count})")
         else:
-            xlabels.append(f"{label.capitalize()} ({cluster_counts.get(label, 0)})")
+            xlabels.append(
+                f"{label.capitalize()} ({cluster_counts.get(label, 0)})")
 
     ylabels = traits_df.columns
 
     tmp_cor = trait_corr.T.round(decimals=2)
     tmp_pvalue = trait_pval.T.round(decimals=2)
-    labels = (np.asarray(["{0}\n({1})".format(cor, pvalue) for cor, pvalue in zip(tmp_cor.values.flatten(), tmp_pvalue.values.flatten())])).reshape(trait_corr.T.shape)
+    labels = (np.asarray(["{0}\n({1})".format(cor, pvalue) for cor, pvalue in zip(
+        tmp_cor.values.flatten(), tmp_pvalue.values.flatten())])).reshape(trait_corr.T.shape)
 
     font_scale = max(0.5, 1.5 / max(num_modules, num_traits))
     annot_font_size = min(max(10, 300 / (num_modules + num_traits)), 20)
@@ -2552,15 +2724,17 @@ def plot_module_trait_relationships_heatmap(adata: AnnData, eigengenes: pd.DataF
 
     sns.set_theme(font_scale=font_scale)
     res = sns.heatmap(trait_corr.T, annot=labels, fmt="", cmap='viridis',
-                    vmin=-1, vmax=1, ax=ax, annot_kws={'size': annot_font_size, "weight": "bold"},
-                    xticklabels=xlabels, yticklabels=ylabels)
+                      vmin=-1, vmax=1, ax=ax, annot_kws={'size': annot_font_size, "weight": "bold"},
+                      xticklabels=xlabels, yticklabels=ylabels)
 
-    res.set_xticklabels(res.get_xmajorticklabels(), fontsize=label_font_size, fontweight="bold", rotation=90)
-    res.set_yticklabels(res.get_ymajorticklabels(), fontsize=label_font_size, fontweight="bold")
+    res.set_xticklabels(res.get_xmajorticklabels(
+    ), fontsize=label_font_size, fontweight="bold", rotation=90)
+    res.set_yticklabels(res.get_ymajorticklabels(),
+                        fontsize=label_font_size, fontweight="bold")
     plt.yticks(rotation=0)
 
     ax.set_title(f"{adata.uns['name']}: Module-trait Relationships Heatmap",
-                fontsize=title_font_size, fontweight="bold")
+                 fontsize=title_font_size, fontweight="bold")
     ax.set_facecolor('white')
 
     cbar = ax.collections[0].colorbar
@@ -2669,7 +2843,7 @@ def plot_eigengene_expression_bokeh(df: pd.DataFrame, config, custom_filename: s
     """
     Creates an interactive Bokeh figure showing the eigengene expression across tissues and clusters.
     Allows users to select any combination of tissues to display, and displays data as bar plots with error bars.
-    
+
     Parameters:
     - df (pd.DataFrame): The DataFrame containing the eigengene expression data.
     - config: Configuration object for plot control.
@@ -2680,7 +2854,8 @@ def plot_eigengene_expression_bokeh(df: pd.DataFrame, config, custom_filename: s
     df['Cluster'] = df['Cluster'].astype(str)
 
     # Drop rows with missing values
-    df = df.dropna(subset=['Tissue', 'Expression', 'Sample', 'Species', 'Cluster'])
+    df = df.dropna(subset=['Tissue', 'Expression',
+                   'Sample', 'Species', 'Cluster'])
 
     # Create a combined identifier for Species and Cluster
     df['Species_Cluster'] = df['Species'] + ' - ' + df['Cluster']
@@ -2709,7 +2884,8 @@ def plot_eigengene_expression_bokeh(df: pd.DataFrame, config, custom_filename: s
     full_points_source = ColumnDataSource(data=df)
 
     # Filter data sources based on the default selected tissues
-    initial_bars_data = mean_expr[mean_expr['Tissue'].isin(default_selected_tissues)]
+    initial_bars_data = mean_expr[mean_expr['Tissue'].isin(
+        default_selected_tissues)]
     initial_points_data = df[df['Tissue'].isin(default_selected_tissues)]
 
     bars_source = ColumnDataSource(data=initial_bars_data)
@@ -2758,7 +2934,8 @@ def plot_eigengene_expression_bokeh(df: pd.DataFrame, config, custom_filename: s
     else:
         colors = viridis(num_clusters)
 
-    color_map = {cluster: colors[i % len(colors)] for i, cluster in enumerate(clusters)}
+    color_map = {cluster: colors[i % len(colors)]
+                 for i, cluster in enumerate(clusters)}
 
     # Plot the bars
     bars = p.vbar(
@@ -2766,13 +2943,15 @@ def plot_eigengene_expression_bokeh(df: pd.DataFrame, config, custom_filename: s
         top='Expression',
         width=0.8,
         source=bars_source,
-        fill_color=factor_cmap('Cluster', palette=colors, factors=clusters),  # Korrektur hier
+        fill_color=factor_cmap('Cluster', palette=colors,
+                               factors=clusters),  # Korrektur hier
         line_color='black'
         # legend_field='Cluster'  # Removed to eliminate the legend
     )
 
     # Add error bars
-    whisker = Whisker(base='x', upper='upper', lower='lower', source=bars_source, line_width=2)
+    whisker = Whisker(base='x', upper='upper', lower='lower',
+                      source=bars_source, line_width=2)
     whisker.upper_head.size = 10
     whisker.lower_head.size = 10
     p.add_layout(whisker)
@@ -2792,7 +2971,8 @@ def plot_eigengene_expression_bokeh(df: pd.DataFrame, config, custom_filename: s
     hover_points.renderers.append(points)
 
     # MultiSelect for tissues
-    tissue_multiselect = MultiSelect(title="Select Traits:", value=default_selected_tissues, options=tissues, size=8)
+    tissue_multiselect = MultiSelect(
+        title="Select Traits:", value=default_selected_tissues, options=tissues, size=8)
 
     # CustomJS callback for MultiSelect
     callback = CustomJS(args=dict(
@@ -2881,7 +3061,7 @@ def plot_eigengene_expression_bokeh(df: pd.DataFrame, config, custom_filename: s
 
 
 def plot_eigengene_modules_bokeh(adata, config, grouping_vars, custom_filename: str = None, width: int = None,
-    height: int = None) -> str:
+                                 height: int = None) -> str:
     """
     Creates an interactive Bokeh figure showing the eigengene expression across specified grouping variables.
     Allows users to select any grouping variable to display, and displays data as bar plots with error bars.
@@ -2914,7 +3094,8 @@ def plot_eigengene_modules_bokeh(adata, config, grouping_vars, custom_filename: 
 
     # Melt the DataFrame to long format
     id_vars = ['sample'] + list(metadata_df.columns)
-    df = df.melt(id_vars=id_vars, var_name='Eigengene', value_name='Expression')
+    df = df.melt(id_vars=id_vars, var_name='Eigengene',
+                 value_name='Expression')
 
     # Ensure that metadata columns are strings
     for col in metadata_df.columns:
@@ -2924,7 +3105,8 @@ def plot_eigengene_modules_bokeh(adata, config, grouping_vars, custom_filename: 
     possible_groupings = grouping_vars
 
     # Create a Select widget for grouping variable
-    grouping_select = Select(title="Select grouping variable:", value=grouping_vars[0], options=grouping_vars)
+    grouping_select = Select(
+        title="Select grouping variable:", value=grouping_vars[0], options=grouping_vars)
 
     # Function to prepare data based on selected grouping variable
     def prepare_data(selected_grouping):
@@ -2980,10 +3162,12 @@ def plot_eigengene_modules_bokeh(adata, config, grouping_vars, custom_filename: 
     # Plot bars for each eigengene separately using dodge
     bars_renderers = []
     whisker_renderers = []
-    bar_width = 0.8 / num_eigengenes  # Total width is 0.8, divided by number of eigengenes
+    # Total width is 0.8, divided by number of eigengenes
+    bar_width = 0.8 / num_eigengenes
 
     for i, eigengene in enumerate(eigengenes):
-        source = ColumnDataSource(mean_expr[mean_expr['Eigengene'] == eigengene])
+        source = ColumnDataSource(
+            mean_expr[mean_expr['Eigengene'] == eigengene])
         bars_sources[eigengene] = source
 
         # Calculate dodge offset
@@ -3136,7 +3320,8 @@ def plot_eigengene_modules_bokeh(adata, config, grouping_vars, custom_filename: 
 
     # Prepare data sources for JavaScript callback
     df_source = ColumnDataSource(df)
-    bars_sources_js = {eigengene: bars_sources[eigengene] for eigengene in eigengenes}
+    bars_sources_js = {
+        eigengene: bars_sources[eigengene] for eigengene in eigengenes}
 
     callback = CustomJS(
         args={
@@ -3173,6 +3358,7 @@ def plot_eigengene_modules_bokeh(adata, config, grouping_vars, custom_filename: 
 
     return os.path.abspath(f"{config.output_path}/{custom_filename}.html")
 
+
 """
 Cytoscape.js Network Plotting
 """
@@ -3183,9 +3369,10 @@ Node = Dict[str, NodeData]
 EdgeData = Dict[str, Union[str, float]]
 Edge = Dict[str, EdgeData]
 
-def plot_cyto_network(config: PlotConfig, custom_filename: str = "cyto_network", network_data: Dict[str, List[Union[Node, Edge]]] = None, 
+
+def plot_cyto_network(config: PlotConfig, custom_filename: str = "cyto_network", network_data: Dict[str, List[Union[Node, Edge]]] = None,
                       searchpath: str = "../flask/app_dev/templates/", use_colors: bool = True, use_shapes: bool = False,
-                      cluster_info: Dict[str, str] = None, node_size: int = 10, highlight: List[str] = None, 
+                      cluster_info: Dict[str, str] = None, node_size: int = 10, highlight: List[str] = None,
                       edge_width: int = 1, highlight_color: str = "magenta",
                       use_edge_transparency: bool = False, use_edge_coloring: bool = True, filter_edges: bool = True) -> str:
     """
@@ -3214,7 +3401,7 @@ def plot_cyto_network(config: PlotConfig, custom_filename: str = "cyto_network",
     # If highlight is a string, convert it to a list
     if isinstance(highlight, str):
         highlight = [highlight]
-    
+
     # Adding cluster information to each node
     if cluster_info:
         for node in network_data['nodes']:
@@ -3222,7 +3409,8 @@ def plot_cyto_network(config: PlotConfig, custom_filename: str = "cyto_network",
             node['data']['cluster'] = cluster_info[node_id]
 
     if use_shapes:
-        shape_dict = generate_cyto_shape_dict([node['data']['moduleColor'] for node in network_data['nodes']], None)
+        shape_dict = generate_cyto_shape_dict(
+            [node['data']['moduleColor'] for node in network_data['nodes']], None)
         for node in network_data['nodes']:
             module_color = node['data']['moduleColor']
             node['data']['shape'] = shape_dict.get(module_color, 'ellipse')
@@ -3243,9 +3431,9 @@ def plot_cyto_network(config: PlotConfig, custom_filename: str = "cyto_network",
 
     # Render the JS template
     js_template = env.get_template("network.js")
-    js_content = js_template.render(network_data=network_data, 
-                                    filter_edges=filter_edges, 
-                                    use_background_color=use_colors, 
+    js_content = js_template.render(network_data=network_data,
+                                    filter_edges=filter_edges,
+                                    use_background_color=use_colors,
                                     use_shapes=use_shapes,
                                     use_cluster_tooltip=cluster_info is not None,
                                     node_size=node_size,
@@ -3256,9 +3444,9 @@ def plot_cyto_network(config: PlotConfig, custom_filename: str = "cyto_network",
 
     # Render the HTML template and embed CSS and JS contents
     html_template = env.get_template("network.html")
-    rendered_html = html_template.render(css_content=css_content, 
+    rendered_html = html_template.render(css_content=css_content,
                                          js_content=js_content)
-    
+
     html_file_path = f"{config.output_path}/{custom_filename}.html"
     if config.show:
         display(IFrame(src=html_file_path, width='100%', height='600px'))

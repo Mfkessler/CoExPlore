@@ -14,6 +14,7 @@ USE FLAT FILES
 """
 ##########
 
+
 def get_transcripts_by_hog(hog_file: str, hog_ids: List[str]) -> Dict[str, List[str]]:
     """
     Extract transcript lists for given HOG IDs from the HOG file.
@@ -38,7 +39,8 @@ def get_transcripts_by_hog(hog_file: str, hog_ids: List[str]) -> Dict[str, List[
                         if i < len(parts) and parts[i].strip():
                             transcripts = parts[i].strip().split(', ')
                             if header in transcripts_by_plant:
-                                transcripts_by_plant[header].update(transcripts)
+                                transcripts_by_plant[header].update(
+                                    transcripts)
                             else:
                                 transcripts_by_plant[header] = set(transcripts)
                         else:
@@ -59,7 +61,8 @@ def create_transcript_df(transcripts: List[str], gaf_file_path: str) -> pd.DataF
     - pd.DataFrame: DataFrame with transcripts as the index, and GO Terms and Gene Names as columns.
     """
 
-    result = {transcript: {'GO_Terms': [], 'Gene_Name': None} for transcript in transcripts}
+    result = {transcript: {'GO_Terms': [], 'Gene_Name': None}
+              for transcript in transcripts}
 
     with gzip.open(gaf_file_path, 'rt') as file:
         for line in file:
@@ -77,7 +80,8 @@ def create_transcript_df(transcripts: List[str], gaf_file_path: str) -> pd.DataF
                 result[gene_id]['GO_Terms'].append(go_term)
 
     for transcript in result:
-        result[transcript]['GO_Terms'] = ','.join(set(result[transcript]['GO_Terms']))
+        result[transcript]['GO_Terms'] = ','.join(
+            set(result[transcript]['GO_Terms']))
 
     df = pd.DataFrame.from_dict(result, orient='index')
 
@@ -129,8 +133,10 @@ def process_hog_to_dfs(hog_ids: List[str], hog_file: str, gaf_files_by_plant: Di
         for plant, transcripts in transcripts_by_plant.items():
             if transcripts:
                 if verbose:
-                    print(f"Processing {plant} with {len(transcripts)} transcripts for HOG ID {hog_id}.")
-                df = create_transcript_df(transcripts, gaf_files_by_plant[plant])
+                    print(
+                        f"Processing {plant} with {len(transcripts)} transcripts for HOG ID {hog_id}.")
+                df = create_transcript_df(
+                    transcripts, gaf_files_by_plant[plant])
                 if plant not in dataframes:
                     dataframes[plant] = df
                 else:
@@ -139,8 +145,10 @@ def process_hog_to_dfs(hog_ids: List[str], hog_file: str, gaf_files_by_plant: Di
                 all_gene_names.update(df['Gene_Name'].dropna().unique())
 
     if verbose:
-        print(f"Total unique GO Terms: {len(all_go_terms)} - {list(all_go_terms)}")
-        print(f"Total unique Gene Names: {len(all_gene_names)} - {list(all_gene_names)}")
+        print(
+            f"Total unique GO Terms: {len(all_go_terms)} - {list(all_go_terms)}")
+        print(
+            f"Total unique Gene Names: {len(all_gene_names)} - {list(all_gene_names)}")
 
     return dataframes
 
@@ -156,7 +164,7 @@ def find_hogs_in_n_species(hog_file: str, n: int) -> List[str]:
     Returns:
     - list: List of HOG IDs that occur in exactly n species.
     """
-    
+
     hog_counts = {}
 
     with open(hog_file, 'r') as file:
@@ -174,13 +182,16 @@ def find_hogs_in_n_species(hog_file: str, n: int) -> List[str]:
             else:
                 hog_counts[species_count] = [hog_id]
 
-    return hog_counts.get(n, [])  # Returns an empty list if no HOGs meet the criteria
+    # Returns an empty list if no HOGs meet the criteria
+    return hog_counts.get(n, [])
+
 
 ##########
 """
 USE ADATAS
 """
 ##########
+
 
 def add_ortho_count(adata_or_list: Union[AnnData, List[AnnData]]) -> None:
     """
@@ -193,12 +204,14 @@ def add_ortho_count(adata_or_list: Union[AnnData, List[AnnData]]) -> None:
 
     def process_adata(adata):
         if 'ortho_count' in adata.var:
-            adata.var.drop(columns='ortho_count', errors='ignore', inplace=True)
+            adata.var.drop(columns='ortho_count',
+                           errors='ignore', inplace=True)
 
         # Filter out empty strings before counting
         valid_ortho_IDs = adata.var['ortho_ID'][adata.var['ortho_ID'] != '']
         ortho_counts = valid_ortho_IDs.value_counts()
-        adata.var['ortho_count'] = adata.var['ortho_ID'].map(ortho_counts).fillna(0).astype(int)
+        adata.var['ortho_count'] = adata.var['ortho_ID'].map(
+            ortho_counts).fillna(0).astype(int)
 
     if isinstance(adata_or_list, list):
         for adata in adata_or_list:
@@ -215,14 +228,15 @@ def update_ortho_ID(adatas: Union[AnnData, List[AnnData]], node: int = 0) -> Non
     - adatas (Union[AnnData, List[AnnData]]): An AnnData object or a list of AnnData objects.
     - node (int): The node level to select the corresponding ortho_IDs. Default is 0.
     """
-    
+
     def set_ortho_id(adata: AnnData, node: int):
         node_key = f"N{node}_ortho"
         if node_key in adata.var.columns:
             adata.var['ortho_ID'] = adata.var[node_key]
         else:
-            raise ValueError(f"Node {node} is not available in the adata.var dataframe.")
-    
+            raise ValueError(
+                f"Node {node} is not available in the adata.var dataframe.")
+
     if isinstance(adatas, AnnData):
         set_ortho_id(adatas, node)
         add_ortho_count(adatas)
@@ -252,12 +266,12 @@ def get_ortho_df(adatas: List[AnnData], transcripts: Dict[str, List[str]] = None
 
     for adata in adatas:
         species = adata.uns['species']
-        
+
         # Check if species-specific transcripts are provided and filter accordingly
         if transcripts is not None and species in transcripts:
             # Filter adata.var to only include specified transcripts for the species
             adata = adata[:, adata.var_names.isin(transcripts[species])]
-        
+
         # Collect unique orthogroups across all datasets
         orthogroups.update(adata.var['ortho_ID'])
 
@@ -269,11 +283,11 @@ def get_ortho_df(adatas: List[AnnData], transcripts: Dict[str, List[str]] = None
     # Fill the DataFrame with ortho counts per species
     for adata in adatas:
         species = adata.uns['species']
-        
+
         # Filter adata.var again to only include specified transcripts for this species, if provided
         if transcripts is not None and species in transcripts:
             adata = adata[:, adata.var_names.isin(transcripts[species])]
-        
+
         # Extract unique orthogroups and their counts
         orthogroup_counts = adata.var.drop_duplicates(subset=['ortho_ID'])
         for _, row in orthogroup_counts.iterrows():
@@ -284,7 +298,7 @@ def get_ortho_df(adatas: List[AnnData], transcripts: Dict[str, List[str]] = None
     # Remove any rows where the index is NaN
     df = df[df.index.notna()]
     df.fillna(0, inplace=True)
-    
+
     # Calculate the total ortho_count across all species and add it to the Count column
     df['Count'] = df.iloc[:, :-1].sum(axis=1)
     df.sort_values(by='Count', ascending=False, inplace=True)
@@ -308,10 +322,13 @@ def get_filtered_ortho_df(filter_df: pd.DataFrame, transcripts: List[str] = None
     """
 
     if transcripts is not None:
-        filter_df = filter_df[filter_df.index.get_level_values('Transcript').isin(transcripts)]
-    
-    filter_df = filter_df[filter_df['ortho_ID'].notna() & (filter_df['ortho_ID'] != "")]
-    grouped = filter_df.groupby(['ortho_ID', 'species']).size().unstack(fill_value=0)
+        filter_df = filter_df[filter_df.index.get_level_values(
+            'Transcript').isin(transcripts)]
+
+    filter_df = filter_df[filter_df['ortho_ID'].notna() & (
+        filter_df['ortho_ID'] != "")]
+    grouped = filter_df.groupby(
+        ['ortho_ID', 'species']).size().unstack(fill_value=0)
     grouped['Count'] = grouped.sum(axis=1)
     grouped.sort_values(by='Count', ascending=False, inplace=True)
     grouped = grouped.astype(int)
@@ -327,13 +344,13 @@ def extract_go_terms(df: pd.DataFrame) -> List[str]:
     and return a list of strings without NaN values.
 
     - df (pd.DataFrame): DataFrame containing the 'go_terms' column
-    
+
     Returns:
     - List[str]: List of GO terms.
     """
-    
+
     go_terms = df['go_terms'].dropna().str.split(',')
-    
+
     return list(set([term for sublist in go_terms for term in sublist]))
 
 
@@ -353,9 +370,10 @@ def transcript_ortho_browser(
     Returns:
     - pd.DataFrame: A DataFrame with the relevant information for the query.
     """
-    
+
     # Define the required columns (if available)
-    possible_columns = ['moduleColors', 'moduleLabels', 'go_terms', 'total_counts', 'ortho_ID', 'ipr_id', 'ipr_desc']
+    possible_columns = ['moduleColors', 'moduleLabels',
+                        'go_terms', 'total_counts', 'ortho_ID', 'ipr_id', 'ipr_desc']
 
     # Ensure adatas is a list
     if isinstance(adatas, AnnData):
@@ -364,7 +382,7 @@ def transcript_ortho_browser(
     # Normalize the query to a list
     if isinstance(query, (str, int)):
         query = [query]
-    
+
     results = []
 
     for adata in adatas:
@@ -386,14 +404,16 @@ def transcript_ortho_browser(
                 elif any(col in adata.var.columns for col in ['moduleColors', 'moduleLabels', 'go_terms', 'ortho_ID', 'ipr_id', 'ipr_desc']):
                     for col in ['moduleColors', 'moduleLabels', 'go_terms', 'ortho_ID', 'ipr_id', 'ipr_desc']:
                         if col in adata.var.columns and any(adata.var[col].astype(str).str.contains(q_str, na=False)):
-                            df_list.append(adata.var[adata.var[col].astype(str).str.contains(q_str, na=False)][columns])
+                            df_list.append(adata.var[adata.var[col].astype(
+                                str).str.contains(q_str, na=False)][columns])
 
             # Combine filtered DataFrames
-            df = pd.concat(df_list, axis=0) if df_list else pd.DataFrame(columns=columns)
-        
+            df = pd.concat(df_list, axis=0) if df_list else pd.DataFrame(
+                columns=columns)
+
         if not df.empty:
             df['species'] = species
-            
+
             # Add 'module_count' if 'moduleColors' exists
             if 'moduleColors' in df.columns:
                 module_counts = df['moduleColors'].value_counts().to_dict()
@@ -403,42 +423,49 @@ def transcript_ortho_browser(
             if 'ortho_ID' in df.columns:
                 valid_ortho_IDs = adata.var['ortho_ID'][adata.var['ortho_ID'] != '']
                 ortho_counts = valid_ortho_IDs.value_counts()
-                df['ortho_count'] = df['ortho_ID'].map(ortho_counts).fillna(0).astype(int)
-            
+                df['ortho_count'] = df['ortho_ID'].map(
+                    ortho_counts).fillna(0).astype(int)
+
             results.append(df)
 
     if results:
         # Combine all results
         result_df = pd.concat(results)
         result_df.index.name = "transcript"
-        
+
         # Set species and transcript as multi-index
         result_df.set_index(['species', result_df.index], inplace=True)
 
         # Calculate unique modules and GO terms per species (if applicable)
         if 'moduleColors' in result_df.columns:
-            unique_modules_per_species = result_df.groupby('species')['moduleColors'].nunique().to_dict()
-            result_df['unique_modules'] = result_df.index.get_level_values('species').map(unique_modules_per_species)
+            unique_modules_per_species = result_df.groupby(
+                'species')['moduleColors'].nunique().to_dict()
+            result_df['unique_modules'] = result_df.index.get_level_values(
+                'species').map(unique_modules_per_species)
 
         if 'go_terms' in result_df.columns:
-            unique_go_terms_per_species = result_df.groupby('species')['go_terms'].nunique().to_dict()
-            result_df['unique_go_terms'] = result_df.index.get_level_values('species').map(unique_go_terms_per_species)
+            unique_go_terms_per_species = result_df.groupby(
+                'species')['go_terms'].nunique().to_dict()
+            result_df['unique_go_terms'] = result_df.index.get_level_values(
+                'species').map(unique_go_terms_per_species)
 
         # Ensure numeric types for 'total_counts' if it exists
         if 'total_counts' in result_df.columns:
-            result_df['total_counts'] = result_df['total_counts'].fillna(0).astype(int)
-        
+            result_df['total_counts'] = result_df['total_counts'].fillna(
+                0).astype(int)
+
         # Standardize column names to lowercase
         result_df.columns = [col.lower() for col in result_df.columns]
         result_df.index.names = [col.lower() for col in result_df.index.names]
-        
+
         return result_df
     else:
         # Return an empty DataFrame with all possible columns
-        empty_columns = [col.lower() for col in possible_columns + ['species', 'module_count', 'ortho_count', 'unique_modules', 'unique_go_terms']]
-        
+        empty_columns = [col.lower() for col in possible_columns + ['species',
+                                                                    'module_count', 'ortho_count', 'unique_modules', 'unique_go_terms']]
+
         return pd.DataFrame(columns=empty_columns)
-    
+
 
 def prepare_dataframe(data: List[Dict[str, Dict[str, str]]], cluster_info: Dict[str, str] = None) -> pd.DataFrame:
     """
@@ -487,15 +514,18 @@ def summarize_orthogroups(df: pd.DataFrame) -> pd.DataFrame:
 
     # Group by ortho_ID and calculate summary metrics
     df_summary = df.groupby('ortho_ID').agg(
-        Transcripts=('id', 'count'),             # Count the number of transcripts (ids)
-        Species=('organism', 'nunique'),         # Count the number of unique organisms
-        Clusters=('Cluster', 'nunique')          # Count the number of unique clusters
+        # Count the number of transcripts (ids)
+        Transcripts=('id', 'count'),
+        # Count the number of unique organisms
+        Species=('organism', 'nunique'),
+        # Count the number of unique clusters
+        Clusters=('Cluster', 'nunique')
     ).reset_index()
 
     # Set ortho_ID as the index and rename it to 'Orthogroup'
     df_summary.set_index('ortho_ID', inplace=True)
     df_summary.index.name = 'Orthogroup'
-    
+
     return df_summary
 
 
@@ -515,30 +545,38 @@ def calculate_jaccard_matrix(df: pd.DataFrame, cluster_col: str = "Cluster", ort
       between clusters i and j based on their shared 'ortho_ID's, indexed by species.
     """
     # Extract unique species-cluster combinations
-    df['species_cluster'] = df[organism_col] + ": " + df[cluster_col].astype(str)
+    df['species_cluster'] = df[organism_col] + \
+        ": " + df[cluster_col].astype(str)
     clusters = df['species_cluster'].unique()
 
     # Create dictionary for ortho_IDs per species-cluster
-    cluster_orthos = {cluster: set(df[df['species_cluster'] == cluster][ortho_id_col]) for cluster in clusters}
+    cluster_orthos = {cluster: set(
+        df[df['species_cluster'] == cluster][ortho_id_col]) for cluster in clusters}
 
     # Initialize an empty matrix for Jaccard indices with species-cluster as index and columns
-    jaccard_matrix = pd.DataFrame(np.zeros((len(clusters), len(clusters))), index=clusters, columns=clusters)
+    jaccard_matrix = pd.DataFrame(
+        np.zeros((len(clusters), len(clusters))), index=clusters, columns=clusters)
 
     # Calculate Jaccard index for each cluster pair
     for i, cluster1 in enumerate(clusters):
         for j, cluster2 in enumerate(clusters):
             if i <= j:  # Calculate only the upper triangular matrix
-                intersection = cluster_orthos[cluster1].intersection(cluster_orthos[cluster2])
-                union = cluster_orthos[cluster1].union(cluster_orthos[cluster2])
-                jaccard_index = len(intersection) / len(union) if len(union) > 0 else 0
+                intersection = cluster_orthos[cluster1].intersection(
+                    cluster_orthos[cluster2])
+                union = cluster_orthos[cluster1].union(
+                    cluster_orthos[cluster2])
+                jaccard_index = len(intersection) / \
+                    len(union) if len(union) > 0 else 0
                 jaccard_matrix.loc[cluster1, cluster2] = jaccard_index
-                jaccard_matrix.loc[cluster2, cluster1] = jaccard_index  # Symmetric entry
+                # Symmetric entry
+                jaccard_matrix.loc[cluster2, cluster1] = jaccard_index
 
     # Set the diagonal values to 1 for self-similarity
     np.fill_diagonal(jaccard_matrix.values, 1)
 
     return jaccard_matrix
-    
+
+
 ###############
 """
 Compare species
@@ -547,81 +585,90 @@ Compare species
 
 # START COMMON HOGS AND JACCARD KOEFFICIENT
 
+
 def calculate_module_similarity(adata_list: List[AnnData]) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
     Compares modules across multiple AnnData objects using HOGs.
-    
+
     Parameters:
     - adata_list (List[AnnData]): List of AnnData objects representing different plant species.
-    
+
     Returns:
     - Tuple[pd.DataFrame, pd.DataFrame]: Two DataFrames, one containing the number of common HOGs per module 
       and another containing the Jaccard coefficient of HOGs per module.
     """
-    
+
     module_hogs = {}
-    
+
     # Extract HOGs for each module in each species
     for adata in adata_list:
         species = adata.uns['species']
         for module in adata.var['moduleColors'].unique():
-            hogs = set(adata.var[adata.var['moduleColors'] == module]['ortho_ID'])
+            hogs = set(
+                adata.var[adata.var['moduleColors'] == module]['ortho_ID'])
             module_hogs[f"{module}_{species}"] = hogs
-    
+
     # Initialize matrices
     module_names = list(module_hogs.keys())
     num_modules = len(module_names)
-    
-    common_hogs_matrix = pd.DataFrame(np.zeros((num_modules, num_modules)), index=module_names, columns=module_names)
-    jaccard_matrix = pd.DataFrame(np.zeros((num_modules, num_modules)), index=module_names, columns=module_names)
-    
+
+    common_hogs_matrix = pd.DataFrame(
+        np.zeros((num_modules, num_modules)), index=module_names, columns=module_names)
+    jaccard_matrix = pd.DataFrame(
+        np.zeros((num_modules, num_modules)), index=module_names, columns=module_names)
+
     # Calculate common HOGs and Jaccard coefficient
     for i, mod1 in enumerate(module_names):
         for j, mod2 in enumerate(module_names):
             if i <= j:
                 hogs1 = module_hogs[mod1]
                 hogs2 = module_hogs[mod2]
-                
+
                 common_hogs = hogs1.intersection(hogs2)
                 union_hogs = hogs1.union(hogs2)
-                
-                common_hogs_matrix.at[mod1, mod2] = common_hogs_matrix.at[mod2, mod1] = len(common_hogs)
-                jaccard_index = len(common_hogs) / len(union_hogs) if union_hogs else 0
-                jaccard_matrix.at[mod1, mod2] = jaccard_matrix.at[mod2, mod1] = jaccard_index
-    
+
+                common_hogs_matrix.at[mod1, mod2] = common_hogs_matrix.at[mod2, mod1] = len(
+                    common_hogs)
+                jaccard_index = len(common_hogs) / \
+                    len(union_hogs) if union_hogs else 0
+                jaccard_matrix.at[mod1,
+                                  mod2] = jaccard_matrix.at[mod2, mod1] = jaccard_index
+
     return common_hogs_matrix, jaccard_matrix
 
 # END COMMON HOGS AND JACCARD KOEFFICIENT
 
-# START CORRELATION OF EIGENGENES 
+# START CORRELATION OF EIGENGENES
+
 
 def aggregate_eigengenes(adata: AnnData) -> pd.DataFrame:
     """
     Aggregates the eigengenes by ortho_ID by taking the mean of eigengenes.
-    
+
     Parameters:
     - adata (AnnData): The AnnData object.
-    
+
     Returns:
     - pd.DataFrame: Aggregated eigengenes DataFrame.
     """
 
-    eigengenes_df = pd.DataFrame(adata.varm['eigengenes'], index=adata.var_names)
+    eigengenes_df = pd.DataFrame(
+        adata.varm['eigengenes'], index=adata.var_names)
     eigengenes_df['ortho_ID'] = adata.var['ortho_ID'].values
     aggregated_df = eigengenes_df.groupby('ortho_ID').mean()
-    
+
     return aggregated_df
 
 
 def calculate_correlation_pair(col1: str, col2: str, combined_df: pd.DataFrame) -> Tuple[Tuple[str, str], float, float]:
     """
     Calculate the Spearman correlation and p-value for a pair of columns.
-    
+
     Parameters:
     - col1 (str): The first column name.
     - col2 (str): The second column name.
     - combined_df (pd.DataFrame): The combined DataFrame with aggregated eigengenes.
-    
+
     Returns:
     - Tuple[Tuple[str, str], float, float]: Column pair, correlation, and p-value.
     """
@@ -634,13 +681,13 @@ def calculate_correlation_pair(col1: str, col2: str, combined_df: pd.DataFrame) 
 def calculate_correlation_matrix(adatas: List[AnnData], correction_method: str = 'fdr_bh') -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
     Calculates the correlation matrix of aggregated eigengenes between multiple AnnData objects and returns p-value matrix.
-    
+
     Parameters:
     - adatas (List[AnnData]): List of AnnData objects.
     - correction_method (str): Method to use for multiple testing correction.
                                Options include 'bonferroni', 'sidak', 'holm-sidak', 'holm', 'simes-hochberg',
                                'hommel', 'fdr_bh', 'fdr_by', 'fdr_tsbh', 'fdr_tsbky'.
-    
+
     Returns:
     - Tuple[pd.DataFrame, pd.DataFrame]: Correlation matrix and p-value matrix.
     """
@@ -648,29 +695,33 @@ def calculate_correlation_matrix(adatas: List[AnnData], correction_method: str =
     all_hogs = set()
     for adata in adatas:
         all_hogs.update(adata.var['ortho_ID'])
-    
+
     aggregated_dfs = []
     species_names = []
-    
+
     for adata in adatas:
         aggregated_df = aggregate_eigengenes(adata)
         species = adata.uns['species']
-        aggregated_df.columns = [f"{col}_{species}" for col in aggregated_df.columns]
+        aggregated_df.columns = [
+            f"{col}_{species}" for col in aggregated_df.columns]
         species_names.append(species)
         aggregated_dfs.append(aggregated_df)
-    
+
     combined_df = pd.concat(aggregated_dfs, axis=1, join='outer').fillna(0)
-    
-    correlation_matrix = pd.DataFrame(np.zeros((combined_df.shape[1], combined_df.shape[1])), index=combined_df.columns, columns=combined_df.columns)
-    p_value_matrix = pd.DataFrame(np.ones((combined_df.shape[1], combined_df.shape[1])), index=combined_df.columns, columns=combined_df.columns)
-    
+
+    correlation_matrix = pd.DataFrame(np.zeros(
+        (combined_df.shape[1], combined_df.shape[1])), index=combined_df.columns, columns=combined_df.columns)
+    p_value_matrix = pd.DataFrame(np.ones(
+        (combined_df.shape[1], combined_df.shape[1])), index=combined_df.columns, columns=combined_df.columns)
+
     tasks = []
     with ProcessPoolExecutor() as executor:
         for i, col1 in enumerate(combined_df.columns):
             for j, col2 in enumerate(combined_df.columns):
                 if i < j:
-                    tasks.append(executor.submit(calculate_correlation_pair, col1, col2, combined_df))
-        
+                    tasks.append(executor.submit(
+                        calculate_correlation_pair, col1, col2, combined_df))
+
         p_values = []
         index_pairs = []
         for future in as_completed(tasks):
@@ -681,47 +732,54 @@ def calculate_correlation_matrix(adatas: List[AnnData], correction_method: str =
             p_value_matrix.at[col2, col1] = p_value
             p_values.append(p_value)
             index_pairs.append((col1, col2))
-    
+
     # Apply the chosen correction method
-    reject, p_values_corrected, _, _ = multipletests(p_values, method=correction_method)
-    
+    reject, p_values_corrected, _, _ = multipletests(
+        p_values, method=correction_method)
+
     for (col1, col2), p_value_corr in zip(index_pairs, p_values_corrected):
         p_value_matrix.at[col1, col2] = p_value_corr
         p_value_matrix.at[col2, col1] = p_value_corr
-    
-    correlation_matrix.columns = [col.replace('kME', '') for col in correlation_matrix.columns]
-    correlation_matrix.index = [idx.replace('kME', '') for idx in correlation_matrix.index]
 
-    p_value_matrix.columns = [col.replace('kME', '') for col in p_value_matrix.columns]
-    p_value_matrix.index = [idx.replace('kME', '') for idx in p_value_matrix.index]
-    
+    correlation_matrix.columns = [col.replace(
+        'kME', '') for col in correlation_matrix.columns]
+    correlation_matrix.index = [idx.replace(
+        'kME', '') for idx in correlation_matrix.index]
+
+    p_value_matrix.columns = [col.replace(
+        'kME', '') for col in p_value_matrix.columns]
+    p_value_matrix.index = [idx.replace('kME', '')
+                            for idx in p_value_matrix.index]
+
     return correlation_matrix, p_value_matrix, combined_df
 
 
 def compare_plants(adatas: List[AnnData], correction_method='fdr_bh') -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
     Compares plants using aggregated eigengenes and returns the correlation matrix and p-value matrix.
-    
+
     Parameters:
     - adatas (List[AnnData]): List of AnnData objects.
     - correction_method (str): Method to use for multiple testing correction.
-    
+
     Returns:
     - Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]: Correlation matrix, p-value matrix and module membership DF.
     """
 
-    correlation_matrix, p_value_matrix, combined_df = calculate_correlation_matrix(adatas, correction_method=correction_method)
-    
+    correlation_matrix, p_value_matrix, combined_df = calculate_correlation_matrix(
+        adatas, correction_method=correction_method)
+
     return correlation_matrix, p_value_matrix, combined_df
 
 # END CORRELATION OF EIGENGENES
 
 # START HELPER FUNCTIONS FOR VISUALIZATION OF HOG LEVELS PER SPECIES
 
+
 def extract_hog_levels_per_species(adatas: List[AnnData]) -> Dict[str, Dict[str, set]]:
     """
     Extracts and combines HOG levels from multiple AnnData objects per species.
-    
+
     Parameters:
     - adatas (List[AnnData]): List of AnnData objects containing HOG information.
 
@@ -740,15 +798,16 @@ def extract_hog_levels_per_species(adatas: List[AnnData]) -> Dict[str, Dict[str,
                 level_name = col.replace('_ortho', '')
                 if level_name not in species_levels[species]:
                     species_levels[species][level_name] = set()
-                species_levels[species][level_name].update(adata.var[col].dropna().unique())
-                
+                species_levels[species][level_name].update(
+                    adata.var[col].dropna().unique())
+
     return species_levels
 
 
 def get_common_hogs_per_level(species_hog_levels: Dict[str, Dict[str, set]]) -> Dict[str, set]:
     """
     Identifies common HOGs per level from the species HOG levels dictionary.
-    
+
     Parameters:
     - species_hog_levels (Dict[str, Dict[str, set]]): A dictionary where keys are species names and values are dictionaries 
                                 of HOG levels and their counts.
@@ -761,7 +820,8 @@ def get_common_hogs_per_level(species_hog_levels: Dict[str, Dict[str, set]]) -> 
     levels = list(next(iter(species_hog_levels.values())).keys())
 
     for level in levels:
-        common_hogs = set.intersection(*(species_hog_levels[species][level] for species in species_hog_levels))
+        common_hogs = set.intersection(
+            *(species_hog_levels[species][level] for species in species_hog_levels))
         common_hogs_per_level[level] = common_hogs
 
     return common_hogs_per_level
@@ -769,6 +829,7 @@ def get_common_hogs_per_level(species_hog_levels: Dict[str, Dict[str, set]]) -> 
 # END HELPER FUNCTIONS FOR VISUALIZATION OF HOG LEVELS PER SPECIES
 
 # START HOG EIGENGENES LINE PLOT BETWEEN TWO PLANTS AND MODULES
+
 
 def aggregate_eigengenes_filter(adata: AnnData, module: str, term: str) -> pd.DataFrame:
     """
@@ -778,13 +839,15 @@ def aggregate_eigengenes_filter(adata: AnnData, module: str, term: str) -> pd.Da
     - adata (AnnData): The AnnData object.
     - module (str): Column name in 'adata.var' to group by, 'moduleColors'.
     - term (str): Module term to filter by.
-    
+
     Returns:
     - pd.DataFrame: Aggregated eigengenes DataFrame.
     """
     # Match eigengenes with ortho_IDs and module terms
-    eigengenes_df = pd.DataFrame(adata.varm['eigengenes'], index=adata.var_names)
-    eigengenes_df.columns = [col.replace('kME', '') for col in eigengenes_df.columns]
+    eigengenes_df = pd.DataFrame(
+        adata.varm['eigengenes'], index=adata.var_names)
+    eigengenes_df.columns = [col.replace('kME', '')
+                             for col in eigengenes_df.columns]
     eigengenes_df['ortho_ID'] = adata.var['ortho_ID']
     eigengenes_df['module'] = adata.var[module]
 
@@ -792,12 +855,13 @@ def aggregate_eigengenes_filter(adata: AnnData, module: str, term: str) -> pd.Da
     subset = eigengenes_df[eigengenes_df['module'] == term]
     if subset.empty:
         return pd.DataFrame()
-    
+
     # Remove the 'module' column and aggregate by ortho_ID
     subset = subset.drop(columns=['module'])
     aggregated_df = subset.groupby('ortho_ID').mean()
 
     return aggregated_df
+
 
 def get_common_hogs(aggregated_df1: pd.DataFrame, aggregated_df2: pd.DataFrame) -> pd.Index:
     """
@@ -806,7 +870,7 @@ def get_common_hogs(aggregated_df1: pd.DataFrame, aggregated_df2: pd.DataFrame) 
     Parameters:
     - aggregated_df1 (pd.DataFrame): First DataFrame of aggregated eigengenes.
     - aggregated_df2 (pd.DataFrame): Second DataFrame of aggregated eigengenes.
-    
+
     Returns:
     - pd.Index: Common HOGs.
     """
