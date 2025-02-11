@@ -17,9 +17,19 @@ species_list = config["species"]
 names_list = config["name"]
 count_matrix_list = config["count_matrix"]
 sample_mapping_list = config["sample_mapping"]
-iprid_list = config["iprid"]
-goid_list = config["goid"]
-orthogroups = config["orthogroups"]
+
+# Check if all lists have the same number of entries
+if not (len(species_list) == len(names_list) == len(count_matrix_list) == len(sample_mapping_list)):
+    raise ValueError("All lists (species, name, count_matrix, sample_mapping) must have the same number of entries.")
+
+# Check if lists are not empty
+if len(species_list) == 0:
+    raise ValueError("The lists (species, name, count_matrix, sample_mapping) must not be empty.")
+
+# Optional metadata from config
+iprid_list = config.get("iprid", [""] * len(names_list))
+goid_list = config.get("goid", [""] * len(names_list))
+orthogroups = config.get("orthogroups", "")
 
 # Boolean or single-value entries from config
 save_tom = config["save_tom"]
@@ -54,10 +64,10 @@ rule all:
 ###############################################################################
 rule wgcna_pipeline:
     input:
-        count_matrix=lambda wc: count_matrix_list[names_list.index(wc.name)],
-        sample_mapping=lambda wc: sample_mapping_list[names_list.index(wc.name)],
-        iprid=lambda wc: iprid_list[names_list.index(wc.name)],
-        goid=lambda wc: goid_list[names_list.index(wc.name)]
+        count_matrix = lambda wc: count_matrix_list[names_list.index(wc.name)],
+        sample_mapping = lambda wc: sample_mapping_list[names_list.index(wc.name)],
+        iprid = lambda wc: iprid_list[names_list.index(wc.name)] if iprid_list[names_list.index(wc.name)] != "" else [],
+        goid = lambda wc: goid_list[names_list.index(wc.name)] if goid_list[names_list.index(wc.name)] != "" else []
     output:
         H5AD_FILE = output_path + "{name}/{name}.h5ad",
         TOM_FILE = output_path + "{name}/tom_matrix.h5",
@@ -65,17 +75,18 @@ rule wgcna_pipeline:
     run:
         import PyWGCNA
         import wgcna.utils as rutils
-        
-        # Get index and relevant info for this wildcard name
+
         idx = names_list.index(wildcards.name)
         sp = species_list[idx]
         nm = names_list[idx]
         cnt_matrix = input.count_matrix
         smpl_map = input.sample_mapping
-        ipr = input.iprid
-        go = input.goid
 
-        # Create directory (if not existing) for storing intermediate files
+        # If iprid or goid are not present, pass empty strings
+        ipr = input.iprid if input.iprid else ""
+        go = input.goid if input.goid else ""
+
+        # Create output directory for intermediate files
         rutils.create_dir(os.path.dirname(output.H5AD_FILE))
 
         # Transform count matrix
@@ -114,7 +125,7 @@ rule wgcna_pipeline:
         # Perform analysis
         pyWGCNA_obj.analyseWGCNA(show=False)
 
-        # Determine if user provided .gaf.gz or .tsv for GO terms
+        # Determine if a .gaf.gz file was provided for GO terms
         gaf_path = go if go.endswith(".gaf.gz") else None
         ortho_file = orthogroups if orthogroups.endswith(".tsv") else None
 
@@ -122,11 +133,11 @@ rule wgcna_pipeline:
         if not gaf_path and go.endswith(".tsv"):
             rutils.add_go_terms_to_adata(pyWGCNA_obj.datExpr, go)
 
-        # If ipr path is present, add InterPro IDs
+        # If ipr file is provided, add InterPro IDs
         if ipr:
             rutils.add_ipr_columns(pyWGCNA_obj.datExpr, ipr)
 
-        # Final saving (TOM, adjacency matrix, WGCNA object) depending on config
+        # Final saving depending on configuration
         rutils.prepare_and_save_wgcna(
             pyWGCNA_obj, 
             f"{output_path}{nm}/", 
@@ -144,7 +155,7 @@ rule reorganize_outputs:
     input:
         H5AD_FILE = output_path + "{name}/{name}.h5ad",
         TOM_FILE = output_path + "{name}/tom_matrix.h5",
-        FIGURES_DIR = directory(output_path + "{name}/figures")
+        FIGURES_DIR = output_path + "{name}/figures"
     output:
         FINAL_H5AD = H5AD_PATH + "{name}.h5ad",
         FINAL_TOM = TOM_PATH + "tom_matrix_{name}.h5",

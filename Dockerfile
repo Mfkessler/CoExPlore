@@ -1,27 +1,23 @@
-# Use Miniconda as the base image
-FROM continuumio/miniconda3:latest
+# Persistent package, mount app directory as volume
+
+# Use slim Python 3.13.2 as the base image
+FROM python:3.13.2-slim
 
 # Set the working directory
 WORKDIR /CoExPlore
 
 # Copy environment files
-COPY app/requirements.txt /CoExPlore/
-COPY app/environment.yml /CoExPlore/
+COPY requirements.txt .
 
 # Copy package temporarily for installation
 COPY package /tmp/package/
 
-# Install system dependencies
+# Install system dependencies including git, graphviz and build-essential (for gcc)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    graphviz && \
+    git \
+    graphviz \
+    build-essential && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
-
-# Install Conda dependencies
-RUN conda env create -f environment.yml && \
-    conda clean -afy
-
-# Set the environment path
-ENV PATH=/opt/conda/envs/WGCNA_APP/bin:$PATH
 
 # Install Pip packages
 RUN pip install --no-cache-dir -r requirements.txt
@@ -35,6 +31,5 @@ RUN pip install git+https://github.com/Mfkessler/PyWGCNA.git
 # Install Snakemake and specific Pulp version
 RUN pip install snakemake pulp==2.7.0
 
-# Clean up temporary files
-RUN rm -rf /tmp/package
-RUN rm -rf ~/.cache/pip /tmp/* /var/tmp/*
+# Clean up temporary files and pip cache
+RUN rm -rf /tmp/package && rm -rf ~/.cache/pip /tmp/* /var/tmp/*

@@ -16,15 +16,15 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Install Conda and Create Environment
-        uses: conda-incubator/setup-miniconda@v2
+      - name: Set up Python 3.13.2
+        uses: actions/setup-python@v4
         with:
-          python-version: "3.8.19"
-          environment-file: package/environment.yml
-          activate-environment: wgcna-package
+          python-version: "3.13.2"
 
       - name: Install Dependencies
         run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
           pip install pytest
           pip install ./package
           pip install git+https://github.com/Mfkessler/PyWGCNA.git

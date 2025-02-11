@@ -66,9 +66,9 @@ Access the application at [http://localhost:5000](http://localhost:5000) to anal
 
 ## Key Components
 
-- **Pipeline**: Located in `wgcna-pipeline/`, automates preprocessing with Snakemake.
-- **Package**: Found in `wgcna-package/`, provides core WGCNA functionality.
-- **App**: Located in `wgcna-app/`, offers an interactive web interface for analysis.
+- **Package**: Found in `package/`, provides core WGCNA functionality.
+- **Pipeline**: Located in `pipeline/`, automates preprocessing with Snakemake.
+- **App**: Located in `app/`, offers an interactive web interface for analysis.
 
 ---
 
