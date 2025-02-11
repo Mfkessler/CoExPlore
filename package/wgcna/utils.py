@@ -22,8 +22,6 @@ from pandas.api.types import is_numeric_dtype
 from jinja2 import Environment, FileSystemLoader
 from collections import defaultdict
 from scipy.spatial.distance import squareform
-from sqlalchemy import text
-
 
 def create_dir(path: str) -> None:
     """

@@ -14,7 +14,6 @@ from .plotting import (PlotConfig,
                        plot_filtered_go_terms, 
                        plot_cyto_network, 
                        plot_overlap, 
-                       plot_eigengene_expression, 
                        plot_eigengene_expression_bokeh)
 from anndata import AnnData
 from jinja2 import Environment, FileSystemLoader

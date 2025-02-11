@@ -11,7 +11,7 @@ import scipy.stats as stats
 import json
 from typing import List, Dict, Tuple
 from anndata import AnnData
-from .utils import reduce_tom_matrix, load_subset_from_hdf5, identify_network_clusters, generate_stage_color_dict, get_data_trait_df, get_tissue_map
+from .utils import reduce_tom_matrix, load_subset_from_hdf5, identify_network_clusters, generate_stage_color_dict, get_data_trait_df
 from .ortho import extract_hog_levels_per_species, get_common_hogs_per_level, get_common_hogs, aggregate_eigengenes_filter
 from plotly.subplots import make_subplots
 from plotly.graph_objs import Figure
@@ -492,8 +492,10 @@ def plot_co_expression_network(tom: pd.DataFrame, adata: AnnData, config: PlotCo
 
     fig = go.Figure(data=traces,
                     layout=go.Layout(
-                        title=title,
-                        titlefont=dict(size=20),
+                        title=dict(
+                            text=title,
+                            font=dict(size=20)
+                        ),
                         showlegend=show_symbol_legend,
                         hovermode='closest',
                         xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
@@ -985,8 +987,10 @@ def plot_correlation_network(df: pd.DataFrame, config: PlotConfig, threshold: fl
     
     fig = go.Figure(data=edge_traces + [node_trace] + legend_shapes,
                     layout=go.Layout(
-                        title=title,
-                        titlefont=dict(size=20),
+                        title=dict(
+                            text=title,
+                            font=dict(size=20)
+                        ),
                         showlegend=show_symbol_legend,
                         legend=dict(
                             x=-0.35,
@@ -1830,7 +1834,7 @@ def plot_orthos_and_transcripts_per_module(adata: AnnData, config: PlotConfig, o
     module_color_counts = adata.var[module_color_col].value_counts()
 
     result_df = pd.DataFrame({
-        'Number of Orthology Groups': ortho_counts,
+        'Number of Orthogroups': ortho_counts,
         'Number of Transcripts': module_color_counts
     }).fillna(0)
 
