@@ -128,6 +128,13 @@ document.addEventListener('DOMContentLoaded', function() {
     }    
 
     cy.ready(function() {
+        /* Init edge visibility */
+        var initialZoom = cy.zoom();
+        cy.scratch('initialZoom', initialZoom);
+        cy.edges().hide();
+        updateEdgesVisibility();
+        cy.on('zoom', updateEdgesVisibility);
+
         /* Shape assignment based on organism */
         if (useShapes) {
             const availableShapes = [
@@ -260,6 +267,57 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
     });
+
+    function clamp(val, min, max) {
+        return Math.max(min, Math.min(max, val));
+    }
+
+    function lerp(a, b, t) {
+        return a + (b - a) * t;
+    }
+
+    function updateEdgesVisibility() {
+        var currentZoom = cy.zoom();
+        var initZoom = cy.scratch('initialZoom');
+
+        console.log('Current Zoom:', currentZoom);
+        // Calculate the relative zoom ratio (1 = initial; >1 = zoom in; <1 = zoom out)
+        var relativeZoom = currentZoom / initZoom;
+        // Define the zoom factor at which all edges should be shown (adjustable)
+        var maxRelative = 6.0;
+        // Interpolation term t: at relativeZoom <= 1, t = 0; at relativeZoom >= maxRelative, t = 1
+        var t = clamp((relativeZoom - 1) / (maxRelative - 1), 0, 1);
+
+        // Calculate the sorted edges by weight for each node if not already done
+        if (!cy.scratch('sortedEdges')) {
+            var sortedEdges = {};
+            cy.nodes().forEach(function (node) {
+                var nodeEdges = node.connectedEdges();
+                // Sort descending by the "weight" attribute (assume 0 if weight is missing)
+                var sorted = nodeEdges.sort(function (a, b) {
+                    return (b.data('weight') || 0) - (a.data('weight') || 0);
+                });
+                sortedEdges[node.id()] = sorted.map(function (edge) { return edge.id(); });
+            });
+            cy.scratch('sortedEdges', sortedEdges);
+        }
+        var sortedEdges = cy.scratch('sortedEdges');
+
+        // Hide all edges initially
+        cy.edges().hide();
+
+        // For each node: Allow at least 1 edge (strongest) and up to all edges
+        cy.nodes().forEach(function (node) {
+            var edgeIds = sortedEdges[node.id()] || [];
+            var totalEdges = edgeIds.length;
+            // Interpolation: At t = 0 (relativeZoom <= 1) show 1, at t = 1 show totalEdges
+            var allowedEdges = Math.ceil(lerp(1, totalEdges, t));
+            for (var i = 0; i < allowedEdges && i < totalEdges; i++) {
+                var edge = cy.getElementById(edgeIds[i]);
+                edge.show();
+            }
+        });
+    }
 
     // Calculate the minimum and maximum TOM value
     var minTOM = Math.min(...cy.edges().map(edge => edge.data('weight')));
