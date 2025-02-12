@@ -375,7 +375,7 @@ def process_anndata(
     1. Adds gene ontology (GO) terms to the AnnData object.
     2. Adds orthologous IDs to the AnnData object.
     3. Calculates quality control metrics for the object.
-    4. Renames the 'n_cells_by_counts' column to 'n_samples_by_counts'.
+    4. Drops the 'n_cells_by_counts' column.
     5. Rounds float columns to the specified number of decimal places. (Optional)
 
     Parameters:
@@ -397,8 +397,8 @@ def process_anndata(
         update_ortho_ID(adata)
     if qc_metrics:
         sc.pp.calculate_qc_metrics(adata, inplace=True)
-        adata.var.rename(
-            columns={"n_cells_by_counts": "n_samples_by_counts"}, inplace=True)
+        # Drop n_cells_by_counts column
+        adata.var.drop(columns="n_cells_by_counts", axis=1, inplace=True)
     if decimal_places:
         float_cols = adata.var.select_dtypes(include=['float64']).columns
         adata.var[float_cols] = adata.var[float_cols].round(decimal_places)
@@ -884,7 +884,7 @@ def get_top_expressed_genes_by_tissue(adatas: List[AnnData], n: int = 1, column:
         tissues = adata.obs[trait].unique()
 
         for tissue in tissues:
-            tissue_data = adata[adata.obs[trait] == tissue]
+            tissue_data = adata[adata.obs[trait] == tissue].copy()
             # Sort genes based on mean expression and select the top N
             top_gene_indices = np.argsort(tissue_data.X.mean(axis=0))[-n:]
             if column:
@@ -1167,8 +1167,8 @@ def prepare_and_save_wgcna(pyWGCNA_obj: object, output_path: str, gaf_path: str 
         add_ortho_id_to_anndata(adata, ortho_file, column_name=name)
     if qc_metrics:
         sc.pp.calculate_qc_metrics(adata, inplace=True)
-        adata.var.rename(
-            columns={"n_cells_by_counts": "n_samples_by_counts"}, inplace=True)
+        # Drop n_cells_by_counts column
+        adata.var.drop(columns="n_cells_by_counts", axis=1, inplace=True)
 
     # Round float columns to n decimal places
     float_cols = adata.var.select_dtypes(include=['float64']).columns
