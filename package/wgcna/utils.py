@@ -2266,8 +2266,8 @@ def calculate_all_tom_metrics(tom: Union[pd.DataFrame, List[pd.DataFrame]], adat
         # Set ortho_ID as the second column
         combined_metrics = combined_metrics[[
             'ortho_ID'] + [col for col in combined_metrics.columns if col != 'ortho_ID']]
-        combined_metrics['ortho_ID'] = combined_metrics['ortho_ID'].replace(
-            '', 'No orthogroup')
+        combined_metrics['ortho_ID'] = combined_metrics['ortho_ID'].cat.rename_categories({
+                                                                                          '': 'No orthogroup'})
 
         # Set Species as the first column
         combined_metrics = combined_metrics[[

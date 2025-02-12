@@ -39,7 +39,7 @@ from bokeh.palettes import Category20, viridis
 
 
 plt.rcParams['savefig.bbox'] = 'tight'
-
+pd.set_option('future.no_silent_downcasting', True)
 
 class PlotConfig:
     def __init__(self, save_plots=False, save_raw=False, output_path='./', file_format='png', show=True, dpi=300):
@@ -105,7 +105,7 @@ def plot_static_TOM_network(tom_path: str, adata: AnnData, config: PlotConfig, t
     species = f"{adata.uns['species']}" if adata.uns['species'] is not None else ""
     if len(species.split()) > 1:
         plt.title(
-            f"Co-Expression Network of $\it{{{species.split()[0]}}}$ $\it{{{species.split()[1]}}}$")
+            f"Co-Expression Network of $\\textit{{{species.split()[0]}}}$ $\\textit{{{species.split()[1]}}}$")
     else:
         plt.title(f"Co-Expression Network")
 
@@ -722,7 +722,7 @@ def plot_highest_expr_genes(adata: AnnData, config: PlotConfig, n_top: int = 10,
 
     if species != "":
         plt.title(
-            f"Top {n_top} Highest Expressed {identifier} of $\it{{{species.split()[0]}}}$ $\it{{{species.split()[1]}}}$")
+            f"Top {n_top} Highest Expressed {identifier} of $\\textit{{{species.split()[0]}}}$ $\\textit{{{species.split()[1]}}}$")
     else:
         plt.title(f"Top {n_top} Highest Expressed {identifier}")
 
@@ -2594,14 +2594,16 @@ def plot_eigengenes(adata: AnnData, eigengenes: pd.DataFrame, config: PlotConfig
 
         df = ME.copy(deep=True)
         df['all'] = sample_info
-        ybar = df[['all', 'eigengeneExp']].groupby(['all']).mean()[
+        ybar = df[['all', 'eigengeneExp']].groupby(['all'], observed=False).mean()[
             'eigengeneExp']
-        ebar = df[['all', 'eigengeneExp']].groupby(['all']).std()[
+        ebar = df[['all', 'eigengeneExp']].groupby(['all'], observed=False).std()[
             'eigengeneExp']
         label = list(ybar.index)
         dot = df[['all', 'eigengeneExp']].copy()
         ind = {val: i for i, val in enumerate(label)}
-        dot.replace(ind, inplace=True)
+        cat_cols = dot.select_dtypes(include='category').columns
+        dot[cat_cols] = dot[cat_cols].astype(object)
+        dot = dot.replace(ind).infer_objects(copy=False)
         xdot = dot['all']
         ydot = dot['eigengeneExp']
 
@@ -2957,7 +2959,7 @@ def plot_eigengene_expression_bokeh(df: pd.DataFrame, config, custom_filename: s
     p.add_layout(whisker)
 
     # Plot individual data points
-    points = p.circle(
+    points = p.scatter(
         x='x',
         y='Expression',
         source=points_source,
