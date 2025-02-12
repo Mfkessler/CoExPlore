@@ -1,3 +1,4 @@
+# docker-compose-dev.yaml
 services:
   postgres:
     image: postgres:15
@@ -14,7 +15,7 @@ services:
       - app-network
 
   db_setup:
-    image: coexplore:dev
+    image: coexplore-dev:latest
     container_name: db_setup
     env_file:
       - .env
@@ -34,7 +35,7 @@ services:
       - app-network
 
   web:
-    image: coexplore:dev
+    image: coexplore-dev:latest
     container_name: flask_app
     env_file:
       - .env
@@ -60,7 +61,7 @@ services:
       - app-network
 
   worker:
-    image: coexplore:dev
+    image: coexplore-dev:latest
     container_name: celery_worker
     env_file:
       - .env

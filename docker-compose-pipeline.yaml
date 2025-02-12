@@ -1,6 +1,6 @@
 services:
   wgcna_pipeline:
-    image: coexplore:latest
+    image: coexplore-pipeline:latest
     container_name: wgcna_pipeline
     env_file:
       - .env
