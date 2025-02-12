@@ -1969,15 +1969,15 @@ def plot_orthos_and_transcripts_per_module(adata: AnnData, config: PlotConfig, o
     bar_width = 0.35  # Smaller bar width for clearer separation
 
     # Generate hover text for each bar
-    hover_text_orthos = ['<b>Module Color:</b> {}<br><b>Number of Orthology Groups:</b> {}'.format(module, count)
-                         for module, count in zip(result_df.index, result_df['Number of Orthology Groups'])]
+    hover_text_orthos = ['<b>Module Color:</b> {}<br><b>Number of Orthogroups:</b> {}'.format(module, count)
+                         for module, count in zip(result_df.index, result_df['Number of Orthogroups'])]
     hover_text_transcripts = ['<b>Module Color:</b> {}<br><b>Number of Transcripts:</b> {}'.format(module, count)
                               for module, count in zip(result_df.index, result_df['Number of Transcripts'])]
 
-    # Add the Number of Orthology Groups bar
+    # Add the Number of Orthogroups bar
     fig.add_trace(
-        go.Bar(x=[x - offset for x in x_positions], y=result_df['Number of Orthology Groups'],
-               name='Number of Orthology Groups', marker=dict(color='DarkSlateGrey'), width=bar_width,
+        go.Bar(x=[x - offset for x in x_positions], y=result_df['Number of Orthogroups'],
+               name='Number of Orthogroups', marker=dict(color='DarkSlateGrey'), width=bar_width,
                hoverinfo='text', hovertext=hover_text_orthos),
         secondary_y=False
     )
@@ -2002,7 +2002,7 @@ def plot_orthos_and_transcripts_per_module(adata: AnnData, config: PlotConfig, o
         barmode='group'
     )
 
-    fig.update_yaxes(title_text='Number of Orthology Groups',
+    fig.update_yaxes(title_text='Number of Orthogroups',
                      secondary_y=False)
     fig.update_yaxes(title_text='Number of Transcripts', secondary_y=True)
 
