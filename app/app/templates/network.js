@@ -127,13 +127,24 @@ document.addEventListener('DOMContentLoaded', function() {
         return svg;
     }    
 
+    function debounce(func, wait) {
+        let timeout;
+        return function(...args) {
+            clearTimeout(timeout);
+            timeout = setTimeout(() => func.apply(this, args), wait);
+        };
+    }
+
     cy.ready(function() {
         /* Init edge visibility */
-        var initialZoom = cy.zoom();
+        const initialZoom = cy.zoom();
         cy.scratch('initialZoom', initialZoom);
-        cy.edges().hide();
         updateEdgesVisibility();
-        cy.on('zoom', updateEdgesVisibility);
+        
+        const debouncedUpdateEdgesVisibility = debounce(updateEdgesVisibility, 100);
+        document.getElementById('edge-visibility-range').addEventListener('input', debouncedUpdateEdgesVisibility);
+        cy.on('zoom', debouncedUpdateEdgesVisibility);
+        cy.on('pan', debouncedUpdateEdgesVisibility);
 
         /* Shape assignment based on organism */
         if (useShapes) {
@@ -277,44 +288,56 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function updateEdgesVisibility() {
-        var currentZoom = cy.zoom();
-        var initZoom = cy.scratch('initialZoom');
-
-        console.log('Current Zoom:', currentZoom);
-        // Calculate the relative zoom ratio (1 = initial; >1 = zoom in; <1 = zoom out)
-        var relativeZoom = currentZoom / initZoom;
-        // Define the zoom factor at which all edges should be shown (adjustable)
-        var maxRelative = 6.0;
-        // Interpolation term t: at relativeZoom <= 1, t = 0; at relativeZoom >= maxRelative, t = 1
-        var t = clamp((relativeZoom - 1) / (maxRelative - 1), 0, 1);
-
-        // Calculate the sorted edges by weight for each node if not already done
+        // Read the slider value (0 to 100)
+        const sliderValue = parseInt(document.getElementById('edge-visibility-range').value, 10);
+        
+        // Parameters
+        const exponentHigh = 3;    // For high-degree nodes – higher value = slower growth
+        const thresholdLow = 10;   // Nodes with <= 10 edges are considered low-degree
+        
+        // Determine the current viewport (model coordinates)
+        const extent = cy.extent();
+        
+        // Initialize sorted edges (once), sorted in descending order by weight
         if (!cy.scratch('sortedEdges')) {
-            var sortedEdges = {};
-            cy.nodes().forEach(function (node) {
-                var nodeEdges = node.connectedEdges();
-                // Sort descending by the "weight" attribute (assume 0 if weight is missing)
-                var sorted = nodeEdges.sort(function (a, b) {
-                    return (b.data('weight') || 0) - (a.data('weight') || 0);
-                });
-                sortedEdges[node.id()] = sorted.map(function (edge) { return edge.id(); });
+            const sortedEdges = {};
+            cy.nodes().forEach(node => {
+                const nodeEdges = node.connectedEdges();
+                const sorted = nodeEdges.sort((a, b) => (b.data('weight') || 0) - (a.data('weight') || 0));
+                sortedEdges[node.id()] = sorted.map(edge => edge.id());
             });
             cy.scratch('sortedEdges', sortedEdges);
         }
-        var sortedEdges = cy.scratch('sortedEdges');
-
+        const sortedEdges = cy.scratch('sortedEdges');
+        
         // Hide all edges initially
         cy.edges().hide();
-
-        // For each node: Allow at least 1 edge (strongest) and up to all edges
-        cy.nodes().forEach(function (node) {
-            var edgeIds = sortedEdges[node.id()] || [];
-            var totalEdges = edgeIds.length;
-            // Interpolation: At t = 0 (relativeZoom <= 1) show 1, at t = 1 show totalEdges
-            var allowedEdges = Math.ceil(lerp(1, totalEdges, t));
-            for (var i = 0; i < allowedEdges && i < totalEdges; i++) {
-                var edge = cy.getElementById(edgeIds[i]);
-                edge.show();
+        
+        function nodeInExtent(node) {
+            const pos = node.position();
+            return pos.x >= extent.x1 && pos.x <= extent.x2 &&
+                   pos.y >= extent.y1 && pos.y <= extent.y2;
+        }
+        
+        // For each node in the viewport: Calculate how many edges should be shown.
+        cy.nodes().forEach(node => {
+            if (nodeInExtent(node)) {
+                const edgeIds = sortedEdges[node.id()] || [];
+                const totalEdges = edgeIds.length;
+                let effectiveFraction;
+                
+                if (totalEdges <= thresholdLow) {
+                    // For low-degree nodes: If slider ≥20%, show all edges; otherwise scale linearly.
+                    effectiveFraction = sliderValue >= 20 ? 1 : sliderValue / 20;
+                } else {
+                    // For high-degree nodes: Convex mapping for slower growth.
+                    effectiveFraction = Math.pow(sliderValue / 100, exponentHigh);
+                }
+                
+                const allowedEdges = Math.ceil(effectiveFraction * totalEdges);
+                for (let i = 0; i < allowedEdges && i < totalEdges; i++) {
+                    cy.getElementById(edgeIds[i]).show();
+                }
             }
         });
     }
@@ -757,7 +780,6 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     /* Adjust Node Size */
-
     nodeSizeRange.value = currentNodeSize;
 
     nodeSizeRange.addEventListener('input', function() {

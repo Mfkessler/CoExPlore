@@ -45,11 +45,19 @@
         <button id="export-png" class="icon-button" title="Export as PNG"><i class="fas fa-image"></i></button> </div>
     </div>
 
-    <!-- Buttons bottom right -->
+    <!-- Sliders bottom right -->
+    <!-- Node size slider (1: smallest, 30: largest) -->
     <div class="node-size-slider">
         <i class="fas fa-circle slider-indicator-left"></i>
         <input type="range" id="node-size-range" min="1" max="30" value="{{ node_size }}" step="1">
         <i class="fas fa-circle slider-indicator-right"></i>
+    </div>
+
+    <!-- Edge visibility slider (0%: no edges, 100%: all edges) -->
+    <div class="edge-visibility-slider">
+        <i class="fas fa-eye-slash slider-indicator-left"></i>
+        <input type="range" id="edge-visibility-range" min="0" max="100" value="20" step="1">
+        <i class="fas fa-network-wired slider-indicator-right"></i>
     </div>
 
     <!-- Tooltip -->
