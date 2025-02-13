@@ -367,8 +367,7 @@ def process_eigengenes(adata: Union[AnnData, List[AnnData]], cluster_map: dict, 
 
             if tool == "cytoscape":
                 # Filter cluster_map to only include clusters from the current species
-                cluster_map_temp = {"_".join(k.split("_")[1:]): v for k, v in cluster_map.items(
-                ) if k.startswith(ad.uns['species'])}
+                cluster_map_temp = filter_cluster_map(cluster_map, ad.uns['species'])
 
             # Check if the cluster_map is empty
             if not cluster_map_temp:
@@ -430,8 +429,7 @@ def process_eigengenes(adata: Union[AnnData, List[AnnData]], cluster_map: dict, 
         # Handle the case where adata is a single AnnData object
         if tool == "cytoscape":
             # Filter cluster_map to only include clusters from the current species
-            cluster_map = {k.split("_")[1]: v for k, v in cluster_map.items(
-            ) if k.startswith(adata.uns['species'])}
+            cluster_map = filter_cluster_map(cluster_map, adata.uns['species'])
 
         print(f"Calculating eigengenes for clusters in {topic}")
         if progress_callback:
@@ -480,10 +478,15 @@ def process_eigengenes(adata: Union[AnnData, List[AnnData]], cluster_map: dict, 
     if progress_callback:
         progress_callback(f"Combining eigengene data for plotting")
     combined_eigengene_data = pd.concat(eigenene_data, ignore_index=True)
-    if progress_callback:
-        progress_callback(f"Plotting combined eigengene expression")
-    combined_plot_path = plot_eigengene_expression_bokeh(combined_eigengene_data, config,
-                                                         custom_filename=f"{custom_filename}_combined_bokeh")
+
+    if not combined_eigengene_data.empty:
+        if progress_callback:
+            progress_callback(f"Plotting combined eigengene expression")
+        combined_plot_path = plot_eigengene_expression_bokeh(combined_eigengene_data, config,
+                                                            custom_filename=f"{custom_filename}_combined_bokeh")
+    else:
+        print("No eigengene data found for combined plotting")
+        combined_plot_path = None
 
     # Combine all module info DataFrames if needed
     combined_module_info_df = pd.concat(
@@ -495,6 +498,23 @@ def process_eigengenes(adata: Union[AnnData, List[AnnData]], cluster_map: dict, 
         classes='dynamic-table display dataTable no-border', index=False, border=0, header=True, table_id="infoResults")
 
     return eigengene_files, module_trait_files, table_html, combined_plot_path
+
+
+def filter_cluster_map(cluster_map: dict, species: str) -> dict:
+    """
+    Filters the cluster map to include only entries from the given species and removes the species prefix.
+
+    Parameters:
+    - cluster_map (dict): The original cluster map with keys starting with species name.
+    - species (str): The species name to filter for.
+
+    Returns:
+    - dict: A new cluster map with the species prefix (and underscore) removed from the keys.
+    """
+
+    species_prefix = species + "_"  # Define the species prefix with underscore.
+
+    return {k[len(species_prefix):]: v for k, v in cluster_map.items() if k.startswith(species_prefix)}
 
 
 def map_tissue_info(cluster_eigengenes: pd.DataFrame, ad: AnnData) -> pd.DataFrame:
