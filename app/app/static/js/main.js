@@ -80,3 +80,5 @@ export function sendGoTermToIframe(goTerm) {
         iframe.contentWindow.postMessage({ type: "goTerm", value: goTerm }, "*");
     }
 }
+
+window.sendGoTermToIframe = sendGoTermToIframe;
