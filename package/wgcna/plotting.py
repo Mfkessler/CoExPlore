@@ -2866,7 +2866,7 @@ def plot_eigengene_expression_bokeh(df: pd.DataFrame, config, custom_filename: s
     df['x'] = list(zip(df['Tissue'], df['Cluster']))
 
     # Prepare the data for bars and error bars
-    grouped = df.groupby(['Tissue', 'Cluster'])
+    grouped = df.groupby(['Tissue', 'Cluster'], observed=False)
     mean_expr = grouped['Expression'].mean().reset_index()
     std_expr = grouped['Expression'].std().reset_index()
 

@@ -56,8 +56,11 @@ def plot_co_expression_network_task(self, data):
 
     plant = data['plant']
     tom_path = f"{Config.DATA_DIR}/tom/tom_matrix_{plant}.h5"
+
     transcripts = data.get('transcripts')
-    logger.info(f"Transcripts before filtering: {len(transcripts)}")
+    total_transcripts = sum(len(t_list) for t_list in transcripts.values())  # Sum of all transcript lists
+    logger.info(f"Total transcripts before filtering: {total_transcripts}")
+
     threshold = float(data.get('threshold', 0.1))
     use_shapes = data.get('useShapesSpecies', False)
     use_colors = data.get('useColors', False)
