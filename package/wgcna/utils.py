@@ -1262,18 +1262,19 @@ def reduce_tom_matrix(TOM: pd.DataFrame, reduction_percentage: float) -> pd.Data
 
 def save_matrix_to_hdf5(table: pd.DataFrame, filename: str, save_sym_only: bool = False, include_diagonal: bool = True) -> None:
     """
-    Saves the table (pd.DataFrame) into an HDF5 file.
-
+    Saves the table (pd.DataFrame) into an HDF5 file with optimized row-wise chunking.
+    
     Parameters:
     - table (pd.DataFrame): The table to be saved.
     - filename (str): The name of the HDF5 file.
     - save_sym_only (bool): If True, saves only the upper triangle of a symmetric matrix.
     - include_diagonal (bool): When saving only the upper triangle, specifies whether to include
       the diagonal elements.
-
+    
     The function saves the index and column labels, and either the full data matrix or only
-    the upper triangle, depending on the value of 'save_sym_only'. It also stores attributes
-    indicating whether only half the matrix is saved and whether the diagonal is included.
+    the upper triangle, depending on the value of 'save_sym_only'. In the full-matrix mode,
+    the data is saved with row-wise chunking (i.e. each row is stored in a separate chunk)
+    to optimize later row-based access.
     """
 
     with h5py.File(filename, 'w') as f:
@@ -1301,10 +1302,11 @@ def save_matrix_to_hdf5(table: pd.DataFrame, filename: str, save_sym_only: bool 
             f.attrs['save_sym_only'] = True
             f.attrs['include_diagonal'] = include_diagonal
         else:
-            # Save the full data matrix
-            f.create_dataset('data', data=table.values)
+            # Save the full data matrix with optimized row-wise chunking.
+            data = table.values
+            chunk_size = (1, data.shape[1])  # Jeder Chunk entspricht einer Zeile.
+            f.create_dataset('data', data=data, chunks=chunk_size)
             f.attrs['save_sym_only'] = False
-            # Not applicable when saving full matrix
             f.attrs['include_diagonal'] = True
 
 
@@ -1332,7 +1334,7 @@ def load_subset_from_hdf5(filename: str, rows: list, cols: list = None, threshol
     - pd.DataFrame: The filtered TOM subset.
     """
 
-    # Ensure unique lists for rows and cols
+    # Ensure rows and cols contain unique values
     rows = list(set(rows))
     if cols:
         cols = list(set(cols))
@@ -1341,19 +1343,16 @@ def load_subset_from_hdf5(filename: str, rows: list, cols: list = None, threshol
 
     if include_neighbours:
         if threshold is None:
-            raise ValueError(
-                "A threshold must be provided if include_neighbours is True.")
+            raise ValueError("A threshold must be provided if include_neighbours is True.")
         if use_symmetry:
-            raise NotImplementedError(
-                "include_neighbours is not supported with use_symmetry=True.")
-        # Load index maps if not provided
+            raise NotImplementedError("include_neighbours is not supported with use_symmetry=True.")
+        # Load index maps if not already provided
         if index_map is None or columns_map is None:
             with h5py.File(filename, 'r') as f:
                 file_index = [s.decode('utf-8') for s in f['index'][:]]
                 file_columns = [s.decode('utf-8') for s in f['columns'][:]]
             index_map = {label: idx for idx, label in enumerate(file_index)}
-            columns_map = {label: idx for idx,
-                           label in enumerate(file_columns)}
+            columns_map = {label: idx for idx, label in enumerate(file_columns)}
 
         new_transcripts = set(rows)
         inv_columns_map = {v: k for k, v in columns_map.items()}
@@ -1365,15 +1364,15 @@ def load_subset_from_hdf5(filename: str, rows: list, cols: list = None, threshol
                     r_idx = index_map[transcript]
                 except KeyError:
                     continue
+                # Load only the required chunk (row) due to row-wise chunking
                 row_data = data[r_idx, :]
-                # Find indices with value >= threshold
+                # Find indices where the value is >= threshold
                 neighbor_idxs = np.where(row_data >= threshold)[0]
                 # Exclude self
                 neighbor_idxs = neighbor_idxs[neighbor_idxs != r_idx]
-                # If more than max_neighbors, select the strongest
+                # If more than max_neighbors, select the strongest ones
                 if len(neighbor_idxs) > max_neighbors:
-                    sorted_idx = neighbor_idxs[np.argsort(
-                        row_data[neighbor_idxs])[::-1]]
+                    sorted_idx = neighbor_idxs[np.argsort(row_data[neighbor_idxs])[::-1]]
                     neighbor_idxs = sorted_idx[:max_neighbors]
                 for col_idx in neighbor_idxs:
                     neighbor = inv_columns_map.get(col_idx)
@@ -1382,7 +1381,7 @@ def load_subset_from_hdf5(filename: str, rows: list, cols: list = None, threshol
         rows = list(new_transcripts)
         cols = list(new_transcripts)
 
-    # Load or create index maps if not already provided
+    # Load index maps if not already provided
     if index_map is None or columns_map is None:
         with h5py.File(filename, 'r') as f:
             file_index = [s.decode('utf-8') for s in f['index'][:]]
@@ -1396,6 +1395,7 @@ def load_subset_from_hdf5(filename: str, rows: list, cols: list = None, threshol
     except KeyError as e:
         raise Exception("Label not found in index or columns: " + str(e))
 
+    # Maintain sorting to restore original order layout
     sorted_row_order = np.argsort(row_indices)
     sorted_col_order = np.argsort(col_indices)
     row_indices_sorted = np.array(row_indices)[sorted_row_order]
@@ -1408,17 +1408,19 @@ def load_subset_from_hdf5(filename: str, rows: list, cols: list = None, threshol
                 n = f.attrs['n']
                 full_matrix = squareform(data_upper)
                 if full_matrix.shape[0] < n:
-                    full_matrix = np.pad(
-                        full_matrix, ((0, 1), (0, 1)), mode='constant', constant_values=0)
-                block_data = full_matrix[np.ix_(
-                    row_indices_sorted, col_indices_sorted)]
+                    full_matrix = np.pad(full_matrix, ((0, 1), (0, 1)),
+                                         mode='constant', constant_values=0)
+                block_data = full_matrix[np.ix_(row_indices_sorted, col_indices_sorted)]
             else:
+                # Utilize row-wise chunking advantage:
+                # This access loads only the specific rows (chunks) into memory.
                 data = f['data']
-                data_rows = data[row_indices_sorted, :]
+                data_rows = data[row_indices_sorted, :]  # efficient row access
                 block_data = data_rows[:, col_indices_sorted]
     except Exception as e:
         raise Exception("Error loading block from HDF5 file: " + str(e))
 
+    # Restore original order
     original_row_order = np.argsort(sorted_row_order)
     original_col_order = np.argsort(sorted_col_order)
     data_subset = block_data[original_row_order, :][:, original_col_order]
@@ -1429,8 +1431,7 @@ def load_subset_from_hdf5(filename: str, rows: list, cols: list = None, threshol
         np.fill_diagonal(df_subset.values, np.nan)
         mask = df_subset > threshold
         df_subset = df_subset.where(mask, other=np.nan)
-        df_subset = df_subset.dropna(
-            how='all', axis=0).dropna(how='all', axis=1)
+        df_subset = df_subset.dropna(how='all', axis=0).dropna(how='all', axis=1)
 
     return df_subset
 
