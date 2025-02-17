@@ -129,6 +129,11 @@
             margin-bottom: 10px;
             text-align: right;
         }
+        
+        .tom-table-container table tbody td:nth-child(2),
+        .cluster-table-container table tbody td:nth-child(2) {
+            font-style: italic;
+        }
 
     </style>
 
@@ -194,7 +199,8 @@
                 </h5>
             </div>
             <div id="tomTableSection" class="collapse show">
-                <div class="card-body">
+                <!-- Add a custom class "tom-table-container" -->
+                <div class="card-body tom-table-container">
                     {{ tom_table_html | safe }}
                 </div>
             </div>
@@ -238,7 +244,8 @@
                 </h5>
             </div>
             <div id="analysisTableSection" class="collapse show">
-                <div class="card-body">
+                <!-- Add a custom class "cluster-table-container" -->
+                <div class="card-body cluster-table-container">
                     {{ table_html | safe }}
                 </div>
             </div>

@@ -46,6 +46,10 @@
         .card {
             border: none !important;
         }
+
+        .italic-text {
+            font-style: italic;
+        }
     </style>
 </head>
 <body>
@@ -155,7 +159,15 @@
                     }
                 },
                 "columns": [
-                    { "data": "species", autoToggle: true },
+                    { 
+                        "data": "species",
+                        "render": function(data, type, row, meta) {
+                            if (type === 'display') {
+                                return '<span class="italic-text">' + data + '</span>';
+                            }
+                            return data;
+                        }
+                    },
                     { "data": "transcript", autoToggle: true },
                     { "data": "modulecolors", autoToggle: true },
                     { "data": "modulelabels", autoToggle: false },

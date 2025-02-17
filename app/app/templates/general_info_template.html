@@ -50,6 +50,16 @@
         .card {
             border: none;
         }
+
+        /* Italic text for table body cells only */
+        table.dataTable tbody td.italic-text {
+            font-style: italic;
+        }
+
+        /* Ensure header cells remain normal */
+        table.dataTable thead th.italic-text {
+            font-style: normal;
+        }
     </style>
 </head>
 <body>
@@ -158,6 +168,10 @@
                     { "data": "total_counts" },
                     { "data": "modules" },
                     { "data": "tissues" }
+                ],
+                // Add columnDefs to set the Species column in italics (column index 0)
+                "columnDefs": [
+                    { "targets": 0, "className": "italic-text" }
                 ],
                 responsive: true,
                 dom: 'Bfrtip',
