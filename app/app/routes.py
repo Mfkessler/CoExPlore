@@ -414,21 +414,26 @@ def build_sql_query(params: dict, select_columns: str) -> tuple:
     Returns:
     - tuple: SQL query string and search parameters.
     """
-
-
     # Create WHERE clause
     where_conditions = []
     search_params = {}
 
-    # Global search
+    # Global search with OR for multiple tokens
     if params['search_value']:
+        import re
+        # Split the search value by comma and/or whitespace, filter out leere Tokens
+        tokens = [token for token in re.split(r'[\s,]+', params['search_value'].strip()) if token]
         global_search_conditions = []
         for idx, col in enumerate(params['columns']):
             if col['searchable']:
                 col_name = col['name']
-                param_name = f"search_value_{idx}"
-                global_search_conditions.append(f"{col_name}::text ILIKE :{param_name}")
-                search_params[param_name] = f"%{params['search_value']}%"
+                token_conditions = []
+                for j, token in enumerate(tokens):
+                    param_name = f"search_value_{idx}_{j}"
+                    token_conditions.append(f"{col_name}::text ILIKE :{param_name}")
+                    search_params[param_name] = f"%{token}%"
+                # Verknüpfe alle Tokens per OR innerhalb der Spalte
+                global_search_conditions.append("(" + " OR ".join(token_conditions) + ")")
         if global_search_conditions:
             where_conditions.append('(' + ' OR '.join(global_search_conditions) + ')')
 
