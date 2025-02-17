@@ -872,7 +872,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // Collect highlighted nodes
             var highlightedNodes = cy.nodes('.highlight').map(function(node) {
-                return node.data('gene'); 
+                return node.data('id'); 
             });
 
             // Send the highlighted nodes back to the main page

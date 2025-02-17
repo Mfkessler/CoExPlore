@@ -395,23 +395,58 @@
 
             // Event listener to receive messages from the iframe (when nodes are selected in the plot)
             window.addEventListener('message', function(event) {
-                if (event.data && event.data.highlightedNodes) {
-                    var highlightedNodes = event.data.highlightedNodes;
+            if (event.data && event.data.highlightedNodes) {
+                var highlightedNodes = event.data.highlightedNodes;
+                var table = $('#tomResults').DataTable();
 
-                    if (highlightedNodes.length > 0) {
-                        // Create a regex string for exact matches, using word boundaries \b
-                        var searchRegex = highlightedNodes.map(function(nodeName) {
-                            return '\\b' + nodeName + '\\b'; // \b ensures exact match
-                        }).join('|'); // Join with | to create OR logic for multiple node names
+                // Remove any existing custom filters (if any)
+                $.fn.dataTable.ext.search = $.fn.dataTable.ext.search.filter(function(fn) {
+                    return fn.name !== 'highlightedNodesFilter';
+                });
 
-                        // Apply the regex search to the TOM Table
-                        $('#tomResults').DataTable().search(searchRegex, true, false).draw();
-                    } else {
-                        // If no nodes are highlighted, reset the TOM Table search
-                        $('#tomResults').DataTable().search('').draw();
-                    }
+                if (highlightedNodes.length > 0) {
+                    // Parse highlighted node IDs formatted as "<species>_<node>"
+                    var searchTokens = highlightedNodes.map(function(id) {
+                        var parts = id.split('_');
+                        return {
+                            species: parts[0].trim(),
+                            node: parts.slice(1).join('_').trim() // In case the node name contains underscores
+                        };
+                    });
+
+                    // Define a custom DataTables filter that checks both the node (gene) and species columns.
+                    var highlightedNodesFilter = function(settings, data, dataIndex) {
+                        // data[0] contains the Node (gene) and data[1] contains the Species
+                        var rowNode = data[0];
+                        var rowSpecies = data[1];
+
+                        // Check if any token matches:
+                        // - The species must match exactly.
+                        // - The node part must match as a whole word using word boundaries.
+                        for (var i = 0; i < searchTokens.length; i++) {
+                            var token = searchTokens[i];
+                            if (rowSpecies === token.species) {
+                                var regex = new RegExp('\\b' + token.node + '\\b', 'i');
+                                if (regex.test(rowNode)) {
+                                    return true;
+                                }
+                            }
+                        }
+                        return false;
+                    };
+
+                    // Name the filter to allow removal later if needed.
+                    highlightedNodesFilter.name = 'highlightedNodesFilter';
+
+                    // Add the custom filter and redraw the table.
+                    $.fn.dataTable.ext.search.push(highlightedNodesFilter);
+                    table.draw();
+                } else {
+                    // If no nodes are highlighted, remove the custom filter and reset the search.
+                    table.search('').draw();
                 }
-            }, false);
+            }
+        }, false);
 
             // Event listener for DataTable search in the TOM Table (explicit search only)
             $('#tomResults_filter input').on('input', function() {
