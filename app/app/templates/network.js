@@ -33,6 +33,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             },
             {
+                selector: 'node[is_neighbor]',
+                style: {
+                    'opacity': 0.5
+                }
+            },
+            {
                 selector: 'edge',
                 style: {
                     'line-color': 'gray',  // Start with default color
