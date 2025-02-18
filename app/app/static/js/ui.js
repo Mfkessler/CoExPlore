@@ -742,6 +742,10 @@ export function runBrowserAnalysisHandler(baseUrl, sessionId) {
         isValid = false;
         errorMessage += "Min Depth must be at least 1.\n";
     }
+    if (maxNeighbors === "" || !isNumeric(maxNeighbors) || parseInt(maxNeighbors) < 0 || parseInt(maxNeighbors) > 10) {
+        isValid = false;
+        errorMessage += "Max Neighbors must be between 0 and 10.\n";
+    }
     if (!isValid) {
         alert(errorMessage);
         return;
