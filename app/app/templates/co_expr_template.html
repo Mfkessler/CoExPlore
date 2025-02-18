@@ -412,24 +412,23 @@
                 });
 
                 if (highlightedNodes.length > 0) {
-                    // Parse highlighted node IDs formatted as "<species>_<node>"
                     var searchTokens = highlightedNodes.map(function(id) {
                         var parts = id.split('_');
                         return {
                             species: parts[0].trim(),
-                            node: parts.slice(1).join('_').trim() // In case the node name contains underscores
+                            node: parts.slice(1).join('_').trim()
                         };
                     });
 
-                    // Define a custom DataTables filter that checks both the node (gene) and species columns.
+                    // Custom DataTables filter applied only to the TOM Table
                     var highlightedNodesFilter = function(settings, data, dataIndex) {
-                        // data[0] contains the Node (gene) and data[1] contains the Species
+                        // Apply filter only to the TOM Table
+                        if (settings.nTable.id !== 'tomResults') {
+                            return true;
+                        }
                         var rowNode = data[0];
                         var rowSpecies = data[1];
 
-                        // Check if any token matches:
-                        // - The species must match exactly.
-                        // - The node part must match as a whole word using word boundaries.
                         for (var i = 0; i < searchTokens.length; i++) {
                             var token = searchTokens[i];
                             if (rowSpecies === token.species) {
@@ -441,15 +440,12 @@
                         }
                         return false;
                     };
-
-                    // Name the filter to allow removal later if needed.
                     highlightedNodesFilter.name = 'highlightedNodesFilter';
 
-                    // Add the custom filter and redraw the table.
+                    // Add the filter and redraw the table
                     $.fn.dataTable.ext.search.push(highlightedNodesFilter);
                     table.draw();
                 } else {
-                    // If no nodes are highlighted, remove the custom filter and reset the search.
                     table.search('').draw();
                 }
             }
