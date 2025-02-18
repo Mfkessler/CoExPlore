@@ -2253,6 +2253,12 @@ def calculate_all_tom_metrics(tom: Union[pd.DataFrame, List[pd.DataFrame]], adat
             'ortho_ID'] + [col for col in combined_metrics.columns if col != 'ortho_ID']]
         combined_metrics['ortho_ID'] = combined_metrics['ortho_ID'].cat.rename_categories({
                                                                                           '': 'No orthogroup'})
+        # Add the new category 'No orthogroup' to the Categorical column
+        combined_metrics['ortho_ID'] = combined_metrics['ortho_ID'].cat.add_categories('No orthogroup')
+
+        # Replace NaN values with 'No orthogroup'
+        combined_metrics['ortho_ID'] = combined_metrics['ortho_ID'].fillna('No orthogroup')
+
 
         # Set Species as the first column
         combined_metrics = combined_metrics[[

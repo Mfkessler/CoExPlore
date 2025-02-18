@@ -488,8 +488,8 @@ def prepare_dataframe(data: List[Dict[str, Dict[str, str]]], cluster_info: Dict[
     if cluster_info:
         df['Cluster'] = df['id'].map(cluster_info).fillna('No clusters')
 
-    # Replace empty ortho_ID values with 'No orthogroup'
-    df['ortho_ID'] = df['ortho_ID'].replace('', 'No orthogroup')
+    # Replace empty and NaN ortho_ID values with 'No orthogroup'
+    df['ortho_ID'] = df['ortho_ID'].replace('', 'No orthogroup').fillna('No orthogroup')
 
     # Drop all rows where "Cluster" is "No clusters"
     df = df[df['Cluster'] != 'No clusters']
