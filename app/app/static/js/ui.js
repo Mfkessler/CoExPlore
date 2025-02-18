@@ -368,10 +368,10 @@ export function updateBrowserInputFields() {
             $("#description_" + selectedAnalysis).toggle();
         });
     browserButton.prop("disabled", false);
-    $("#nTopPercentGroupBrowser, #nTopGroupBrowser, #thresholdGroupBrowser, #maxPvalGroupBrowser, #minFeGroupBrowser, #minDepthGroupBrowser, #useShapesGroupBrowser, #useShapesSpeciesGroupBrowser, #useColorsGroupBrowser, #plotOnlyGroupBrowser, #interSpeciesOnlyGroupBrowser, #minOrthosGroupBrowser, #highlightListGroupBrowser, #maxNeighborsGroupBrowser").hide();
+    $("#nTopPercentGroupBrowser, #nTopGroupBrowser, #thresholdGroupBrowser, #maxPvalGroupBrowser, #minFeGroupBrowser, #minDepthGroupBrowser, #useShapesGroupBrowser, #useShapesSpeciesGroupBrowser, #useColorsGroupBrowser, #interSpeciesOnlyGroupBrowser, #minOrthosGroupBrowser, #highlightListGroupBrowser, #maxNeighborsGroupBrowser").hide();
     switch (selectedAnalysis) {
         case "plot_co_expression_network":
-            $("#thresholdGroupBrowser, #highlightListGroupBrowser, #useShapesSpeciesGroupBrowser, #useColorsGroupBrowser, #plotOnlyGroupBrowser, #maxNeighborsGroupBrowser").show();
+            $("#thresholdGroupBrowser, #highlightListGroupBrowser, #useShapesSpeciesGroupBrowser, #useColorsGroupBrowser, #maxNeighborsGroupBrowser").show();
             hasParameters = true;
             break;
         case "plot_go_terms":
@@ -674,7 +674,6 @@ export function runBrowserAnalysisHandler(baseUrl, sessionId) {
     let minDepth = $("#minDepthBrowser").val();
     let useShapes = $("#useShapesBrowser").is(":checked");
     let useColors = $("#useColorsBrowser").is(":checked");
-    let plotOnly = $("#plotOnlyBrowser").is(":checked");
     let highlightList = $("#highlightListBrowser")
         .val()
         .split(",")
@@ -775,7 +774,6 @@ export function runBrowserAnalysisHandler(baseUrl, sessionId) {
                                 requestData.highlightList = highlightList;
                                 requestData.useShapesSpecies = useShapesSpecies;
                                 requestData.useColors = useColors;
-                                requestData.plotOnly = plotOnly;
                                 requestData.maxNeighbors = parseInt(maxNeighbors);
                                 text = true;
                             } else if (analysisType === "plot_go_terms") {
