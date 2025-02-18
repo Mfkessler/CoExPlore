@@ -70,6 +70,13 @@ def plot_co_expression_network_task(self, data):
     custom_filename = f"{prefix}co_expression_network_{plant}_{threshold}"
     template_path = os.path.join(current_app.root_path, 'templates')
     topic = ""
+    max_neighbors = data.get('maxNeighbors', 0)
+
+    if max_neighbors > 0:
+        logger.info(f"Max neighbors: {max_neighbors}")
+        include_neighbors = True
+    else:
+        include_neighbors = False
 
     if isinstance(plant, list):
         adata = [adata_cache.get_adata(p) for p in plant]
@@ -92,7 +99,8 @@ def plot_co_expression_network_task(self, data):
                                                             obo_path=f"{Config.DATA_DIR}/go-basic.obo", topic=topic, plot_go_enrichment=False,
                                                             template_path=template_path, highlight=highlight_list, tool=tool, custom_filename=custom_filename,
                                                             use_colors=use_colors, use_shapes=use_shapes, progress_callback=progress_callback,
-                                                            tom_prefix=f"{Config.DATA_DIR}/tom", filter_edges=False)
+                                                            tom_prefix=f"{Config.DATA_DIR}/tom", filter_edges=False, max_neighbors=max_neighbors,
+                                                            include_neighbors=include_neighbors)
             
             return {"status": "SUCCESS", "result": {"status": "success", "plot_url": f"{Config.BASE_URL}/{plot_config.output_path}/{html_path}"}}
         else:

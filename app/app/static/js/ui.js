@@ -368,10 +368,10 @@ export function updateBrowserInputFields() {
             $("#description_" + selectedAnalysis).toggle();
         });
     browserButton.prop("disabled", false);
-    $("#nTopPercentGroupBrowser, #nTopGroupBrowser, #thresholdGroupBrowser, #maxPvalGroupBrowser, #minFeGroupBrowser, #minDepthGroupBrowser, #useShapesGroupBrowser, #useShapesSpeciesGroupBrowser, #useColorsGroupBrowser, #plotOnlyGroupBrowser, #interSpeciesOnlyGroupBrowser, #minOrthosGroupBrowser, #highlightListGroupBrowser").hide();
+    $("#nTopPercentGroupBrowser, #nTopGroupBrowser, #thresholdGroupBrowser, #maxPvalGroupBrowser, #minFeGroupBrowser, #minDepthGroupBrowser, #useShapesGroupBrowser, #useShapesSpeciesGroupBrowser, #useColorsGroupBrowser, #plotOnlyGroupBrowser, #interSpeciesOnlyGroupBrowser, #minOrthosGroupBrowser, #highlightListGroupBrowser, #maxNeighborsGroupBrowser").hide();
     switch (selectedAnalysis) {
         case "plot_co_expression_network":
-            $("#thresholdGroupBrowser, #highlightListGroupBrowser, #useShapesSpeciesGroupBrowser, #useColorsGroupBrowser, #plotOnlyGroupBrowser").show();
+            $("#thresholdGroupBrowser, #highlightListGroupBrowser, #useShapesSpeciesGroupBrowser, #useColorsGroupBrowser, #plotOnlyGroupBrowser, #maxNeighborsGroupBrowser").show();
             hasParameters = true;
             break;
         case "plot_go_terms":
@@ -669,6 +669,7 @@ export function runBrowserAnalysisHandler(baseUrl, sessionId) {
     let nTop = $("#nTopBrowser").val();
     let threshold = $("#thresholdBrowser").val();
     let maxPval = $("#maxPvalBrowser").val();
+    let maxNeighbors = $("#maxNeighborsBrowser").val();
     let minFe = $("#minFeBrowser").val();
     let minDepth = $("#minDepthBrowser").val();
     let useShapes = $("#useShapesBrowser").is(":checked");
@@ -775,6 +776,7 @@ export function runBrowserAnalysisHandler(baseUrl, sessionId) {
                                 requestData.useShapesSpecies = useShapesSpecies;
                                 requestData.useColors = useColors;
                                 requestData.plotOnly = plotOnly;
+                                requestData.maxNeighbors = parseInt(maxNeighbors);
                                 text = true;
                             } else if (analysisType === "plot_go_terms") {
                                 requestData.maxPval = parseFloat(maxPval);

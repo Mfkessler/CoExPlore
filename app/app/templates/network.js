@@ -292,8 +292,8 @@ document.addEventListener('DOMContentLoaded', function() {
         const sliderValue = parseInt(document.getElementById('edge-visibility-range').value, 10);
         
         // Parameters
-        const exponentHigh = 3;    // For high-degree nodes – higher value = slower growth
-        const thresholdLow = 10;   // Nodes with <= 10 edges are considered low-degree
+        const exponentHigh = 4;    // For high-degree nodes – higher value = slower growth
+        const thresholdLow = 15;   // Nodes with <= 10 edges are considered low-degree
         
         // Determine the current viewport (model coordinates)
         const extent = cy.extent();
