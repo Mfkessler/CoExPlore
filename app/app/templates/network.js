@@ -114,11 +114,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 break;
             case 'vee':
                 shapeElement = document.createElementNS(svgNS, "polygon");
-                shapeElement.setAttribute("points", "2,2 10,18 18,2");
+                shapeElement.setAttribute("points", "2,2 10,8 18,2 10,18");
                 break;
             case 'rhomboid':
                 shapeElement = document.createElementNS(svgNS, "polygon");
-                shapeElement.setAttribute("points", "4,2 16,2 12,18 0,18");
+                shapeElement.setAttribute("points", "4,18 16,18 12,2 0,2");
                 break;
             default:
                 shapeElement = document.createElementNS(svgNS, "rect");
