@@ -33,7 +33,7 @@ def analyze_co_expression_network(adata: Union[AnnData, List[AnnData]], config: 
                                   highlight_color: str = "magenta", tool: str = "cytoscape",
                                   use_colors: bool = False, use_shapes: bool = False,
                                   node_size: int = 10, use_symmetry: bool = False, progress_callback: Callable[[str], None] = None,
-                                  trait: str = "tissue", filter_edges: bool = True, include_neighbours: bool = False,
+                                  trait: str = "tissue", filter_edges: bool = True, include_neighbors: bool = False,
                                   max_neighbors: int = 10) -> dict:
     """
     Analyze co-expression network for a given topic:
@@ -102,11 +102,11 @@ def analyze_co_expression_network(adata: Union[AnnData, List[AnnData]], config: 
 
     if isinstance(adata, list):
         tom, adata = get_tom_data(tom_path, adata, transcripts=transcripts, query=query, threshold=threshold, tom_prefix=tom_prefix,
-                                  use_symmetry=use_symmetry, progress_callback=progress_callback, include_neighbours=include_neighbours,
+                                  use_symmetry=use_symmetry, progress_callback=progress_callback, include_neighbours=include_neighbors,
                                   max_neighbors=max_neighbors)
     else:
         tom = get_tom_data(tom_path, adata, transcripts=transcripts, query=query, threshold=threshold, tom_prefix=tom_prefix,
-                           use_symmetry=use_symmetry, progress_callback=progress_callback, include_neighbours=include_neighbours,
+                           use_symmetry=use_symmetry, progress_callback=progress_callback, include_neighbours=include_neighbors,
                            max_neighbors=max_neighbors)
 
     title_suffix = topic
