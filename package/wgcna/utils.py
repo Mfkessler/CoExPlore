@@ -1312,13 +1312,12 @@ def save_matrix_to_hdf5(table: pd.DataFrame, filename: str, save_sym_only: bool 
 
 def load_subset_from_hdf5(filename: str, rows: list, cols: list = None, threshold: float = None,
                           index_map=None, columns_map=None, use_symmetry: bool = False,
-                          include_neighbours: bool = False, max_neighbors: int = 10) -> pd.DataFrame:
+                          include_neighbours: bool = False, max_neighbors: int = 10) -> Tuple[pd.DataFrame, set]:
     """
     Loads a subset of a large HDF5 file into a pandas DataFrame.
-    Optionally, if include_neighbours is True, for each transcript in rows, the function
-    checks for neighbors with a connection value >= threshold and adds up to max_neighbors
-    (sorted by connection strength). After that, nodes without any valid connection are removed.
-
+    Optionally, if include_neighbours is True, for each transcript in rows the function
+    adds neighbors with connection value >= threshold (up to max_neighbors).
+    
     Parameters:
     - filename (str): HDF5 file name.
     - rows (list): List of transcript labels (for both rows and columns).
@@ -1329,59 +1328,52 @@ def load_subset_from_hdf5(filename: str, rows: list, cols: list = None, threshol
     - use_symmetry (bool): If True, uses symmetry (not supported with include_neighbours).
     - include_neighbours (bool): If True, add neighbors with connection >= threshold.
     - max_neighbors (int): Maximum number of neighbors to add per transcript.
-
+    
     Returns:
     - pd.DataFrame: The filtered TOM subset.
+    - set: Set of neighbor transcripts (if include_neighbours is True), else empty set.
     """
-
-    # Ensure rows and cols contain unique values
+    original_rows = set(rows)
     rows = list(set(rows))
     if cols:
         cols = list(set(cols))
     else:
         cols = rows
 
+    neighbor_set = set()
     if include_neighbours:
         if threshold is None:
             raise ValueError("A threshold must be provided if include_neighbours is True.")
         if use_symmetry:
             raise NotImplementedError("include_neighbours is not supported with use_symmetry=True.")
-        # Load index maps if not already provided
         if index_map is None or columns_map is None:
             with h5py.File(filename, 'r') as f:
                 file_index = [s.decode('utf-8') for s in f['index'][:]]
                 file_columns = [s.decode('utf-8') for s in f['columns'][:]]
             index_map = {label: idx for idx, label in enumerate(file_index)}
             columns_map = {label: idx for idx, label in enumerate(file_columns)}
-
         new_transcripts = set(rows)
         inv_columns_map = {v: k for k, v in columns_map.items()}
-
         with h5py.File(filename, 'r') as f:
             data = f['data']
             for transcript in rows:
-                try:
-                    r_idx = index_map[transcript]
-                except KeyError:
+                if transcript not in index_map:
                     continue
-                # Load only the required chunk (row) due to row-wise chunking
+                r_idx = index_map[transcript]
                 row_data = data[r_idx, :]
-                # Find indices where the value is >= threshold
                 neighbor_idxs = np.where(row_data >= threshold)[0]
-                # Exclude self
                 neighbor_idxs = neighbor_idxs[neighbor_idxs != r_idx]
-                # If more than max_neighbors, select the strongest ones
                 if len(neighbor_idxs) > max_neighbors:
                     sorted_idx = neighbor_idxs[np.argsort(row_data[neighbor_idxs])[::-1]]
                     neighbor_idxs = sorted_idx[:max_neighbors]
                 for col_idx in neighbor_idxs:
                     neighbor = inv_columns_map.get(col_idx)
-                    if neighbor is not None:
+                    if neighbor:
                         new_transcripts.add(neighbor)
+        neighbor_set = new_transcripts - original_rows
         rows = list(new_transcripts)
         cols = list(new_transcripts)
 
-    # Load index maps if not already provided
     if index_map is None or columns_map is None:
         with h5py.File(filename, 'r') as f:
             file_index = [s.decode('utf-8') for s in f['index'][:]]
@@ -1395,7 +1387,6 @@ def load_subset_from_hdf5(filename: str, rows: list, cols: list = None, threshol
     except KeyError as e:
         raise Exception("Label not found in index or columns: " + str(e))
 
-    # Maintain sorting to restore original order layout
     sorted_row_order = np.argsort(row_indices)
     sorted_col_order = np.argsort(col_indices)
     row_indices_sorted = np.array(row_indices)[sorted_row_order]
@@ -1412,15 +1403,12 @@ def load_subset_from_hdf5(filename: str, rows: list, cols: list = None, threshol
                                          mode='constant', constant_values=0)
                 block_data = full_matrix[np.ix_(row_indices_sorted, col_indices_sorted)]
             else:
-                # Utilize row-wise chunking advantage:
-                # This access loads only the specific rows (chunks) into memory.
                 data = f['data']
-                data_rows = data[row_indices_sorted, :]  # efficient row access
+                data_rows = data[row_indices_sorted, :]
                 block_data = data_rows[:, col_indices_sorted]
     except Exception as e:
         raise Exception("Error loading block from HDF5 file: " + str(e))
 
-    # Restore original order
     original_row_order = np.argsort(sorted_row_order)
     original_col_order = np.argsort(sorted_col_order)
     data_subset = block_data[original_row_order, :][:, original_col_order]
@@ -1433,7 +1421,7 @@ def load_subset_from_hdf5(filename: str, rows: list, cols: list = None, threshol
         df_subset = df_subset.where(mask, other=np.nan)
         df_subset = df_subset.dropna(how='all', axis=0).dropna(how='all', axis=1)
 
-    return df_subset
+    return df_subset, neighbor_set
 
 
 def convert_hdf5_to_upper_triangle(old_filename, new_filename):
@@ -1915,57 +1903,55 @@ def export_co_expression_network_to_cytoscape(
     tom: Union[pd.DataFrame, List[pd.DataFrame]],
     adata: Union[AnnData, List[AnnData]],
     selected_module_colors: List[str] = None,
-    threshold: float = 0.5
+    threshold: float = 0.5,
+    neighbor_info: Union[set, List[set]] = None
 ) -> dict:
     """
     Exports the co-expression network(s) in a format compatible with Cytoscape.js.
-
+    
     Parameters:
-    - tom (pd.DataFrame or List[pd.DataFrame]): The TOM matrix or a list of TOM matrices.
-    - adata (AnnData or List[AnnData]): Annotated data object or a list of annotated data objects.
-    - selected_module_colors (List[str]): List of module colors to display. If None, all modules are displayed.
-    - threshold (float): Threshold for TOM connections to consider an edge.
-
+    - tom (pd.DataFrame or List[pd.DataFrame]): The TOM matrix or list of TOM matrices.
+    - adata (AnnData or List[AnnData]): Annotated data object(s).
+    - selected_module_colors (List[str]): Module colors to display. If None, all modules are shown.
+    - threshold (float): TOM connection threshold for edges.
+    - neighbor_info (set or List[set]): Neighbor transcripts for the corresponding TOM(s).
+    
     Returns:
-    - dict: A dictionary containing nodes and edges in Cytoscape.js format.
+    - dict: Dictionary with nodes, edges, and a list of neighbors per TOM.
     """
 
-    # Check if both tom and adata are lists
     if isinstance(tom, list) and isinstance(adata, list):
         if len(tom) != len(adata):
-            raise ValueError(
-                "The number of TOMs and AnnData objects must be the same.")
-        tom_adata_pairs = zip(tom, adata)
+            raise ValueError("The number of TOMs and AnnData objects must be the same.")
+        tom_adata_pairs = list(zip(tom, adata))
+        neighbor_list = neighbor_info if isinstance(neighbor_info, list) else [neighbor_info] * len(tom)
     elif isinstance(tom, pd.DataFrame) and isinstance(adata, AnnData):
         tom_adata_pairs = [(tom, adata)]
+        neighbor_list = [neighbor_info] if neighbor_info is not None else [set()]
     else:
-        raise TypeError(
-            "Both tom and adata must be either lists or single objects of their respective types.")
+        raise TypeError("Both tom and adata must be either lists or single objects of their respective types.")
 
     nodes = []
     edges = []
-    organism_id = 0  # Counter for organisms without a specified name
+    neighbors_output = []
+    organism_id = 0
 
-    for current_tom, current_adata in tom_adata_pairs:
+    for idx, (current_tom, current_adata) in enumerate(tom_adata_pairs):
         gene_metadata = current_adata.var
-
         if selected_module_colors:
-            mod_genes = gene_metadata[gene_metadata['moduleColors'].isin(
-                selected_module_colors)].index
+            mod_genes = gene_metadata[gene_metadata['moduleColors'].isin(selected_module_colors)].index
         else:
             mod_genes = gene_metadata.index
-
-        # Ensure genes are present in the TOM matrix
         mod_genes = [gene for gene in mod_genes if gene in current_tom.index]
-
-        # Retrieve the organism name from adata.uns['species']
         if 'species' in current_adata.uns:
             organism = current_adata.uns['species']
         else:
             organism = f"Organism_{organism_id}"
             organism_id += 1
 
-        # Add nodes
+        current_neighbors = neighbor_list[idx] if neighbor_list[idx] is not None else set()
+        neighbors_output.append({'organism': organism, 'neighbors': list(current_neighbors)})
+
         for gene in mod_genes:
             node_data = {
                 'data': {
@@ -1979,12 +1965,11 @@ def export_co_expression_network_to_cytoscape(
                     'ipr_id': gene_metadata.loc[gene, 'ipr_id'] if "ipr_id" in gene_metadata.columns else ""
                 }
             }
-            # Replace all NaN values with empty strings
-            node_data['data'] = {k: v if not pd.isna(
-                v) else "" for k, v in node_data['data'].items()}
+            if gene in current_neighbors:
+                node_data['data']['is_neighbor'] = True
+            node_data['data'] = {k: v if not pd.isna(v) else "" for k, v in node_data['data'].items()}
             nodes.append(node_data)
 
-        # Add edges
         for i in range(len(mod_genes)):
             for j in range(i + 1, len(mod_genes)):
                 gene_i = mod_genes[i]
@@ -2000,8 +1985,7 @@ def export_co_expression_network_to_cytoscape(
                     }
                     edges.append(edge_data)
 
-    # Return nodes and edges in Cytoscape.js format
-    return {'nodes': nodes, 'edges': edges}
+    return {'nodes': nodes, 'edges': edges, 'neighbors': neighbors_output}
 
 
 def identify_network_clusters_from_json(network_data: dict, cluster_name: str,

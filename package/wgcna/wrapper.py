@@ -83,29 +83,26 @@ def analyze_co_expression_network(adata: Union[AnnData, List[AnnData]], config: 
     if tool not in ["cytoscape", "plotly"]:
         raise ValueError(f"Invalid tool: {tool}, use 'cytoscape' or 'plotly'")
 
-    # Check if adata is a list of AnnData objects
     if tool == "cytoscape" and isinstance(adata, list):
         if custom_filename is None:
             custom_filename = f"{topic}"
-
     elif tool == "plotly" and isinstance(adata, list):
-        raise ValueError(
-            "Plotly is not supported for multiple AnnData objects")
+        raise ValueError("Plotly is not supported for multiple AnnData objects")
     else:
         if custom_filename is None:
             custom_filename = f"{adata.uns['name']}_{topic}"
 
     print(f"Analyzing co-expression network for {topic} using {tool}")
     if progress_callback:
-        progress_callback(
-            f"Analyzing co-expression network for {topic} using {tool}")
+        progress_callback(f"Analyzing co-expression network for {topic} using {tool}")
 
+    # Load TOM data (with neighbor information)
     if isinstance(adata, list):
-        tom, adata = get_tom_data(tom_path, adata, transcripts=transcripts, query=query, threshold=threshold, tom_prefix=tom_prefix,
+        tom, adata, neighbor_info = get_tom_data(tom_path, adata, transcripts=transcripts, query=query, threshold=threshold, tom_prefix=tom_prefix,
                                   use_symmetry=use_symmetry, progress_callback=progress_callback, include_neighbours=include_neighbors,
                                   max_neighbors=max_neighbors)
     else:
-        tom = get_tom_data(tom_path, adata, transcripts=transcripts, query=query, threshold=threshold, tom_prefix=tom_prefix,
+        tom, neighbor_info = get_tom_data(tom_path, adata, transcripts=transcripts, query=query, threshold=threshold, tom_prefix=tom_prefix,
                            use_symmetry=use_symmetry, progress_callback=progress_callback, include_neighbours=include_neighbors,
                            max_neighbors=max_neighbors)
 
@@ -115,7 +112,7 @@ def analyze_co_expression_network(adata: Union[AnnData, List[AnnData]], config: 
         if progress_callback:
             progress_callback(f"Preparing data for {tool} visualization")
         cyto_data = export_co_expression_network_to_cytoscape(
-            tom, adata, threshold=threshold)
+            tom, adata, threshold=threshold, neighbor_info=neighbor_info)
 
         if progress_callback:
             progress_callback(f"Identifying clusters")
@@ -211,109 +208,99 @@ def analyze_co_expression_network(adata: Union[AnnData, List[AnnData]], config: 
 def get_tom_data(tom_path: Union[str, List[str]], adata: Union[AnnData, List[AnnData]], transcripts: Dict[str, List[str]] = None, query: str = "GO:0009908",
                  threshold: float = 0.2, tom_prefix: str = "/vol/share/ranomics_app/data/tom", use_symmetry: bool = False, index_map: dict = None,
                  columns_map: dict = None, progress_callback: Callable[[str], None] = None,
-                 include_neighbours: bool = False, max_neighbors: int = 10) -> Union[pd.DataFrame, List[pd.DataFrame]]:
+                 include_neighbours: bool = False, max_neighbors: int = 10) -> Union[Tuple[pd.DataFrame, set], Tuple[List[pd.DataFrame], List[AnnData], List[set]]]:
     """
-    This function loads the TOM matrix for one or multiple AnnData objects.
-
+    Loads the TOM matrix for one or multiple AnnData objects.
+    
     Parameters:
-    - tom_path (Union[str, List[str]]): Path to the TOM matrix file or a list of paths if multiple.
-    - adata (Union[AnnData, List[AnnData]]): The AnnData object or a list of AnnData objects.
-    - transcripts (Dict[str, List[str]]): List of transcripts to be used for subsetting.
-    - query (str): The query for filtering transcripts. Defaults to "GO:0009908".
-    - threshold (float): Threshold for filtering the TOM matrix. Defaults to 0.2.
-    - tom_prefix (str): The prefix for the TOM file if tom_path is not provided.
-    - use_symmetry (bool): Whether to use a symmetric TOM matrix.
-    - index_map (dict): A dictionary mapping row labels to indices.
-    - columns_map (dict): A dictionary mapping column labels to indices.
-    - progress_callback (Callable[[str], None]): Callback function to report progress.
-    - include_neighbours (bool): If True, for each transcript in rows,
-                                check for neighbours with value >= threshold and include them.  
-    - max_neighbors (int): Maximum number of neighbours to include.
-
+    - tom_path (str or List[str]): Path(s) to the TOM file(s).
+    - adata (AnnData or List[AnnData]): The AnnData object(s).
+    - transcripts (Dict[str, List[str]]): Transcripts to subset.
+    - query (str): Query for filtering transcripts.
+    - threshold (float): Threshold for TOM filtering.
+    - tom_prefix (str): Prefix for TOM file if tom_path is not provided.
+    - use_symmetry (bool): Whether to use symmetry.
+    - index_map (dict): Optional index mapping.
+    - columns_map (dict): Optional columns mapping.
+    - progress_callback (Callable): Progress callback.
+    - include_neighbours (bool): If True, include neighbor transcripts.
+    - max_neighbors (int): Maximum neighbors per transcript.
+    
     Returns:
-    - tom (Union[np.ndarray, List[np.ndarray]]): The loaded TOM matrix or a list of TOM matrices.
+    - (pd.DataFrame, set): TOM matrix and neighbor set for a single AnnData.
+    - (List[pd.DataFrame], List[AnnData], List[set]): Lists for multiple objects.
     """
 
     valid_adatas = []
-
     if isinstance(adata, list):
-        # Handle the case where adata is a list of AnnData objects
         toms = []
+        neighbor_info_list = []
         for idx, ad in enumerate(adata):
-            current_tom_path = tom_path[idx] if isinstance(
-                tom_path, list) else f"{tom_prefix}/tom_matrix_{ad.uns['name']}.h5"
-
+            current_tom_path = tom_path[idx] if isinstance(tom_path, list) else f"{tom_prefix}/tom_matrix_{ad.uns['name']}.h5"
             if not os.path.exists(current_tom_path):
                 print(f"File not found: {current_tom_path}")
                 continue
-
             if not transcripts:
-                current_transcripts = [t[1] for t in list(
-                    transcript_ortho_browser(query, ad).index)]
-
-            if transcripts:
+                current_transcripts = [t[1] for t in list(transcript_ortho_browser(query, ad).index)]
+            else:
                 current_species = ad.uns['species']
                 if current_species in transcripts:
-                    # Filter transcripts specific to the current species that are present in ad.var_names
-                    current_transcripts = [
-                        t for t in transcripts[current_species] if t in ad.var_names]
+                    current_transcripts = [t for t in transcripts[current_species] if t in ad.var_names]
                 else:
-                    print(
-                        f"No transcripts found for species {current_species} in dataset {ad.uns['name']}")
+                    print(f"No transcripts found for species {current_species} in dataset {ad.uns['name']}")
                     continue
-
             if not current_transcripts:
-                print(
-                    f"No transcripts found for the query in dataset {ad.uns['name']}")
+                print(f"No transcripts found for the query in dataset {ad.uns['name']}")
                 continue
-
-            print(
-                f"Loading {len(current_transcripts)} transcripts from {current_tom_path}")
+            print(f"Loading {len(current_transcripts)} transcripts from {current_tom_path}")
             if progress_callback:
-                progress_callback(
-                    f"Loading {len(current_transcripts)} transcripts from TOM of dataset {ad.uns['name']}")
-            tom = load_subset_from_hdf5(filename=current_tom_path, rows=current_transcripts, cols=current_transcripts,
-                                        threshold=threshold, use_symmetry=use_symmetry, index_map=index_map, columns_map=columns_map,
-                                        include_neighbours=include_neighbours, max_neighbors=max_neighbors)
+                progress_callback(f"Loading {len(current_transcripts)} transcripts from TOM of dataset {ad.uns['name']}")
+            tom, neighbor_set = load_subset_from_hdf5(
+                filename=current_tom_path,
+                rows=current_transcripts,
+                cols=current_transcripts,
+                threshold=threshold,
+                use_symmetry=use_symmetry,
+                index_map=index_map,
+                columns_map=columns_map,
+                include_neighbours=include_neighbours,
+                max_neighbors=max_neighbors
+            )
             print(f"Transcripts after filtering: {tom.shape[0]}")
-            toms.append(tom)
+            toms.append(tom.astype("float64"))
+            neighbor_info_list.append(neighbor_set)
             valid_adatas.append(ad)
-
         for idx, t in enumerate(toms):
             toms[idx] = t.astype("float64")
-
-        return toms, valid_adatas
+        return toms, valid_adatas, neighbor_info_list
     else:
         if not tom_path:
             tom_path = f"{tom_prefix}/tom_matrix_{adata.uns['name']}.h5"
-
         if not os.path.exists(tom_path):
             print(f"File not found: {tom_path}")
             return None
-
         if transcripts:
-            transcripts = [
-                t for t in transcripts[adata.uns['species']] if t in adata.var_names]
+            transcripts = [t for t in transcripts[adata.uns['species']] if t in adata.var_names]
         else:
-            transcripts = [t[1] for t in list(
-                transcript_ortho_browser(query, adata).index)]
-
+            transcripts = [t[1] for t in list(transcript_ortho_browser(query, adata).index)]
         if not transcripts:
-            print(
-                f"No transcripts found for the query in dataset {adata.uns['name']}")
+            print(f"No transcripts found for the query in dataset {adata.uns['name']}")
             return None
-
         print(f"Loading {len(transcripts)} transcripts from {tom_path}")
         if progress_callback:
-            progress_callback(
-                f"Loading {len(transcripts)} transcripts from TOM of dataset {adata.uns['name']}")
-        tom = load_subset_from_hdf5(filename=tom_path, rows=transcripts, cols=transcripts, threshold=threshold, use_symmetry=use_symmetry,
-                                    include_neighbours=include_neighbours, max_neighbors=max_neighbors)
+            progress_callback(f"Loading {len(transcripts)} transcripts from TOM of dataset {adata.uns['name']}")
+        tom, neighbor_set = load_subset_from_hdf5(
+            filename=tom_path,
+            rows=transcripts,
+            cols=transcripts,
+            threshold=threshold,
+            use_symmetry=use_symmetry,
+            include_neighbours=include_neighbours,
+            max_neighbors=max_neighbors
+        )
         print(f"Transcripts after filtering: {tom.shape[0]}")
-
         tom = tom.astype("float64")
-
-        return tom
+        return tom, neighbor_set
 
 
 def process_eigengenes(adata: Union[AnnData, List[AnnData]], cluster_map: dict, config: dict, topic: str,
