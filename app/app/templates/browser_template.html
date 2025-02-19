@@ -1,5 +1,4 @@
 <!-- browser.html -->
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -26,27 +25,22 @@
             border: none !important;
             border-collapse: collapse !important;
         }
-
         table.display.no-border th,
         table.display.no-border td {
             border-bottom: none !important;
         }
-
         /* Remove the default top border from DataTables */
         table.display.no-border {
             border-top: none !important;
         }
-
         /* Remove background colors from table headers */
         table.display.no-border thead th {
             background-color: transparent !important;
         }
-
         /* Remove borders from the card */
         .card {
             border: none !important;
         }
-
         .italic-text {
             font-style: italic;
         }
@@ -55,6 +49,11 @@
 <body>
     <div class="card">
         <div class="card-body">
+            <!-- Transcript Filter: larger than default search field -->
+            <div class="mb-3">
+                <label for="transcriptSearch">Transcript Filter:</label>
+                <textarea id="transcriptSearch" class="form-control" rows="3" placeholder="Enter transcripts separated by comma, space, tab or newline"></textarea>
+            </div>
             <table id="browserRes" class="display responsive nowrap no-border" style="width:100%; display:none;">
                 <thead>
                     <tr>
@@ -71,9 +70,6 @@
                         <th>Ortho Count</th>
                         <th>InterPro ID</th>
                         <th>InterPro Description</th>
-                        <th>Pfam ID</th>
-                        <th>Pfam Description</th>
-                        <th>TF</th>
                     </tr>
                 </thead>
             </table>
@@ -95,10 +91,27 @@
 
     <script>
         const BASE_URL = "{{ BASE_URL }}";
-
         var table;
 
         $(document).ready(function() {
+            // Custom DataTables search filter for transcript field
+            $.fn.dataTable.ext.search.push(function(settings, data, dataIndex) {
+                // Only apply for our browserRes table
+                if (settings.nTable.id !== 'browserRes') return true;
+                // Get the user input and trim whitespace
+                var transcriptFilter = $('#transcriptSearch').val().trim();
+                if (!transcriptFilter) return true;
+                // Split input by comma, whitespace, tab or newline and filter empty tokens
+                var tokens = transcriptFilter.split(/[\s,]+/).filter(function(token) {
+                    return token;
+                });
+                // Get the transcript column (index 1) and perform case-insensitive exact match
+                var transcript = (data[1] || "").toLowerCase();
+                return tokens.some(function(token) {
+                    return transcript === token.toLowerCase();
+                });
+            });
+
             function getParameterByName(name) {
                 var url = window.location.href;
                 name = name.replace(/[[]]/g, "\\$&");
@@ -111,7 +124,6 @@
 
             var speciesFilterJson = getParameterByName('species_filter');
             var initialSpeciesFilter = [];
-
             if (speciesFilterJson) {
                 try {
                     initialSpeciesFilter = JSON.parse(speciesFilterJson);
@@ -119,13 +131,13 @@
                     console.error("Error parsing species_filter:", e);
                 }
             }
-
             console.log("Initial Species Filter:", initialSpeciesFilter);
 
             table = $('#browserRes').DataTable({
                 "processing": true,
                 "serverSide": true,
-                "ajax": async function(data, callback, settings) {
+                ajax: async function(data, callback, settings) {
+                    data.transcript_filter = $('#transcriptSearch').val().trim();
                     try {
                         const response = await fetch(BASE_URL + "/api/data", {
                             method: "POST",
@@ -138,13 +150,10 @@
                                 table_name: "{{ BROWSER_DB }}"
                             })
                         });
-
                         if (!response.ok) {
                             throw new Error(`HTTP error! status: ${response.status}`);
                         }
-
                         const json = await response.json();
-
                         callback({
                             draw: data.draw,
                             recordsTotal: json.recordsTotal,
@@ -183,10 +192,7 @@
                     { "data": "unique_go_terms", autoToggle: false },
                     { "data": "ortho_count", autoToggle: false },
                     { "data": "ipr_id", autoToggle: false },
-                    { "data": "ipr_desc", autoToggle: false },
-                    { "data": "pfam_id", autoToggle: false },
-                    { "data": "pfam_desc", autoToggle: false },
-                    { "data": "tf_family", autoToggle: false }
+                    { "data": "ipr_desc", autoToggle: false }
                 ],
                 responsive: true,
                 dom: 'Bfrtip',
@@ -203,38 +209,31 @@
                             try {
                                 // Get the current DataTables parameters
                                 var params = dt.ajax.params();
-
                                 // Include species_filter in the params
                                 if (Array.isArray(initialSpeciesFilter)) {
                                     params.species_filter = JSON.stringify(initialSpeciesFilter);
                                 }
-
                                 // Get the list of visible columns
                                 var visibleColumns = [];
                                 dt.columns().every(function (index) {
                                     if (dt.column(index).visible()) {
-                                        // Get the data key for the column
                                         var columnData = dt.settings()[0].aoColumns[index].data;
                                         visibleColumns.push(columnData);
                                     }
                                 });
                                 params.visible_columns = visibleColumns;
-
                                 // Fetch all data from the server
                                 const response = await fetch(BASE_URL + '/api/export_data', {
                                     method: 'POST',
                                     headers: {
                                         'Content-Type': 'application/json'
                                     },
-                                    body: JSON.stringify(params)  // Send parameters correctly as JSON
+                                    body: JSON.stringify(params)
                                 });
-
                                 if (!response.ok) {
                                     throw new Error(`HTTP error! status: ${response.status}`);
                                 }
-
                                 const blob = await response.blob();
-
                                 // Download the TSV file
                                 var link = document.createElement('a');
                                 link.href = window.URL.createObjectURL(blob);
@@ -252,9 +251,9 @@
                 columnDefs: [
                     { responsivePriority: 1, targets: 0 },
                     { responsivePriority: 2, targets: 1 },
-                    { targets: [0, 1], visible: true, searchable: true, orderable: true },  // Ensure the first two columns are always visible
+                    { targets: [0, 1], visible: true, searchable: true, orderable: true },
                     {
-                        targets: [4, 11, 12, 14],
+                        targets: [4, 11, 12],
                         render: function (data, type, row) {
                             if (type === 'display' && data && data.length > 30) {
                                 return '<span class="d-inline-block text-truncate" style="max-width: 200px;">' + data + '</span>';
@@ -266,16 +265,19 @@
                 ],
                 initComplete: function() {
                     toggleEmptyColumns(this.api());
-
                     $('#browserRes').on('draw.dt', function() {
                         toggleEmptyColumns(table);
                         sendHeight();
                     });
-
                     $('#browserRes').on('responsive-display.dt', function(e, datatable, row, showHide) {
                         sendHeight();
                     });
                 }
+            });
+
+            // Trigger table redraw when transcript filter input changes
+            $('#transcriptSearch').on('input', function() {
+                table.draw();
             });
 
             table.buttons().container()
@@ -284,11 +286,9 @@
             window.addEventListener('message', function(event) {
                 if (event.data.type === 'getTableParams') {
                     var params = table.ajax.params();
-
                     if (initialSpeciesFilter && Array.isArray(initialSpeciesFilter)) {
                         params.species_filter = JSON.stringify(initialSpeciesFilter);
                     }
-
                     console.log("Sending table params with species filter:", params);
                     event.source.postMessage({ type: 'tableParams', data: params }, event.origin);
                 }
@@ -297,7 +297,6 @@
             window.addEventListener('message', function(event) {
                 if (event.data.type === 'goTerm') {
                     var goTerm = event.data.value;
-
                     var searchInput = document.querySelector('input[type="search"]');
                     if (searchInput) {
                         searchInput.value = goTerm;
@@ -309,26 +308,21 @@
             function toggleEmptyColumns(api) {
                 api.columns().every(function() {
                     var column = this;
-                    // Get the column settings (including custom properties)
                     var colSettings = column.settings()[0].aoColumns[column.index()];
-                    // Skip if autoToggle is explicitly disabled
                     if (colSettings.autoToggle === false) {
                         return;
                     }
-                    // Check if all values in the column are empty (for the current page)
                     var isEmpty = column.data().toArray().every(function(value) {
                         return value === null ||
                             value === undefined ||
                             (typeof value === 'string' && value.trim() === '');
                     });
-                    // Hide the column if it is empty, otherwise show it
                     column.visible(!isEmpty);
                 });
             }
 
             function sendHeight() {
                 var height = document.body.scrollHeight;
-
                 if (window.frameElement && window.frameElement.id) {
                     try {
                         window.parent.postMessage({ type: 'resizeBrowser', target: window.frameElement.id, height: height }, '*');
@@ -346,6 +340,5 @@
 
         $('#browserRes').show();
     </script>
-
 </body>
 </html>
