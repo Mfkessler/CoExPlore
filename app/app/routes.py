@@ -320,7 +320,8 @@ def parse_request_params(request) -> dict:
     - request (Request): The Flask request object.
 
     Returns:
-    - dict: Parsed parameters including start, length, search value, columns, species filter, and order.
+    - dict: Parsed parameters including start, length, search value, columns, species filter,
+            transcript filter (if provided), and order.
     """
 
     params = {}
@@ -333,7 +334,7 @@ def parse_request_params(request) -> dict:
     params['start'] = int(values.get('start', 0))
     params['length'] = int(values.get('length', 10))
 
-    # Process search value
+    # Process global search value
     if request.is_json:
         params['search_value'] = values.get('search', {}).get('value', '')
     else:
@@ -374,6 +375,9 @@ def parse_request_params(request) -> dict:
     except json.JSONDecodeError:
         params['species_filter'] = []
 
+    # Process transcript filter (new addition)
+    params['transcript_filter'] = values.get('transcript_filter', '')
+
     # Process order parameters
     params['order'] = []
     if request.is_json:
@@ -408,20 +412,20 @@ def build_sql_query(params: dict, select_columns: str) -> tuple:
     Build SQL query based on parsed parameters.
 
     Parameters:
-    - params (dict): Parsed parameters including start, length, search value, columns, species filter, and order.
+    - params (dict): Parsed parameters including start, length, search value, columns, species filter,
+                     transcript filter, and order.
     - select_columns (str): Columns to select in the SQL query.
 
     Returns:
     - tuple: SQL query string and search parameters.
     """
-    # Create WHERE clause
+    
     where_conditions = []
     search_params = {}
 
     # Global search with OR for multiple tokens
     if params['search_value']:
         import re
-        # Split the search value by comma and/or whitespace, filter out leere Tokens
         tokens = [token for token in re.split(r'[\s,]+', params['search_value'].strip()) if token]
         global_search_conditions = []
         for idx, col in enumerate(params['columns']):
@@ -432,7 +436,6 @@ def build_sql_query(params: dict, select_columns: str) -> tuple:
                     param_name = f"search_value_{idx}_{j}"
                     token_conditions.append(f"{col_name}::text ILIKE :{param_name}")
                     search_params[param_name] = f"%{token}%"
-                # Verknüpfe alle Tokens per OR innerhalb der Spalte
                 global_search_conditions.append("(" + " OR ".join(token_conditions) + ")")
         if global_search_conditions:
             where_conditions.append('(' + ' OR '.join(global_search_conditions) + ')')
@@ -445,12 +448,26 @@ def build_sql_query(params: dict, select_columns: str) -> tuple:
             where_conditions.append(f"{col_name}::text ILIKE :{param_name}")
             search_params[param_name] = f"%{col['search_value']}%"
 
-    # Add species filter
+    # Add species filter if provided
     if params['species_filter']:
         species_placeholders = ', '.join([f":species_{i}" for i in range(len(params['species_filter']))])
         where_conditions.append(f"species IN ({species_placeholders})")
         for i, species in enumerate(params['species_filter']):
             search_params[f"species_{i}"] = species
+
+    # Add transcript filter if provided (new addition)
+    transcript_filter = params.get('transcript_filter', '').strip()
+    if transcript_filter:
+        import re
+        tokens = [token for token in re.split(r'[\s,]+', transcript_filter) if token]
+        if tokens:
+            token_conditions = []
+            for i, token in enumerate(tokens):
+                param_name = f"transcript_token_{i}"
+                # Case-insensitive exact match on the transcript column
+                token_conditions.append(f"LOWER(transcript) = :{param_name}")
+                search_params[param_name] = token.lower()
+            where_conditions.append('(' + ' OR '.join(token_conditions) + ')')
 
     where_clause = 'WHERE ' + ' AND '.join(where_conditions) if where_conditions else ''
 
@@ -472,7 +489,6 @@ def build_sql_query(params: dict, select_columns: str) -> tuple:
         search_params['length'] = params['length']
         search_params['start'] = params['start']
 
-    # Create final query
     query = f"SELECT {select_columns} FROM {params['table_name']} {where_clause} {order_clause} {limit_offset}"
 
     return query, search_params
