@@ -71,6 +71,8 @@
                         <th>Ortho Count</th>
                         <th>InterPro ID</th>
                         <th>InterPro Description</th>
+                        <th>Pfam ID</th>
+                        <th>Pfam Description</th>
                     </tr>
                 </thead>
             </table>
@@ -179,7 +181,9 @@
                     { "data": "unique_go_terms", autoToggle: false },
                     { "data": "ortho_count", autoToggle: false },
                     { "data": "ipr_id", autoToggle: true },
-                    { "data": "ipr_desc", autoToggle: true }
+                    { "data": "ipr_desc", autoToggle: true },
+                    { "data": "pfam_id", autoToggle: true },
+                    { "data": "pfam_desc", autoToggle: true }
                 ],
                 responsive: true,
                 dom: 'Bfrtip',
@@ -247,7 +251,7 @@
                     { responsivePriority: 2, targets: 1 },
                     { targets: [0, 1], visible: true, searchable: true, orderable: true },  // Ensure the first two columns are always visible
                     {
-                        targets: [4, 11, 12],
+                        targets: [4, 11, 12, 14],
                         render: function (data, type, row) {
                             if (type === 'display' && data && data.length > 30) {
                                 return '<span class="d-inline-block text-truncate" style="max-width: 200px;">' + data + '</span>';

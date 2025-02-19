@@ -373,7 +373,8 @@ def transcript_ortho_browser(
 
     # Define the required columns (if available)
     possible_columns = ['moduleColors', 'moduleLabels',
-                        'go_terms', 'total_counts', 'ortho_ID', 'ipr_id', 'ipr_desc']
+                        'go_terms', 'total_counts', 'ortho_ID', 'ipr_id', 'ipr_desc',
+                        'pfam_id', 'pfam_desc']
 
     # Ensure adatas is a list
     if isinstance(adatas, AnnData):
