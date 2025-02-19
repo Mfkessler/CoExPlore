@@ -2419,6 +2419,49 @@ def add_ipr_columns(adata: AnnData, ipr_mapping_file: str) -> AnnData:
     return adata
 
 
+def add_pfam_columns(adata: AnnData, pfam_mapping_file: str) -> AnnData:
+    """
+    Add 'pfam_id' and 'pfam_desc' columns to adata.var based on a PFAM mapping file.
+
+    Parameters:
+    - adata (AnnData): AnnData object with var index matching transcript IDs.
+    - pfam_mapping_file (str): Path to the file containing PFAM ID and description mappings.
+
+    Returns:
+    - AnnData: Updated AnnData object with new 'pfam_id' and 'pfam_desc' columns.
+    """
+
+    if not os.path.exists(pfam_mapping_file):
+        print(
+            f"Warning: PFAM mapping file '{pfam_mapping_file}' not found. Filling 'pfam_id' and 'pfam_desc' with empty strings.")
+        adata.var["pfam_id"] = ''
+        adata.var["pfam_desc"] = ''
+        return adata
+
+    # Load the PFAM mapping file (tab-separated)
+    pfam_df = pd.read_csv(pfam_mapping_file, sep="\t", header=None, names=["transcript", "pfam_id", "pfam_desc"])
+
+    # Group PFAM IDs and descriptions by transcript
+    grouped_pfam = pfam_df.groupby("transcript").agg({
+        "pfam_id": lambda x: ",".join(x),
+        "pfam_desc": lambda x: ",".join(x)
+    }).reset_index()
+
+    # Create dictionaries for fast mapping
+    pfam_dict_ids = grouped_pfam.set_index("transcript")["pfam_id"].to_dict()
+    pfam_dict_desc = grouped_pfam.set_index("transcript")["pfam_desc"].to_dict()
+
+    # Map the PFAM data to adata.var
+    adata.var["pfam_id"] = adata.var.index.map(pfam_dict_ids)
+    adata.var["pfam_desc"] = adata.var.index.map(pfam_dict_desc)
+
+    # Fill missing values with empty strings
+    adata.var["pfam_id"] = adata.var["pfam_id"].fillna('')
+    adata.var["pfam_desc"] = adata.var["pfam_desc"].fillna('')
+
+    return adata
+
+
 def add_combined_column(adata: AnnData, columns: List[str] = None, new_column_name: str = "Combined_Trait", drop_others: bool = False) -> None:
     """
     Adds a new column to adata.obs by combining values from specified or all columns.
