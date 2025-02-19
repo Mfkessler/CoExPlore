@@ -153,6 +153,9 @@ def analyze_co_expression_network(adata: Union[AnnData, List[AnnData]], config: 
     # Calculate TOM metrics and generate Datatable
     if progress_callback:
         progress_callback(f"Calculating TOM metrics")
+
+    # TODO Remove TOM metrics and use metadata information from AnnData
+    
     tom_metrics = calculate_all_tom_metrics(
         tom, adata, cluster_map, tool, progress_callback).reset_index()
     tom_table_html = tom_metrics.to_html(

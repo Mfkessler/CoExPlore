@@ -2422,26 +2422,44 @@ def add_ipr_columns(adata: AnnData, ipr_mapping_file: str) -> AnnData:
 def add_pfam_columns(adata: AnnData, pfam_mapping_file: str) -> AnnData:
     """
     Add 'pfam_id' and 'pfam_desc' columns to adata.var based on a PFAM mapping file.
-
+    
+    The mapping file is expected to use the first whitespace or tab to separate the transcript ID
+    from the PFAM ID and the second whitespace or tab to separate the PFAM ID from its description.
+    
     Parameters:
     - adata (AnnData): AnnData object with var index matching transcript IDs.
     - pfam_mapping_file (str): Path to the file containing PFAM ID and description mappings.
-
+    
     Returns:
     - AnnData: Updated AnnData object with new 'pfam_id' and 'pfam_desc' columns.
     """
+    import os
+    import pandas as pd
 
     if not os.path.exists(pfam_mapping_file):
-        print(
-            f"Warning: PFAM mapping file '{pfam_mapping_file}' not found. Filling 'pfam_id' and 'pfam_desc' with empty strings.")
+        print(f"Warning: PFAM mapping file '{pfam_mapping_file}' not found. Filling 'pfam_id' and 'pfam_desc' with empty strings.")
         adata.var["pfam_id"] = ''
         adata.var["pfam_desc"] = ''
         return adata
 
-    # Load the PFAM mapping file (tab-separated)
-    pfam_df = pd.read_csv(pfam_mapping_file, sep="\t", header=None, names=["transcript", "pfam_id", "pfam_desc"])
+    # Read the PFAM mapping file using a global separator:
+    # The first whitespace/tab separates transcript from pfam_id,
+    # the second whitespace/tab separates pfam_id from pfam_desc.
+    rows = []
+    with open(pfam_mapping_file, "r") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            # Split only on the first two whitespace/tab occurrences
+            parts = line.split(maxsplit=2)
+            if len(parts) < 3:
+                continue  # Skip lines that do not have all three fields
+            rows.append(parts)
+    pfam_df = pd.DataFrame(rows, columns=["transcript", "pfam_id", "pfam_desc"])
+    pfam_df["transcript"] = pfam_df["transcript"].astype(str).str.strip()
 
-    # Group PFAM IDs and descriptions by transcript
+    # Group PFAM IDs and descriptions by transcript, concatenating multiple entries with a comma
     grouped_pfam = pfam_df.groupby("transcript").agg({
         "pfam_id": lambda x: ",".join(x),
         "pfam_desc": lambda x: ",".join(x)
@@ -2451,6 +2469,14 @@ def add_pfam_columns(adata: AnnData, pfam_mapping_file: str) -> AnnData:
     pfam_dict_ids = grouped_pfam.set_index("transcript")["pfam_id"].to_dict()
     pfam_dict_desc = grouped_pfam.set_index("transcript")["pfam_desc"].to_dict()
 
+    # Drop existing pfam columns if they exist to avoid conflicts with categorical dtype
+    for col in ["pfam_id", "pfam_desc"]:
+        if col in adata.var.columns:
+            adata.var = adata.var.drop(columns=[col])
+
+    # Ensure the index is of string type and stripped of any extra spaces
+    adata.var.index = adata.var.index.astype(str).str.strip()
+
     # Map the PFAM data to adata.var
     adata.var["pfam_id"] = adata.var.index.map(pfam_dict_ids)
     adata.var["pfam_desc"] = adata.var.index.map(pfam_dict_desc)
@@ -2458,6 +2484,49 @@ def add_pfam_columns(adata: AnnData, pfam_mapping_file: str) -> AnnData:
     # Fill missing values with empty strings
     adata.var["pfam_id"] = adata.var["pfam_id"].fillna('')
     adata.var["pfam_desc"] = adata.var["pfam_desc"].fillna('')
+
+    return adata
+
+
+def add_tf_columns(adata: AnnData, tf_mapping_file: str) -> AnnData:
+    """
+    Add 'tf_family' column to adata.var based on a transcription factor mapping file.
+
+    Parameters:
+    - adata (AnnData): AnnData object with var index matching transcript IDs.
+    - tf_mapping_file (str): Path to the file containing transcription factor mappings.
+
+    Returns:
+    - AnnData: Updated AnnData object with new 'tf_family' column.
+    """
+
+    if not os.path.exists(tf_mapping_file):
+        print(
+            f"Warning: TF mapping file '{tf_mapping_file}' not found. Filling 'tf_family' with empty strings."
+        )
+        adata.var["tf_family"] = ''
+        return adata
+    
+    # Drop column if it already exists
+    adata.var = adata.var.drop(columns=["tf_family"], errors="ignore")
+
+    # Load the transcription factor mapping file.
+    # The file is assumed to be whitespace-separated with a header ("Gene Family").
+    tf_df = pd.read_csv(tf_mapping_file, sep="\s+", header=0)
+    # Rename columns to consistent names.
+    tf_df.columns = ["transcript", "tf_family"]
+
+    # Group TF families by transcript; if multiple entries exist, join them with a comma.
+    grouped_tf = tf_df.groupby("transcript").agg({
+        "tf_family": lambda x: ",".join(x)
+    }).reset_index()
+
+    # Create a dictionary for fast mapping.
+    tf_dict = grouped_tf.set_index("transcript")["tf_family"].to_dict()
+
+    # Map the TF data to adata.var.
+    adata.var["tf_family"] = adata.var.index.map(tf_dict)
+    adata.var["tf_family"] = adata.var["tf_family"].fillna('')
 
     return adata
 
