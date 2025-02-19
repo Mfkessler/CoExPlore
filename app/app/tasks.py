@@ -96,6 +96,9 @@ def plot_co_expression_network_task(self, data):
                                                         tom_prefix=f"{Config.DATA_DIR}/tom", filter_edges=False, max_neighbors=max_neighbors,
                                                         include_neighbors=include_neighbors)
         
+        if isinstance(html_path, dict):
+            return {"status": "FAILURE", "result": {"status": "error", "message": f"{html_path.get('message')}"}}
+
         return {"status": "SUCCESS", "result": {"status": "success", "plot_url": f"{Config.BASE_URL}/{plot_config.output_path}/{html_path}"}}
     else:
         return {"status": "FAILURE", "result": {"status": "error", "message": "Data not loaded", "info": f"{adata_cache.keys()}"}}    

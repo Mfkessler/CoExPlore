@@ -105,6 +105,13 @@ def analyze_co_expression_network(adata: Union[AnnData, List[AnnData]], config: 
         tom, neighbor_info = get_tom_data(tom_path, adata, transcripts=transcripts, query=query, threshold=threshold, tom_prefix=tom_prefix,
                            use_symmetry=use_symmetry, progress_callback=progress_callback, include_neighbours=include_neighbors,
                            max_neighbors=max_neighbors)
+        
+    # Check, if ALL TOM matrices are empty
+    if isinstance(tom, list):
+        if all(tom.empty for tom in tom):
+            return {"message": "No transcripts passed the threshold for any dataset"}
+    elif tom.empty and isinstance(adata, AnnData):
+        return {"message": "No transcripts passed the threshold for any dataset"}
 
     title_suffix = topic
     print(f"Plotting co-expression network for {topic}")
