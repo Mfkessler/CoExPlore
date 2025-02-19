@@ -169,23 +169,24 @@
                                 return '<span class="italic-text">' + data + '</span>';
                             }
                             return data;
-                        }
+                        },
+                        autoToggle: false
                     },
-                    { "data": "transcript", autoToggle: true },
-                    { "data": "modulecolors", autoToggle: true },
+                    { "data": "transcript", autoToggle: false },
+                    { "data": "modulecolors", autoToggle: false },
                     { "data": "modulelabels", autoToggle: false },
-                    { "data": "go_terms", autoToggle: true },
+                    { "data": "go_terms", autoToggle: false },
                     { "data": "total_counts", autoToggle: false },
-                    { "data": "ortho_id", autoToggle: true },
+                    { "data": "ortho_id", autoToggle: false },
                     { "data": "module_count", autoToggle: false },
                     { "data": "unique_modules", autoToggle: false },
                     { "data": "unique_go_terms", autoToggle: false },
                     { "data": "ortho_count", autoToggle: false },
-                    { "data": "ipr_id", autoToggle: true },
-                    { "data": "ipr_desc", autoToggle: true },
-                    { "data": "pfam_id", autoToggle: true },
-                    { "data": "pfam_desc", autoToggle: true },
-                    { "data": "tf_family", autoToggle: true }
+                    { "data": "ipr_id", autoToggle: false },
+                    { "data": "ipr_desc", autoToggle: false },
+                    { "data": "pfam_id", autoToggle: false },
+                    { "data": "pfam_desc", autoToggle: false },
+                    { "data": "tf_family", autoToggle: false }
                 ],
                 responsive: true,
                 dom: 'Bfrtip',
