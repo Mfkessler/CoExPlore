@@ -2565,3 +2565,93 @@ def add_combined_column(adata: AnnData, columns: List[str] = None, new_column_na
     else:
         print(
             f"Added combined column '{new_column_name}', other columns retained")
+
+
+def add_metadata_columns(adata: AnnData, mapping_file: str, columns: Dict[str, str] = None) -> AnnData:
+    """
+    Add gene metadata columns to adata.var based on a mapping file.
+
+    The mapping file must have at least two columns: the first column contains gene names and the subsequent
+    columns contain metadata. The user can specify a mapping of column names to human readable names via the
+    'columns' parameter. The keys in this dictionary are used as the column names (must only contain lowercase
+    letters, digits, and underscores) and the values are the human readable names. If 'columns' is None, metadata
+    columns will be added with auto-generated names following the pattern "metadata_n". The column mapping is stored
+    in adata.uns['metadata']. If it already exists, it will be extended.
+
+    Parameters:
+    - adata (AnnData): AnnData object with var index matching gene names.
+    - mapping_file (str): Path to the file containing gene metadata mappings (tab-separated, no header).
+    - columns (Dict[str, str]): Dictionary mapping desired column names to human readable names.
+      The number of keys must equal the number of metadata columns in the file (total columns - 1).
+
+    Returns:
+    - AnnData: Updated AnnData object with new metadata columns added to adata.var and column mapping stored in adata.uns['metadata'].
+
+    Raises:
+    - FileNotFoundError: If the mapping file does not exist.
+    - ValueError: If the mapping file format is incorrect, if the number of provided column mappings does not match,
+      or if a provided column name is invalid.
+    """
+    
+    # Check if mapping file exists
+    if not os.path.exists(mapping_file):
+        raise FileNotFoundError(f"Mapping file '{mapping_file}' not found.")
+    
+    # Read the mapping file (tab-separated, no header)
+    try:
+        df = pd.read_csv(mapping_file, sep="\t", header=None, dtype=str)
+    except Exception as e:
+        raise ValueError(f"Error reading mapping file '{mapping_file}': {e}")
+    
+    # Ensure there is at least one metadata column (i.e. at least 2 columns total)
+    if df.shape[1] < 2:
+        raise ValueError(f"Mapping file '{mapping_file}' must have at least two columns (gene names and metadata).")
+    
+    # Process gene names (first column)
+    df.iloc[:, 0] = df.iloc[:, 0].astype(str).str.strip()
+    
+    # Determine number of metadata columns
+    n_meta = df.shape[1] - 1
+
+    # Process columns parameter: keys determine column names, values are the human readable names.
+    if columns is not None:
+        if len(columns) != n_meta:
+            raise ValueError(f"Provided columns length ({len(columns)}) does not match number of metadata columns in file ({n_meta}).")
+        # Validate keys in columns dict
+        for key in columns.keys():
+            if not re.fullmatch(r"[a-z0-9_]+", key):
+                raise ValueError(f"Invalid column name '{key}'. Column names must only contain lowercase letters, digits, and underscores without whitespace.")
+        col_items = list(columns.items())
+    else:
+        # Auto-generate column names in the format "metadata_n"
+        col_items = []
+        current_index = 1
+        for _ in range(n_meta):
+            while f"metadata_{current_index}" in adata.var.columns or any(f"metadata_{current_index}" == k for k, _ in col_items):
+                current_index += 1
+            col_name = f"metadata_{current_index}"
+            col_items.append((col_name, col_name))
+            current_index += 1
+        columns = dict(col_items)
+    
+    # Update adata.uns['metadata'] with the provided mapping, or initialize if not exists
+    if 'metadata' not in adata.uns or not isinstance(adata.uns['metadata'], dict):
+        adata.uns['metadata'] = {}
+    adata.uns['metadata'].update(columns)
+    
+    # Map each metadata column from the file to adata.var
+    for i, (col_key, _) in enumerate(col_items):
+        # Extract the i-th metadata column (column index i+1 in the file)
+        meta_series = df.iloc[:, i+1].astype(str).str.strip()
+        # Create a temporary DataFrame for mapping gene names to metadata
+        temp_df = pd.DataFrame({
+            "gene": df.iloc[:, 0],
+            "meta": meta_series
+        })
+        # Group by gene and join unique entries with commas
+        grouped = temp_df.groupby("gene")["meta"].apply(lambda x: ",".join(x.dropna().unique())).to_dict()
+        # Map the grouped metadata to adata.var.index; missing values become empty strings
+        adata.var[col_key] = adata.var.index.map(lambda gene: grouped.get(gene, ""))
+        adata.var[col_key] = adata.var[col_key].fillna('')
+    
+    return adata
