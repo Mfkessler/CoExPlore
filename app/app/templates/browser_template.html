@@ -49,10 +49,22 @@
 <body>
     <div class="card">
         <div class="card-body">
-            <!-- Transcript Filter: larger than default search field -->
-            <div class="mb-3">
-                <textarea id="transcriptSearch" class="form-control" rows="3" placeholder="Filter by transcripts: Enter transcripts separated by comma, space, tab or newline"></textarea>
+            <div class="row">
+                <div class="col-lg-3 mb-3">
+                    <select id="columnSelect" class="form-control">
+                        {% for key, header in METADATA_DICT.items() %}
+                            {% if key != "species" %}
+                                <option value="{{ key }}">{{ header }}</option>
+                            {% endif %}
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-lg-9 mb-3">
+                    <textarea id="transcriptSearch" class="form-control" rows="3" placeholder="Filter: Tokens separated by comma, space, tab, or newline"></textarea>
+                </div>
             </div>
+            
+            <!-- DataTables table -->
             <table id="browserRes" class="display responsive nowrap no-border" style="width:100%; display:none;">
                 <thead>
                     <tr>
@@ -101,19 +113,21 @@
         ];
 
         $(document).ready(function() {
-            // Custom DataTables search filter for transcript field
+            // Custom DataTables search filter with selectable column
             $.fn.dataTable.ext.search.push(function(settings, data, dataIndex) {
                 if (settings.nTable.id !== 'browserRes') return true;
-                var transcriptFilter = $('#transcriptSearch').val().trim();
-                if (!transcriptFilter) return true;
-                var tokens = transcriptFilter.split(/[\s,]+/).filter(function(token) {
-                    return token;
-                });
-                // Find the index of the 'transcript' column in dtColumns
-                var transcriptIndex = dtColumns.findIndex(function(col) { return col.data === 'transcript'; });
-                var transcript = transcriptIndex >= 0 ? (data[transcriptIndex] || "").toLowerCase() : "";
+                var filterText = $('#transcriptSearch').val().trim();
+                if (!filterText) return true;
+                var tokens = filterText.split(/[\s,]+/).filter(function(token) { return token; });
+                
+                // Select the column to filter from the dropdown
+                var selectedColumn = $('#columnSelect').val();
+                // Find the index of the selected column in dtColumns
+                var columnIndex = dtColumns.findIndex(function(col) { return col.data === selectedColumn; });
+                var columnData = columnIndex >= 0 ? (data[columnIndex] || "").toLowerCase() : "";
+                
                 return tokens.some(function(token) {
-                    return transcript === token.toLowerCase();
+                    return columnData === token.toLowerCase();
                 });
             });
 
@@ -139,10 +153,14 @@
             console.log("Initial Species Filter:", initialSpeciesFilter);
 
             table = $('#browserRes').DataTable({
+                language: {
+                    search: "Global Search:"
+                },
                 "processing": true,
                 "serverSide": true,
                 ajax: async function(data, callback, settings) {
                     data.transcript_filter = $('#transcriptSearch').val().trim();
+                    data.transcript_filter_column = $('#columnSelect').val();
                     try {
                         const response = await fetch(BASE_URL + "/api/data", {
                             method: "POST",
@@ -244,6 +262,10 @@
 
             // Trigger table redraw when transcript filter input changes
             $('#transcriptSearch').on('input', function() {
+                table.draw();
+            });
+
+            $('#columnSelect').on('change', function() {
                 table.draw();
             });
 
