@@ -9,6 +9,7 @@ import tempfile
 import json
 import logging
 import redis
+import re
 import scanpy as sc
 import pandas as pd
 import numpy as np
@@ -375,8 +376,9 @@ def parse_request_params(request) -> dict:
     except json.JSONDecodeError:
         params['species_filter'] = []
 
-    # Process transcript filter (new addition)
+    # Process transcript filter
     params['transcript_filter'] = values.get('transcript_filter', '')
+    params['transcript_filter_column'] = values.get('transcript_filter_column', 'transcript')
 
     # Process order parameters
     params['order'] = []
@@ -425,7 +427,6 @@ def build_sql_query(params: dict, select_columns: str) -> tuple:
 
     # Global search with OR for multiple tokens
     if params['search_value']:
-        import re
         tokens = [token for token in re.split(r'[\s,]+', params['search_value'].strip()) if token]
         global_search_conditions = []
         for idx, col in enumerate(params['columns']):
@@ -455,19 +456,28 @@ def build_sql_query(params: dict, select_columns: str) -> tuple:
         for i, species in enumerate(params['species_filter']):
             search_params[f"species_{i}"] = species
 
-    # Add transcript filter if provided (new addition)
+    # Extended filter: transcript_filter (general filter_column) with list logic
     transcript_filter = params.get('transcript_filter', '').strip()
     if transcript_filter:
-        import re
+        # Use filter column, default: 'transcript'
+        filter_column = params.get('transcript_filter_column', 'transcript')
+        # Validation: only use allowed columns
+        allowed_columns = [col['name'] for col in params['columns']]
+        if filter_column not in allowed_columns:
+            filter_column = 'transcript'
+
         tokens = [token for token in re.split(r'[\s,]+', transcript_filter) if token]
+
         if tokens:
-            token_conditions = []
-            for i, token in enumerate(tokens):
-                param_name = f"transcript_token_{i}"
-                # Case-insensitive exact match on the transcript column
-                token_conditions.append(f"LOWER(transcript) = :{param_name}")
-                search_params[param_name] = token.lower()
-            where_conditions.append('(' + ' OR '.join(token_conditions) + ')')
+            # Pass search tokens as an array (in lowercase)
+            search_params['transcript_tokens'] = [token.lower() for token in tokens]
+            # If commas are present, use array overlap (&&) - it is sufficient if at least one token matches.
+            condition = (
+                f"((POSITION(',' IN {filter_column}) > 0 AND "
+                f"string_to_array(LOWER({filter_column}), ',') && :transcript_tokens) OR "
+                f"(POSITION(',' IN {filter_column}) = 0 AND LOWER({filter_column}) = ANY(:transcript_tokens)))"
+            )
+            where_conditions.append(condition)
 
     where_clause = 'WHERE ' + ' AND '.join(where_conditions) if where_conditions else ''
 
