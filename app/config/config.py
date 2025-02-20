@@ -1,4 +1,5 @@
 import os
+import json
 
 class Config:
     ENV_NAME = os.getenv("ENV_NAME", "default")
@@ -36,3 +37,5 @@ class Config:
             "options": {"queue": CELERY_TASK_DEFAULT_QUEUE},
         },
     }
+
+    METADATA_DICT = json.loads(os.getenv("METADATA_DICT", "{}"))

@@ -608,8 +608,10 @@ def export_data():
 def browser():
     context = {
         "BASE_URL": Config.BASE_URL,
-        "BROWSER_DB": Config.BROWSER_DB
+        "BROWSER_DB": Config.BROWSER_DB,
+        "METADATA_DICT": Config.METADATA_DICT
     }
+
     return render_template('browser_template.html', **context)
 
 
