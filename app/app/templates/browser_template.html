@@ -1,4 +1,4 @@
-<!-- browser.html -->
+<!-- browser_template.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -57,19 +57,9 @@
             <table id="browserRes" class="display responsive nowrap no-border" style="width:100%; display:none;">
                 <thead>
                     <tr>
-                        <th>Species</th>
-                        <th>Transcript</th>
-                        <th>Module Colors</th>
-                        <th>Module Labels</th>
-                        <th>GO Terms</th>
-                        <th>Total Counts</th>
-                        <th>Orthogroup</th>
-                        <th>Module Count</th>
-                        <th>Unique Modules</th>
-                        <th>Unique GO Terms</th>
-                        <th>Ortho Count</th>
-                        <th>InterPro ID</th>
-                        <th>InterPro Description</th>
+                        {% for key, header in METADATA_DICT.items() %}
+                        <th>{{ header }}</th>
+                        {% endfor %}
                     </tr>
                 </thead>
             </table>
@@ -93,20 +83,36 @@
         const BASE_URL = "{{ BASE_URL }}";
         var table;
 
+        // Dynamically generated DataTables columns based on METADATA_DICT
+        var dtColumns = [
+          {% for key, header in METADATA_DICT.items() %}
+            {% if key == "species" %}
+            { 
+                "data": "{{ key }}",
+                "render": function(data, type, row, meta) {
+                    if (type === 'display') {
+                        return '<span class="italic-text">' + data + '</span>';
+                    }
+                    return data;
+                },
+                autoToggle: false
+            }{% else %}
+            { "data": "{{ key }}", autoToggle: false }{% endif %}{% if not loop.last %},{% endif %}
+          {% endfor %}
+        ];
+
         $(document).ready(function() {
             // Custom DataTables search filter for transcript field
             $.fn.dataTable.ext.search.push(function(settings, data, dataIndex) {
-                // Only apply for our browserRes table
                 if (settings.nTable.id !== 'browserRes') return true;
-                // Get the user input and trim whitespace
                 var transcriptFilter = $('#transcriptSearch').val().trim();
                 if (!transcriptFilter) return true;
-                // Split input by comma, whitespace, tab or newline and filter empty tokens
                 var tokens = transcriptFilter.split(/[\s,]+/).filter(function(token) {
                     return token;
                 });
-                // Get the transcript column (index 1) and perform case-insensitive exact match
-                var transcript = (data[1] || "").toLowerCase();
+                // Find the index of the 'transcript' column in dtColumns
+                var transcriptIndex = dtColumns.findIndex(function(col) { return col.data === 'transcript'; });
+                var transcript = transcriptIndex >= 0 ? (data[transcriptIndex] || "").toLowerCase() : "";
                 return tokens.some(function(token) {
                     return transcript === token.toLowerCase();
                 });
@@ -170,30 +176,7 @@
                         });
                     }
                 },
-                "columns": [
-                    { 
-                        "data": "species",
-                        "render": function(data, type, row, meta) {
-                            if (type === 'display') {
-                                return '<span class="italic-text">' + data + '</span>';
-                            }
-                            return data;
-                        },
-                        autoToggle: false
-                    },
-                    { "data": "transcript", autoToggle: false },
-                    { "data": "modulecolors", autoToggle: false },
-                    { "data": "modulelabels", autoToggle: false },
-                    { "data": "go_terms", autoToggle: false },
-                    { "data": "total_counts", autoToggle: false },
-                    { "data": "ortho_id", autoToggle: false },
-                    { "data": "module_count", autoToggle: false },
-                    { "data": "unique_modules", autoToggle: false },
-                    { "data": "unique_go_terms", autoToggle: false },
-                    { "data": "ortho_count", autoToggle: false },
-                    { "data": "ipr_id", autoToggle: false },
-                    { "data": "ipr_desc", autoToggle: false }
-                ],
+                "columns": dtColumns,
                 responsive: true,
                 dom: 'Bfrtip',
                 lengthMenu: [ [10, 25, 50, -1], [10, 25, 50, "All"] ],
@@ -207,13 +190,10 @@
                         text: 'Download Table',
                         action: async function (e, dt, node, config) {
                             try {
-                                // Get the current DataTables parameters
                                 var params = dt.ajax.params();
-                                // Include species_filter in the params
                                 if (Array.isArray(initialSpeciesFilter)) {
                                     params.species_filter = JSON.stringify(initialSpeciesFilter);
                                 }
-                                // Get the list of visible columns
                                 var visibleColumns = [];
                                 dt.columns().every(function (index) {
                                     if (dt.column(index).visible()) {
@@ -222,7 +202,6 @@
                                     }
                                 });
                                 params.visible_columns = visibleColumns;
-                                // Fetch all data from the server
                                 const response = await fetch(BASE_URL + '/api/export_data', {
                                     method: 'POST',
                                     headers: {
@@ -234,7 +213,6 @@
                                     throw new Error(`HTTP error! status: ${response.status}`);
                                 }
                                 const blob = await response.blob();
-                                // Download the TSV file
                                 var link = document.createElement('a');
                                 link.href = window.URL.createObjectURL(blob);
                                 var filename = prompt('Enter file name') || 'filtered_export.tsv';
@@ -248,20 +226,10 @@
                         }
                     }
                 ],
+                // Minimal defined columnDefs for responsive priorities
                 columnDefs: [
                     { responsivePriority: 1, targets: 0 },
-                    { responsivePriority: 2, targets: 1 },
-                    { targets: [0, 1], visible: true, searchable: true, orderable: true },
-                    {
-                        targets: [4, 11, 12],
-                        render: function (data, type, row) {
-                            if (type === 'display' && data && data.length > 30) {
-                                return '<span class="d-inline-block text-truncate" style="max-width: 200px;">' + data + '</span>';
-                            }
-                            return data || '';
-                        }
-                    },
-                    { targets: [2, 3, 5, 7, 8, 9, 10], visible: false }
+                    { responsivePriority: 2, targets: 1 }
                 ],
                 initComplete: function() {
                     toggleEmptyColumns(this.api());
@@ -314,8 +282,8 @@
                     }
                     var isEmpty = column.data().toArray().every(function(value) {
                         return value === null ||
-                            value === undefined ||
-                            (typeof value === 'string' && value.trim() === '');
+                               value === undefined ||
+                               (typeof value === 'string' && value.trim() === '');
                     });
                     column.visible(!isEmpty);
                 });
