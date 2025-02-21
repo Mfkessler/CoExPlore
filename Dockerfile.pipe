@@ -12,9 +12,6 @@ COPY package /tmp/wgcna-package/
 # Install the persistent package (without dependencies)
 RUN pip install --no-deps /tmp/wgcna-package
 
-# Install custom package: PyWGCNA
-RUN pip install git+https://github.com/Mfkessler/PyWGCNA.git
-
 # Install Snakemake and specific Pulp version
 RUN pip install snakemake pulp==2.7.0
 

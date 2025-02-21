@@ -14,3 +14,5 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Install pip dependencies from requirements.txt
 RUN pip install --no-cache-dir -r /tmp/requirements.txt && rm /tmp/requirements.txt
 
+# Install custom package: PyWGCNA
+RUN pip install --upgrade git+https://github.com/Mfkessler/PyWGCNA.git

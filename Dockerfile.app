@@ -15,9 +15,6 @@ COPY package /tmp/wgcna-package/
 # Install the persistent package (without dependencies)
 RUN pip install --no-deps /tmp/wgcna-package
 
-# Install custom package: PyWGCNA
-RUN pip install git+https://github.com/Mfkessler/PyWGCNA.git
-
 # Clean up temporary files and pip cache
 RUN rm -rf /tmp/wgcna-package ~/.cache/pip /tmp/* /var/tmp/* && \
     apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
