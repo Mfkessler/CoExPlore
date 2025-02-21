@@ -224,7 +224,7 @@ def plot_filtered_jaccard_modules_task(self, data):
     adata_list = [adata_cache.get_adata(plant) for plant in plants]
 
     if len(adata_list) > 0:
-        mds = [rutils.create_mapping_dict(adata, value_column='ortho_ID', transcripts=transcripts, min_count=min_orthos) for adata in adata_list]
+        mds = [rutils.create_mapping_dict(adata, value_column='ortho_id', transcripts=transcripts, min_count=min_orthos) for adata in adata_list]
         j_df_modules = rutils.get_jaccard_df(mds)
 
         custom_filename = f"{prefix}modules_network_filtered_{threshold}"
@@ -263,7 +263,7 @@ def plot_filtered_jaccard_species_task(self, data):
     adata_list = [adata_cache.get_adata(plant) for plant in plants]
 
     if len(adata_list) > 1:
-        mds = [rutils.create_mapping_dict(adata, value_column='ortho_ID', transcripts=transcripts, mapping_column="species", min_count=min_orthos) for adata in adata_list]
+        mds = [rutils.create_mapping_dict(adata, value_column='ortho_id', transcripts=transcripts, mapping_column="species", min_count=min_orthos) for adata in adata_list]
         j_df_species = rutils.get_jaccard_df(mds)
 
         custom_filename = f"{prefix}species_network_filtered_{threshold}"
@@ -440,7 +440,7 @@ def plot_jaccard_tissues_task(self, data):
     adata_list = [adata_cache.get_adata(plant) for plant in plants]
 
     if len(adata_list) > 1:
-        dicts = rutils.get_top_expressed_genes_by_tissue(adata_list, n=nTop, column='ortho_ID')
+        dicts = rutils.get_top_expressed_genes_by_tissue(adata_list, n=nTop, column='ortho_id')
         j_df_tissues = rutils.get_jaccard_df(dicts)
 
         custom_filename = f"{prefix}tissues_network_{threshold}"
@@ -470,7 +470,7 @@ def plot_tissues_corr_task(self, data):
     adata_list = [adata_cache.get_adata(plant) for plant in plants]
 
     if len(adata_list) > 1:
-        dicts = rutils.get_top_expressed_genes_by_tissue(adata_list, n=nTop, column='ortho_ID')
+        dicts = rutils.get_top_expressed_genes_by_tissue(adata_list, n=nTop, column='ortho_id')
         j_df_tissues = rutils.get_jaccard_df(dicts)
 
         custom_filename = f"{prefix}tissues_heatmap_{nTop}"
@@ -500,7 +500,7 @@ def plot_jaccard_modules_task(self, data):
     adata_list = [adata_cache.get_adata(plant) for plant in plants]
 
     if len(adata_list) > 1:
-        mds = [rutils.create_mapping_dict(adata, value_column='ortho_ID') for adata in adata_list]
+        mds = [rutils.create_mapping_dict(adata, value_column='ortho_id') for adata in adata_list]
         j_df_modules = rutils.get_jaccard_df(mds)
 
         custom_filename = f"{prefix}modules_network_{threshold}"
@@ -533,7 +533,7 @@ def plot_modules_corr_task(self, data):
     adata_list = [adata_cache.get_adata(plant) for plant in plants]
 
     if len(adata_list) > 1:
-        mds = [rutils.create_mapping_dict(adata, value_column='ortho_ID') for adata in adata_list]
+        mds = [rutils.create_mapping_dict(adata, value_column='ortho_id') for adata in adata_list]
         j_df_modules = rutils.get_jaccard_df(mds)
 
         custom_filename = f"{prefix}modules_heatmap"
