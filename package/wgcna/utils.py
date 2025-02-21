@@ -216,7 +216,7 @@ def get_general_info(adata: AnnData, obs_col: str = "tissue") -> Tuple[pd.DataFr
     species = adata.uns['species']
     num_samples = adata.n_obs
     num_transcripts = adata.n_vars
-    num_modules = adata.var['moduleColors'].nunique()
+    num_modules = adata.var['module_colors'].nunique()
     num_tissues = adata.obs[obs_col].nunique()
     total_counts = adata.X.sum()
 
@@ -561,7 +561,7 @@ def calculate_expr_threshold(adata: AnnData, std_multiplier: float = 1) -> float
 
 
 def add_goea_to_anndata(adata: AnnData, obo_path: str = "../go-basic.obo", results_dir: str = "goea_results", go_column: str = "go_terms",
-                        uns_key: str = "goea_results", column: str = 'moduleColors', top_percentage: int = 10, go_background_set: set = None) -> None:
+                        uns_key: str = "goea_results", column: str = 'module_colors', top_percentage: int = 10, go_background_set: set = None) -> None:
     """
     Performs GOEA using GO terms from an AnnData object, integrating detailed results and
     visualizations directly into the AnnData object. Considers only the top percentage of 
@@ -679,65 +679,70 @@ def get_goea_df(adata: AnnData, key: str = 'goea_results', column_name: str = "T
     return pd.DataFrame(goea_results_list)
 
 
-def add_ortho_id_to_anndata(adata: AnnData, mapping_file: str, column_name: str) -> None:
+def add_ortho_id_to_anndata(adata: AnnData, mapping_file: str, column_name: str, ortho_col_name: str = "HOG", ortho_id_col_name: str = "ortho_id", separator: str = ", ", fill_value: str = '') -> None:
     """
-    Adds a new column 'ortho_ID' to the adata.var dataframe by mapping identifiers
+    Adds a new column to the adata.var dataframe by mapping identifiers
     from a specified column of a given mapping file directly to the adata.var of an AnnData object.
 
     Parameters:
     - adata (AnnData): The AnnData object whose .var dataframe will be modified.
     - mapping_file (str): Path to the mapping file containing orthogroup IDs and identifiers.
     - column_name (str): Name of the column in the mapping file that contains the identifiers to be mapped.
+    - ortho_col_name (str): Name of the column in the mapping file containing orthogroup IDs. 
+    - ortho_id_col_name (str): Name of the new column to be added to adata.var. 
+    - separator (str): Separator used in the mapping file to split identifiers. 
+    - fill_value (str): Value to fill in the new column if no mapping is found. 
     """
 
     if not os.path.exists(mapping_file):
-        print(
-            f"Warning: Mapping file '{mapping_file}' not found. Filling 'ortho_ID' with empty strings.")
-        adata.var['ortho_ID'] = ''
+        print(f"Warning: Mapping file '{mapping_file}' not found. Filling '{ortho_id_col_name}' with '{fill_value}'.")
+        adata.var[ortho_id_col_name] = fill_value
         return
 
-    ortho_df = pd.read_csv(mapping_file, sep="\t", usecols=[
-                           "HOG", column_name], index_col="HOG")
-
-    adata.var['ortho_ID'] = None
+    ortho_df = pd.read_csv(mapping_file, sep="\t", usecols=[ortho_col_name, column_name], index_col=ortho_col_name)
 
     id_to_ortho = {}
     for ortho_id, identifiers in ortho_df[column_name].dropna().items():
-        for identifier in identifiers.split(", "):
+        for identifier in identifiers.split(separator):
             id_to_ortho[identifier] = ortho_id
 
-    adata.var['ortho_ID'] = adata.var.index.map(id_to_ortho).fillna(None)
+    adata.var[ortho_id_col_name] = adata.var.index.map(id_to_ortho).fillna(fill_value)
     add_ortho_count(adata)
 
 
-def add_ortho_ids_to_anndata(adata: AnnData, column_name: str, base_path: str = "../Phylogenetic_Hierarchical_Orthogroups") -> None:
+def add_ortho_ids_to_anndata(adata: AnnData, column_name: str, base_path: str = "../Phylogenetic_Hierarchical_Orthogroups",
+                             ortho_levels: List[int] = list(range(7)), ortho_prefix: str = "N", ortho_suffix: str = "_ortho",
+                             ortho_id_col: str = "ortho_id", separator: str = ", ") -> None:
     """
     Adds new columns 'N0_ortho', 'N1_ortho', ..., 'N6_ortho' to the adata.var dataframe by mapping identifiers
-    from specified columns of the given mapping files. Additionally, sets the 'ortho_ID' column to the values of 'N0_ortho'.
+    from specified columns of the given mapping files. Additionally, sets the "ortho_id" column to the values of 'N0_ortho'.
 
     Parameters:
     - adata (AnnData): The AnnData object whose .var dataframe will be modified.
     - column_name (str): Name of the column in the mapping files that contains the identifiers to be mapped.
     - base_path (str): Base path to the directory containing orthogroup mapping files (N0.tsv, N1.tsv, etc.).
+    - ortho_levels (List[int]): List of orthogroup levels to process.
+    - ortho_prefix (str): Prefix for orthogroup columns.
+    - ortho_suffix (str): Suffix for orthogroup columns.
+    - ortho_id_col (str): Name of the column to store the primary orthogroup ID.
+    - separator (str): Separator used in the mapping file to split identifiers.
     """
 
-    for level in range(7):
-        node_key = f"N{level}_ortho"
-        mapping_file = f"{base_path}/N{level}.tsv"
-        ortho_df = pd.read_csv(mapping_file, sep="\t", usecols=[
-                               "HOG", column_name], index_col="HOG")
+    for level in ortho_levels:
+        node_key = f"{ortho_prefix}{level}{ortho_suffix}"
+        mapping_file = f"{base_path}/{ortho_prefix}{level}.tsv"
+        ortho_df = pd.read_csv(mapping_file, sep="\t", usecols=["HOG", column_name], index_col="HOG")
 
         id_to_ortho = {}
         for ortho_id, identifiers in ortho_df[column_name].dropna().items():
-            for identifier in identifiers.split(", "):
+            for identifier in identifiers.split(separator):
                 if identifier not in id_to_ortho:
                     id_to_ortho[identifier] = []
                 id_to_ortho[identifier].append(ortho_id)
 
-        adata.var[node_key] = adata.var.index.map(
-            lambda x: ','.join(id_to_ortho.get(x, []))).fillna("")
+        adata.var[node_key] = adata.var.index.map(lambda x: separator.join(id_to_ortho.get(x, []))).fillna("")
 
-    adata.var['ortho_ID'] = adata.var['N0_ortho']
+    adata.var[ortho_id_col] = adata.var[f"{ortho_prefix}0{ortho_suffix}"]
     add_ortho_count(adata)
 
 
@@ -751,7 +756,7 @@ def analyze_adata_by_obs_and_module(adata: AnnData, obs_column: str = None) -> D
 
     Returns:
     - A dictionary of DataFrames, each key is a unique value from the obs_column or 'all_data' if obs_column is None,
-      and each value is a DataFrame with 'moduleColors' as the index and two columns:
+      and each value is a DataFrame with 'module_colors' as the index and two columns:
       'transcripts_per_module' and 'unique_GO_terms_per_module'.
     """
 
@@ -760,8 +765,8 @@ def analyze_adata_by_obs_and_module(adata: AnnData, obs_column: str = None) -> D
         lambda x: eval(x) if isinstance(x, str) else x)
 
     def calculate_module_stats(adata: AnnData) -> pd.DataFrame:
-        return adata.var.groupby('moduleColors').agg(
-            transcripts_per_module=('moduleColors', 'size'),
+        return adata.var.groupby('module_colors').agg(
+            transcripts_per_module=('module_colors', 'size'),
             unique_GO_terms_per_module=('GO_ID', lambda x: len(
                 set().union(*[set(item) for item in x.dropna()])))
         ).reset_index()
@@ -902,7 +907,7 @@ def get_top_expressed_genes_by_tissue(adatas: List[AnnData], n: int = 1, column:
     return gene_dicts
 
 
-def create_mapping_dict(adata: AnnData, mapping_column: str = "moduleColors", value_column: str = None,
+def create_mapping_dict(adata: AnnData, mapping_column: str = "module_colors", value_column: str = None,
                         transcripts: Dict[str, List[str]] = None, min_count: int = None) -> dict:
     """
     Creates a dictionary mapping entries from the specified mapping column in adata.var to a list of associated transcripts
@@ -1137,7 +1142,7 @@ def prepare_and_save_wgcna(pyWGCNA_obj: object, output_path: str, gaf_path: str 
     name = pyWGCNA_obj.name
     hub_genes = pyWGCNA_obj.top_n_hub_genes(n=100)
     hub_dict = {color: data for color,
-                data in hub_genes.groupby('moduleColors')}
+                data in hub_genes.groupby('module_colors')}
     for color, df in hub_dict.items():
         df.index = df.index.get_level_values(1)
 
@@ -1159,6 +1164,10 @@ def prepare_and_save_wgcna(pyWGCNA_obj: object, output_path: str, gaf_path: str 
         "module_corr": pyWGCNA_obj.moduleTraitCor, "module_p": pyWGCNA_obj.moduleTraitPvalue}
     adata.uns["hub_genes"] = hub_dict
     adata.uns["num_transcripts"] = pyWGCNA_obj.geneExpr.shape[1]
+
+    # Drop dynamicColors column if it exists
+    if 'dynamicColors' in adata.var:
+        adata.var.drop(columns='dynamicColors', inplace=True)
 
     # Process adata
     if gaf_path:
@@ -1211,7 +1220,7 @@ def get_adatas_info_df(adatas: List[AnnData], adatas_ortho: List[AnnData], trait
             'Samples': [adata.n_obs],
             'Transcripts': [adata.n_vars],
             'Total Counts': [adata.obs['total_counts'].sum()],
-            'Modules': [adata.var['moduleLabels'].nunique()],
+            'Modules': [adata.var['module_labels'].nunique()],
             'Tissues': [adata.obs[trait].nunique()],
             'Go Terms': [adata.var['go_terms'].apply(lambda x: len(x.split(',')) if pd.notna(x) else 0).sum()],
         })
@@ -1223,7 +1232,7 @@ def get_adatas_info_df(adatas: List[AnnData], adatas_ortho: List[AnnData], trait
             'Samples': [adata_ortho.n_obs],
             'Transcripts': [adata_ortho.n_vars],
             'Total Counts': [adata_ortho.obs['total_counts'].sum()],
-            'Modules': [adata_ortho.var['moduleLabels'].nunique()],
+            'Modules': [adata_ortho.var['module_labels'].nunique()],
             'Tissues': [adata_ortho.obs[trait].nunique()],
             'Go Terms': [adata_ortho.var['go_terms'].apply(lambda x: len(x.split(',')) if pd.notna(x) else 0).sum()],
         })
@@ -1683,7 +1692,7 @@ def calculate_eigengenes(adata: AnnData, cluster_map: Dict[str, str], column: st
 
     expr = pd.DataFrame(adata.X, index=adata.obs_names,
                         columns=adata.var_names)
-    module_colors = adata.var['moduleColors']
+    module_colors = adata.var['module_colors']
 
     # Remove alle Keys of the cluster_map that are not in the adata.var.index
     cluster_map = {key: value for key,
@@ -1904,7 +1913,19 @@ def export_co_expression_network_to_cytoscape(
     adata: Union[AnnData, List[AnnData]],
     selected_module_colors: List[str] = None,
     threshold: float = 0.5,
-    neighbor_info: Union[set, List[set]] = None
+    neighbor_info: Union[set, List[set]] = None,
+    id_key: str = 'id',
+    gene_key: str = 'gene',
+    module_color_key: str = 'moduleColor',
+    ortho_id_key: str = 'ortho_id',
+    organism_key: str = 'organism',
+    name_key: str = 'name',
+    go_terms_key: str = 'go_terms',
+    ipr_id_key: str = 'ipr_id',
+    is_neighbor_key: str = 'is_neighbor',
+    source_key: str = 'source',
+    target_key: str = 'target',
+    weight_key: str = 'weight'
 ) -> dict:
     """
     Exports the co-expression network(s) in a format compatible with Cytoscape.js.
@@ -1915,6 +1936,18 @@ def export_co_expression_network_to_cytoscape(
     - selected_module_colors (List[str]): Module colors to display. If None, all modules are shown.
     - threshold (float): TOM connection threshold for edges.
     - neighbor_info (set or List[set]): Neighbor transcripts for the corresponding TOM(s).
+    - id_key (str): Key for node ID in the output dictionary.
+    - gene_key (str): Key for gene in the output dictionary.
+    - module_color_key (str): Key for module color in the output dictionary.
+    - ortho_id_key (str): Key for orthologous ID in the output dictionary.
+    - organism_key (str): Key for organism in the output dictionary.
+    - name_key (str): Key for name in the output dictionary.
+    - go_terms_key (str): Key for GO terms in the output dictionary.
+    - ipr_id_key (str): Key for IPR ID in the output dictionary.
+    - is_neighbor_key (str): Key for neighbor flag in the output dictionary.
+    - source_key (str): Key for edge source in the output dictionary.
+    - target_key (str): Key for edge target in the output dictionary.
+    - weight_key (str): Key for edge weight in the output dictionary.
     
     Returns:
     - dict: Dictionary with nodes, edges, and a list of neighbors per TOM.
@@ -1939,7 +1972,7 @@ def export_co_expression_network_to_cytoscape(
     for idx, (current_tom, current_adata) in enumerate(tom_adata_pairs):
         gene_metadata = current_adata.var
         if selected_module_colors:
-            mod_genes = gene_metadata[gene_metadata['moduleColors'].isin(selected_module_colors)].index
+            mod_genes = gene_metadata[gene_metadata['module_colors'].isin(selected_module_colors)].index
         else:
             mod_genes = gene_metadata.index
         mod_genes = [gene for gene in mod_genes if gene in current_tom.index]
@@ -1950,23 +1983,23 @@ def export_co_expression_network_to_cytoscape(
             organism_id += 1
 
         current_neighbors = neighbor_list[idx] if neighbor_list[idx] is not None else set()
-        neighbors_output.append({'organism': organism, 'neighbors': list(current_neighbors)})
+        neighbors_output.append({organism_key: organism, 'neighbors': list(current_neighbors)})
 
         for gene in mod_genes:
             node_data = {
                 'data': {
-                    'id': f"{organism}_{gene}",
-                    'gene': gene,
-                    'moduleColor': gene_metadata.loc[gene, 'moduleColors'],
-                    'ortho_ID': gene_metadata.loc[gene, 'ortho_ID'] if "ortho_ID" in gene_metadata.columns else "",
-                    'organism': organism,
-                    'name': current_adata.uns['name'],
-                    'go_terms': gene_metadata.loc[gene, 'go_terms'] if "go_terms" in gene_metadata.columns else "",
-                    'ipr_id': gene_metadata.loc[gene, 'ipr_id'] if "ipr_id" in gene_metadata.columns else ""
+                    id_key: f"{organism}_{gene}",
+                    gene_key: gene,
+                    module_color_key: gene_metadata.loc[gene, 'module_colors'],
+                    ortho_id_key: gene_metadata.loc[gene, 'ortho_id'] if "ortho_id" in gene_metadata.columns else "",
+                    organism_key: organism,
+                    name_key: current_adata.uns['name'],
+                    go_terms_key: gene_metadata.loc[gene, 'go_terms'] if "go_terms" in gene_metadata.columns else "",
+                    ipr_id_key: gene_metadata.loc[gene, 'ipr_id'] if "ipr_id" in gene_metadata.columns else ""
                 }
             }
             if gene in current_neighbors:
-                node_data['data']['is_neighbor'] = True
+                node_data['data'][is_neighbor_key] = True
             node_data['data'] = {k: v if not pd.isna(v) else "" for k, v in node_data['data'].items()}
             nodes.append(node_data)
 
@@ -1977,10 +2010,10 @@ def export_co_expression_network_to_cytoscape(
                 if current_tom.loc[gene_i, gene_j] > threshold:
                     edge_data = {
                         'data': {
-                            'source': f"{organism}_{gene_i}",
-                            'target': f"{organism}_{gene_j}",
-                            'weight': current_tom.loc[gene_i, gene_j],
-                            'organism': organism
+                            source_key: f"{organism}_{gene_i}",
+                            target_key: f"{organism}_{gene_j}",
+                            weight_key: current_tom.loc[gene_i, gene_j],
+                            organism_key: organism
                         }
                     }
                     edges.append(edge_data)
@@ -2201,7 +2234,7 @@ def calculate_all_tom_metrics(tom: Union[pd.DataFrame, List[pd.DataFrame]], adat
       Each node appears only once, and metrics are calculated based on the TOM it belongs to.
     """
 
-    def calculate_metrics_single(tom_single: pd.DataFrame, adata: AnnData, cluster_info_single: Dict[str, str]) -> pd.DataFrame:
+    def calculate_metrics_single(tom_single: pd.DataFrame, adata: AnnData, cluster_info_single: Dict[str, str], ortho_id_col: str = 'ortho_id') -> pd.DataFrame:
         if tool == "cytoscape":
             # Keep everything after the first "_"
             cluster_info_single = {"_".join(
@@ -2244,21 +2277,21 @@ def calculate_all_tom_metrics(tom: Union[pd.DataFrame, List[pd.DataFrame]], adat
             tom_metrics, graph_metrics, left_index=True, right_index=True)
         combined_metrics['species'] = tom_species
 
-        ortho_ID = adata.var['ortho_ID'] if 'ortho_ID' in adata.var.columns else pd.Series(
+        ortho_ID = adata.var[ortho_id_col] if ortho_id_col in adata.var.columns else pd.Series(
             [""] * len(adata.var), index=adata.var.index)
-        combined_metrics['ortho_ID'] = combined_metrics.index.map(ortho_ID)
+        combined_metrics[ortho_id_col] = combined_metrics.index.map(ortho_ID)
 
-        # Set ortho_ID as the second column
+        # Set ortho_id_col as the second column
         combined_metrics = combined_metrics[[
-            'ortho_ID'] + [col for col in combined_metrics.columns if col != 'ortho_ID']]
-        combined_metrics['ortho_ID'] = combined_metrics['ortho_ID'].cat.rename_categories({
+            ortho_id_col] + [col for col in combined_metrics.columns if col != ortho_id_col]]
+        combined_metrics[ortho_id_col] = combined_metrics[ortho_id_col].cat.rename_categories({
                                                                                           '': 'No orthogroup'})
         # Check if 'No orthogroup' is not already in the categories; add it if missing
-        if 'No orthogroup' not in combined_metrics['ortho_ID'].cat.categories:
-            combined_metrics['ortho_ID'] = combined_metrics['ortho_ID'].cat.add_categories('No orthogroup')
+        if 'No orthogroup' not in combined_metrics[ortho_id_col].cat.categories:
+            combined_metrics[ortho_id_col] = combined_metrics[ortho_id_col].cat.add_categories('No orthogroup')
 
         # Replace NaN values with 'No orthogroup'
-        combined_metrics['ortho_ID'] = combined_metrics['ortho_ID'].fillna('No orthogroup')
+        combined_metrics[ortho_id_col] = combined_metrics[ortho_id_col].fillna('No orthogroup')
 
         # Set Species as the first column
         combined_metrics = combined_metrics[[

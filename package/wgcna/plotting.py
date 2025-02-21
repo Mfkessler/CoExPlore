@@ -79,7 +79,7 @@ def plot_static_TOM_network(tom_path: str, adata: AnnData, config: PlotConfig, t
     module_info = adata.var
 
     if selected_module_colors:
-        mod_genes = module_info[module_info['moduleColors'].isin(
+        mod_genes = module_info[module_info['module_colors'].isin(
             selected_module_colors)].index
     else:
         mod_genes = module_info.index
@@ -96,7 +96,7 @@ def plot_static_TOM_network(tom_path: str, adata: AnnData, config: PlotConfig, t
                 G.add_edge(gene_i, gene_j, weight=TOM.loc[gene_i, gene_j])
 
     pos = nx.spring_layout(G, k=0.1, iterations=50)
-    node_colors = [module_info.loc[node, 'moduleColors'] for node in G.nodes()]
+    node_colors = [module_info.loc[node, 'module_colors'] for node in G.nodes()]
     edge_weights = [G[u][v]['weight'] for u, v in G.edges()]
 
     plt.figure(figsize=(20, 20))
@@ -286,7 +286,7 @@ def plot_co_expression_network(tom: pd.DataFrame, adata: AnnData, config: PlotCo
         tom = reduce_tom_matrix(tom, reduction_percentage)
 
     if selected_module_colors:
-        mod_genes = module_info[module_info['moduleColors'].isin(
+        mod_genes = module_info[module_info['module_colors'].isin(
             selected_module_colors)].index
     else:
         mod_genes = module_info.index
@@ -389,10 +389,10 @@ def plot_co_expression_network(tom: pd.DataFrame, adata: AnnData, config: PlotCo
         edge_traces = []
 
     remaining_module_colors = list(
-        module_info.loc[list(nodes_with_edges), 'moduleColors'])
+        module_info.loc[list(nodes_with_edges), 'module_colors'])
     shape_dict = generate_shape_dict(remaining_module_colors)
     node_color_dict = {
-        node: module_info.loc[node, 'moduleColors'] for node in nodes_with_edges}
+        node: module_info.loc[node, 'module_colors'] for node in nodes_with_edges}
 
     if cluster_map:
         cluster_strings = pd.Series(cluster_map).reindex(nodes_with_edges)
@@ -452,7 +452,7 @@ def plot_co_expression_network(tom: pd.DataFrame, adata: AnnData, config: PlotCo
         x, y = pos[node]
         node_x.append(x)
         node_y.append(y)
-        hover_text = f"<b>Transcript:</b> {node}<br><b>Module:</b> {module_info.loc[node, 'moduleColors']}<br><b>Degree:</b> {len(list(G.neighbors(node)))}"
+        hover_text = f"<b>Transcript:</b> {node}<br><b>Module:</b> {module_info.loc[node, 'module_colors']}<br><b>Degree:</b> {len(list(G.neighbors(node)))}"
         if additional_hover and additional_hover in module_info.columns:
             hover_text += f"<br><b>{additional_hover}:</b> {module_info.loc[node, additional_hover]}"
         node_text.append(hover_text)
@@ -460,7 +460,7 @@ def plot_co_expression_network(tom: pd.DataFrame, adata: AnnData, config: PlotCo
         if highlight and node in highlight:
             node_colors.append(highlight_color)  # Highlight nodes
         elif use_colors:
-            node_colors.append(module_info.loc[node, 'moduleColors'])
+            node_colors.append(module_info.loc[node, 'module_colors'])
         else:
             node_colors.append('black')
 
@@ -1319,7 +1319,7 @@ def plot_stacked_results(results: Dict[str, pd.DataFrame], config: PlotConfig, c
     Parameters:
     - results (Dict[str, pd.DataFrame]): A dictionary of DataFrames from AnnData analysis. Each key represents a unique
       value from the .obs column or 'all_data' if obs_column is None. Each DataFrame contains
-      'moduleColors' as the index, and two columns: 'transcripts_per_module' and 'unique_GO_terms_per_module'.
+      'module_colors' as the index, and two columns: 'transcripts_per_module' and 'unique_GO_terms_per_module'.
     - config (PlotConfig): Configuration object for plot control.
     - custom_filename (str): Custom filename for the plot.
 
@@ -1336,7 +1336,7 @@ def plot_stacked_results(results: Dict[str, pd.DataFrame], config: PlotConfig, c
         # Adding trace for transcripts per module
         fig_transcripts.add_trace(go.Bar(
             name=obs_value,
-            x=df['moduleColors'],
+            x=df['module_colors'],
             y=df['transcripts_per_module'],
             hoverinfo='y+name'
         ))
@@ -1344,7 +1344,7 @@ def plot_stacked_results(results: Dict[str, pd.DataFrame], config: PlotConfig, c
         # Adding trace for unique GO terms per module
         fig_go_terms.add_trace(go.Bar(
             name=obs_value,
-            x=df['moduleColors'],
+            x=df['module_colors'],
             y=df['unique_GO_terms_per_module'],
             hoverinfo='y+name'
         ))
@@ -1706,11 +1706,11 @@ def plot_module_gene_proportions(adata: AnnData, config: PlotConfig, custom_file
     """
 
     total_genes = adata.var.shape[0]
-    module_colors = adata.var['moduleColors'].unique()
+    module_colors = adata.var['module_colors'].unique()
     proportions = []
 
     for module in module_colors:
-        module_genes = adata.var[adata.var['moduleColors'] == module].shape[0]
+        module_genes = adata.var[adata.var['module_colors'] == module].shape[0]
         proportion = round((module_genes / total_genes) * 100, 2)
         proportions.append((module, proportion))
 
@@ -1753,7 +1753,7 @@ def plot_transcripts_and_go(data: Dict[str, pd.DataFrame], config: PlotConfig, c
 
     Parameters:
     - data (Dict[str, pd.DataFrame]): A dictionary of DataFrames, where each key is a tissue stage and each value is a DataFrame containing
-      columns 'moduleColors', 'transcripts_per_module', and 'unique_GO_terms_per_module'.
+      columns 'module_colors', 'transcripts_per_module', and 'unique_GO_terms_per_module'.
     - config (PlotConfig): Configuration object for plot control.
     - custom_filename (str): Custom filename for the plot.
     """
@@ -1773,7 +1773,7 @@ def plot_transcripts_and_go(data: Dict[str, pd.DataFrame], config: PlotConfig, c
 
         # Add lines for transcripts
         fig_transcripts.add_trace(go.Scatter(
-            x=df['moduleColors'], y=df['transcripts_per_module'],
+            x=df['module_colors'], y=df['transcripts_per_module'],
             mode='lines+markers',
             name=stage,
             line=dict(color=color),
@@ -1782,7 +1782,7 @@ def plot_transcripts_and_go(data: Dict[str, pd.DataFrame], config: PlotConfig, c
 
         # Add lines for GO terms
         fig_go_terms.add_trace(go.Scatter(
-            x=df['moduleColors'], y=df['unique_GO_terms_per_module'],
+            x=df['module_colors'], y=df['unique_GO_terms_per_module'],
             mode='lines+markers',
             name=stage,
             line=dict(color=color),
@@ -1831,7 +1831,7 @@ def plot_transcripts_and_go(data: Dict[str, pd.DataFrame], config: PlotConfig, c
 
 def plot_hub_connectivity(adata: AnnData, config: PlotConfig, top_n: int = 1, primary_y_column: str = 'connectivity', secondary_y_column: str = 'mean_counts',
                           primary_y_label: str = 'Connectivity', secondary_y_label: str = 'Mean Counts',
-                          hover_columns: List[str] = ["ortho_ID", "connectivity", "mean_counts", "total_counts"], custom_filename: str = None) -> go.Figure:
+                          hover_columns: List[str] = ["ortho_id", "connectivity", "mean_counts", "total_counts"], custom_filename: str = None) -> go.Figure:
     """
     Plots a dual y-axis bar plot for specified columns of gene data with customizable hover information.
     Accepts an AnnData object directly, ensuring that additional information from adata.var is included.
@@ -1933,15 +1933,15 @@ def plot_hub_connectivity(adata: AnnData, config: PlotConfig, top_n: int = 1, pr
     return fig
 
 
-def plot_orthos_and_transcripts_per_module(adata: AnnData, config: PlotConfig, ortho_id_col: str = 'ortho_ID', module_color_col: str = 'moduleColors', custom_filename: str = None) -> go.Figure:
+def plot_orthos_and_transcripts_per_module(adata: AnnData, config: PlotConfig, ortho_id_col: str = 'ortho_id', module_color_col: str = 'module_colors', custom_filename: str = None) -> go.Figure:
     """
     Creates a grouped bar plot showing the number of unique ortholog IDs and total number of transcripts per module color
     with detailed hover text.
 
     Parameters:
     adata (AnnData): The anndata object containing ortholog IDs and module colors.
-    ortho_id_col (str): Column name for ortholog IDs. Default is 'ortho_ID'.
-    module_color_col (str): Column name for module colors. Default is 'moduleColors'.
+    ortho_id_col (str): Column name for ortholog IDs. Default is 'ortho_id'.
+    module_color_col (str): Column name for module colors. Default is 'module_colors'.
     config (PlotConfig): Configuration object for plot control.
     custom_filename (str): Custom filename for the plot.
 
@@ -2295,7 +2295,10 @@ def plot_top_ortho_groups(df: pd.DataFrame, config: PlotConfig, top_n: int = 20,
 
 
 def plot_orthogroup_expression(adata: AnnData, config: PlotConfig, ortho_id: str, custom_filename: str = None,
-                               trait: str = "tissue") -> None:
+                               trait: str = "tissue", combined_trait: str = "Combined_Trait", ortho_id_col: str = "ortho_id",
+                               expression_label: str = "Expression level", title_prefix: str = "Expression of Orthogroup",
+                               xlabel: str = "Tissue", ylabel: str = "Transcripts", color_map: str = "viridis",
+                               cbar_orientation: str = "vertical", cbar_position: List[float] = [0.88, 0.88, 0.02, 0.1]) -> None:
     """
     Plots a heatmap of the expression levels of transcripts belonging to a specific orthogroup across different tissues,
     with clustering of columns only.
@@ -2306,31 +2309,39 @@ def plot_orthogroup_expression(adata: AnnData, config: PlotConfig, ortho_id: str
     - ortho_id (str): The orthogroup ID to analyze.
     - custom_filename (str): Custom filename for the plot.
     - trait (str): The trait column to use for grouping the data.
+    - combined_trait (str): The fallback trait column if the primary trait is not found.
+    - ortho_id_col (str): The column name for orthogroup IDs in adata.var.
+    - expression_label (str): The label for the colorbar.
+    - title_prefix (str): The prefix for the plot title.
+    - xlabel (str): The label for the x-axis.
+    - ylabel (str): The label for the y-axis.
+    - color_map (str): The color map to use for the heatmap.
+    - cbar_orientation (str): The orientation of the colorbar.
+    - cbar_position (List[float]): The position of the colorbar.
     """
 
     if trait not in adata.obs.columns:
-        trait = "Combined_Trait"
+        trait = combined_trait
         if trait not in adata.obs.columns:
             raise ValueError(
                 f"Trait column {trait} not found in the AnnData object.")
 
-    ortho_transcripts = adata.var[adata.var['ortho_ID'] == ortho_id].index
+    ortho_transcripts = adata.var[adata.var[ortho_id_col] == ortho_id].index
 
     # Get expression data for the orthogroup transcripts
     expression_data = adata[:, ortho_transcripts].to_df()
     expression_data[trait] = adata.obs[trait]
     expression_data = expression_data.groupby(trait).mean()
 
-    g = sns.clustermap(expression_data.T, cmap='viridis', cbar_kws={'label': 'Expression level', 'orientation': 'vertical'},
+    g = sns.clustermap(expression_data.T, cmap=color_map, cbar_kws={'label': expression_label, 'orientation': cbar_orientation},
                        col_cluster=True, row_cluster=True)
     g.figure.suptitle(
-        f'Expression of Orthogroup {ortho_id} Transcripts Across Tissues', y=1.02)
-    g.ax_heatmap.set_xlabel('Tissue')
-    g.ax_heatmap.set_ylabel('Transcripts')
+        f'{title_prefix} {ortho_id} Transcripts Across Tissues', y=1.02)
+    g.ax_heatmap.set_xlabel(xlabel)
+    g.ax_heatmap.set_ylabel(ylabel)
 
     # Adjust colorbar position to be smaller and to the right corner
-    # [left, bottom, width, height]
-    g.cax.set_position([0.88, 0.88, 0.02, 0.1])
+    g.cax.set_position(cbar_position)
 
     if config.save_plots:
         if custom_filename:
@@ -2417,7 +2428,7 @@ def plot_hog_eigengenes(adatas: List[AnnData], config: PlotConfig, module: str, 
     Parameters:
     - adatas (List[AnnData]): List of AnnData objects, one per plant.
     - config (PlotConfig): Configuration object for plot control.
-    - module (str): Column name in `adata.var` to group by, 'moduleColors'.
+    - module (str): Column name in `adata.var` to group by, 'module_colors'.
     - plant1 (str): Name of the first plant species.
     - plant2 (str): Name of the second plant species.
     - term1 (str): Module for the first plant.
