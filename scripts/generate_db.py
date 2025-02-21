@@ -1,10 +1,13 @@
 import os
+import json
 import scanpy as sc
 import wgcna.utils as rutils
 import wgcna.ortho as rortho
 from sqlalchemy import create_engine, text
 
 def main():
+    METADATA_DICT = json.loads(os.getenv("METADATA_DICT", "{}"))
+    columns = list(METADATA_DICT.keys())
     h5ad_dir = os.environ.get("H5AD_DIR", "h5ad")
 
     # Environment variables for the DB from Docker Compose
@@ -21,21 +24,7 @@ def main():
     adatas = [sc.read_h5ad(os.path.join(h5ad_dir, f)) for f in h5ad_files]
 
     # Create browser table
-    df = rortho.transcript_ortho_browser("", adatas)
-
-    # Add optional columns if they do not exist
-    if 'ortho_id' not in df.columns:
-        df['ortho_id'] = ""
-    if 'ortho_count' not in df.columns:
-        df['ortho_count'] = 0
-    if 'ipr_id' not in df.columns:
-        df['ipr_id'] = ""
-    if 'ipr_desc' not in df.columns:
-        df['ipr_desc'] = ""
-    if 'go_terms' not in df.columns:
-        df['go_terms'] = ""
-    if 'unique_go_terms' not in df.columns:
-        df['unique_go_terms'] = ""
+    df = rortho.transcript_ortho_browser("", adatas, possible_columns=columns)
 
     df.to_sql('wgcna_browser', engine, if_exists='replace', index=True)
     print("Table wgcna_browser created successfully!")
