@@ -556,7 +556,7 @@ document.addEventListener('DOMContentLoaded', function() {
         var tooltipText = '<b>Species:</b> ' + node.data('organism') +
           '<br><b>Transcript:</b> ' + node.data('gene') +
           '<br><b>Module:</b> ' + node.data('moduleColor') +
-          '<br><b>Orthogroup:</b> ' + node.data('ortho_ID') +
+          '<br><b>Orthogroup:</b> ' + node.data('ortho_id') +
           '<br><b>Degree:</b> ' + node.degree() +
           '<br><b>GO Terms:</b> ' + goTerms +
           '<br><b>InterPro IDs:</b> ' + iprIds;
@@ -608,9 +608,9 @@ document.addEventListener('DOMContentLoaded', function() {
     adjustNodeAndEdgeSize();
 
     // Jitter effect for all metadata
-    const metadataKeys = ["ortho_ID", "degree", "gene", "moduleColor", "organism", "go_terms", "ipr_id"];
+    const metadataKeys = ["ortho_id", "degree", "gene", "moduleColor", "organism", "go_terms", "ipr_id"];
     const metadataMapping = {
-        "ortho_ID": "Orthogroup",
+        "ortho_id": "Orthogroup",
         "degree": "Degree",
         "gene": "Transcript",
         "moduleColor": "Module",
