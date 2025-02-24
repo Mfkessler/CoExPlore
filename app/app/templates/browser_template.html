@@ -58,7 +58,6 @@
             border: 1px solid #ced4da;
             transition: border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
         }
-
         .form-control:focus {
             border-color: #80bdff;
             box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
@@ -69,11 +68,9 @@
             outline: none;
             cursor: pointer;
         }
-
         details>summary::-webkit-details-marker {
             display: none;
         }
-
         .toggle-header {
             font-size: 1.25rem;
             display: inline-flex;
@@ -82,33 +79,27 @@
             background: none;
             border: none;
         }
-
         .toggle-header::after {
             content: "\25BC";
             margin-left: 5px;
             transition: transform 0.3s ease;
         }
-
         details[open] .toggle-header::after {
             transform: rotate(180deg);
         }
-
         .toggle-content {
             opacity: 0;
             transform: translateY(-10px);
             transition: opacity 0.3s ease, transform 0.3s ease;
         }
-
         details[open] .toggle-content {
             opacity: 1;
             transform: translateY(0);
             margin-top: 10px;
         }
-        
         input[type="number"] {
             width: 10ch;
         }
-
         input[type="text"] {
             width: 20ch;
         }
@@ -130,12 +121,12 @@
                 display: block;
             }
         }
-
     </style>
 </head>
 <body>
     <div class="card">
         <div class="card-body">
+            <!-- Row with select and transcriptSearch -->
             <div class="row">
                 <div class="col-lg-3 mb-3">
                     <select id="columnSelect" class="form-control">
@@ -148,6 +139,26 @@
                 </div>
                 <div class="col-lg-9 mb-3">
                     <textarea id="transcriptSearch" class="form-control" rows="3" placeholder="Filter: Tokens separated by comma, space, tab, or newline"></textarea>
+                </div>
+            </div>
+
+            <!-- Checkbox for unique orthogroups filtering -->
+            <div class="row mb-2">
+                <div class="col-sm-6 text-end">
+                    <label class="form-check-label" for="orthogroupSearch">Use unique orthogroups for filtering</label>
+                </div>
+                <div class="col-sm-6">
+                    <input type="checkbox" class="form-check-input" id="orthogroupSearch">
+                </div>
+            </div>
+
+            <!-- New info row: Tokens recognized (left) and Filtered table entries (right) -->
+            <div class="row mb-3">
+                <div class="col-6">
+                    <span id="tokensInfo">Tokens recognized: 0</span>
+                </div>
+                <div class="col-6 text-end">
+                    <span id="tableEntriesInfo">Filtered table entries: 0</span>
                 </div>
             </div>
             
@@ -168,7 +179,6 @@
     <br>
     <div class="row justify-content-center">
         <div class="col-md-6 col-lg-8">
-
             <!-- Dropdown for column selection -->
             <div class="row mb-2">
                 <label for="exportColumnSelect" class="col-sm-6 col-form-label text-end">
@@ -182,7 +192,6 @@
                     </select>
                 </div>
             </div>
-
             <!-- Checkbox for unique entries -->
             <div class="row mb-2">
                 <div class="col-sm-6 text-end">
@@ -192,7 +201,6 @@
                     <input type="checkbox" class="form-check-input" id="uniqueEntries">
                 </div>
             </div>
-
             <!-- Input field for separator -->
             <div class="row mb-2">
                 <label for="separatorInput" class="col-sm-6 col-form-label text-end">
@@ -203,14 +211,12 @@
                         placeholder="Default: NewLine">
                 </div>
             </div>
-
             <!-- Centered copy button -->
             <div class="row">
                 <div class="col-12 text-center">
                     <button id="copyEntriesBtn" class="btn btn-primary btn-sm">Copy Entries</button>
                 </div>
             </div>
-
         </div>
     </div>
     <br>
@@ -231,6 +237,7 @@
     <script>
         const BASE_URL = "{{ BASE_URL }}";
         var table;
+        var orthogroupTokens = "";
 
         // Dynamically generated DataTables columns based on METADATA_DICT
         var dtColumns = [
@@ -257,12 +264,10 @@
                 var filterText = $('#transcriptSearch').val().trim();
                 if (!filterText) return true;
                 var tokens = filterText.split(/[\s,]+/).filter(function(token) { return token; });
-                
                 // Select column from the dropdown
                 var selectedColumn = $('#columnSelect').val();
                 var columnIndex = dtColumns.findIndex(function(col) { return col.data === selectedColumn; });
                 var columnData = columnIndex >= 0 ? (data[columnIndex] || "").toLowerCase() : "";
-                
                 return tokens.some(function(token) {
                     return columnData === token.toLowerCase();
                 });
@@ -296,14 +301,17 @@
                 "processing": true,
                 "serverSide": true,
                 ajax: async function(data, callback, settings) {
-                    data.transcript_filter = $('#transcriptSearch').val().trim();
-                    data.transcript_filter_column = $('#columnSelect').val();
+                    if ($('#orthogroupSearch').is(':checked')) {
+                        data.transcript_filter = orthogroupTokens;
+                        data.transcript_filter_column = "ortho_id";
+                    } else {
+                        data.transcript_filter = $('#transcriptSearch').val().trim();
+                        data.transcript_filter_column = $('#columnSelect').val();
+                    }
                     try {
                         const response = await fetch(BASE_URL + "/api/data", {
                             method: "POST",
-                            headers: {
-                                "Content-Type": "application/json"
-                            },
+                            headers: { "Content-Type": "application/json" },
                             body: JSON.stringify({
                                 ...data,
                                 species_filter: JSON.stringify(initialSpeciesFilter),
@@ -389,6 +397,9 @@
                     $('#browserRes').on('draw.dt', function() {
                         toggleEmptyColumns(table);
                         sendHeight();
+                        // Update filtered table entries info
+                        var info = table.page.info();
+                        $('#tableEntriesInfo').text('Filtered table entries: ' + info.recordsDisplay);
                     });
                     $('#browserRes').on('responsive-display.dt', function(e, datatable, row, showHide) {
                         sendHeight();
@@ -401,17 +412,14 @@
                 // Store the original button text and reference
                 var $btn = $(this);
                 var originalText = $btn.text();
-
                 // Get current DataTables parameters (including filters etc.)
                 var params = table.ajax.params();
                 // Add the selected column and unique flag
                 params.selected_column = $('#exportColumnSelect').val();
                 params.unique = $('#uniqueEntries').is(':checked');
-                
                 if (initialSpeciesFilter && Array.isArray(initialSpeciesFilter)) {
                     params.species_filter = JSON.stringify(initialSpeciesFilter);
                 }
-
                 try {
                     const response = await fetch(BASE_URL + '/api/get_column_entries', {
                         method: 'POST',
@@ -430,7 +438,6 @@
                     }
                     var textToCopy = entries.join(sep);
                     await navigator.clipboard.writeText(textToCopy);
-                    
                     // Disable the button and update text with the number of copied entries
                     var count = entries.length;
                     $btn.prop('disabled', true).text(count + ' Entries Copied');
@@ -444,12 +451,35 @@
                 }
             });
 
+            // Update tokens recognized info and redraw table on transcriptSearch input
             $('#transcriptSearch').on('input', function() {
+                var tokens = $(this).val().trim().split(/[\s,]+/).filter(function(token) { return token; });
+                $('#tokensInfo').text('Tokens recognized: ' + tokens.length);
+                if ($('#orthogroupSearch').is(':checked')) {
+                    // Recompute unique orthogroup tokens from the current filtered data
+                    let dataArray = table.rows({ filter: 'applied' }).data().toArray();
+                    let groups = dataArray.map(row => row.ortho_id).filter(x => x && x.trim() !== '');
+                    groups = [...new Set(groups)];
+                    orthogroupTokens = groups.join(' ');
+                    console.log("Orthogroup tokens:", orthogroupTokens);
+                }
+                table.ajax.reload();
+            });
+
+            // Update tokens recognized info and redraw table on columnSelect change
+            $('#columnSelect').on('change', function() {
                 table.draw();
             });
 
-            $('#columnSelect').on('change', function() {
-                table.draw();
+            $('#orthogroupSearch').on('change', function() {
+                if ($(this).is(':checked')) {
+                    // Extract unique orthogroup values from the currently filtered data
+                    let dataArray = table.rows({ filter: 'applied' }).data().toArray();
+                    let groups = dataArray.map(row => row.ortho_id).filter(x => x && x.trim() !== '');
+                    groups = [...new Set(groups)];
+                    orthogroupTokens = groups.join(' ');
+                }
+                table.ajax.reload();
             });
 
             table.buttons().container()
