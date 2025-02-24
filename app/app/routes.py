@@ -559,6 +559,7 @@ def data():
 
         return jsonify({"error": "Server Error"}), 500
 
+
 @api_bp.route('/api/get_transcripts', methods=['POST'])
 def get_transcripts():
     try:
@@ -583,6 +584,52 @@ def get_transcripts():
     except Exception as e:
         print(f"Error: {e}")
         return jsonify({'error': 'Server Error'}), 500
+
+
+@api_bp.route('/api/get_column_entries', methods=['POST'])
+def get_column_entries():
+    logger.debug("Request JSON:", request.json)
+    try:
+        params = parse_request_params(request)
+        # Get the name of the desired column (e.g., "transcript", "author", etc.)
+        selected_column = request.json.get('selected_column')
+        if not selected_column:
+            return jsonify({'error': 'No column selected'}), 400
+
+        # Unique flag: True if only unique entries are desired
+        unique = request.json.get('unique', False)
+
+        # Build the SQL query only for the selected column
+        select_columns = selected_column
+        
+        # Fetch all rows (all pages)
+        params['start'] = None
+        params['length'] = None
+        query, query_params = build_sql_query(params, select_columns)
+
+        # Debug outputs
+        logger.info("SQL Query: %s", query)
+        logger.info("Search Params: %s", query_params)
+
+        # Execute the SQL query
+        df = execute_sql_query(query, query_params)
+
+        # Remove NaN values and empty strings
+        entries = df[selected_column].dropna().astype(str)
+        entries = entries[entries.str.strip() != '']
+
+        # If unique is desired, remove duplicates
+        if unique:
+            entries = entries.drop_duplicates()
+
+        entries_list = entries.tolist()
+
+        return jsonify({'entries': entries_list})
+    
+    except Exception as e:
+        print(f"Error: {e}")
+        return jsonify({'error': 'Server Error'}), 500
+
 
 @api_bp.route('/api/export_data', methods=['POST'])
 def export_data():
