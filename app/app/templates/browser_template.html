@@ -136,6 +136,12 @@
                             {% endif %}
                         {% endfor %}
                     </select>
+
+                    <!-- Count info spans (hidden by default) -->
+                    <div id="filterInfo" style="display: none; text-align: center; margin-top: 10px;">
+                        <span id="keptTranscripts">Kept transcripts: 0</span><br>
+                        <span id="lostTranscripts">Lost transcripts: 0</span>
+                    </div>
                 </div>
                 <div class="col-lg-9 mb-3">
                     <textarea id="transcriptSearch" class="form-control" rows="3" placeholder="Filter: Tokens separated by comma, space, tab, or newline"></textarea>
@@ -152,7 +158,9 @@
                 </div>
             </div>
 
-            <!-- New info row: Tokens recognized (left) and Filtered table entries (right) -->
+
+            
+            <!-- Info row: Tokens recognized (left) and Filtered table entries (right) -->
             <div class="row mb-3">
                 <div class="col-6">
                     <span id="tokensInfo">Tokens recognized: 0</span>
@@ -472,13 +480,24 @@
             });
 
             $('#orthogroupSearch').on('change', function() {
+                let totalBefore = table.rows({ filter: 'applied' }).data().toArray().length;
+
                 if ($(this).is(':checked')) {
-                    // Extract unique orthogroup values from the currently filtered data
                     let dataArray = table.rows({ filter: 'applied' }).data().toArray();
                     let groups = dataArray.map(row => row.ortho_id).filter(x => x && x.trim() !== '');
                     groups = [...new Set(groups)];
                     orthogroupTokens = groups.join(' ');
+
+                    let totalAfter = groups.length;
+                    let lost = totalBefore - totalAfter;
+
+                    $('#keptTranscripts').text("Kept transcripts: " + totalAfter);
+                    $('#lostTranscripts').text("Lost transcripts: " + lost);
+                    $('#filterInfo').show();
+                } else {
+                    $('#filterInfo').hide();
                 }
+                
                 table.ajax.reload();
             });
 
