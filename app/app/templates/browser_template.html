@@ -444,7 +444,16 @@
                         sep = "\n";
                     }
                     var textToCopy = entries.join(sep);
-                    await navigator.clipboard.writeText(textToCopy);
+                    if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+                        await navigator.clipboard.writeText(textToCopy);
+                    } else {
+                        // Fallback for browsers that do not support navigator.clipboard
+                        var $temp = $("<textarea>");
+                        $("body").append($temp);
+                        $temp.val(textToCopy).select();
+                        document.execCommand("copy");
+                        $temp.remove();
+                    }
                     // Disable the button and update text with the number of copied entries
                     var count = entries.length;
                     $btn.prop('disabled', true).text(count + ' Entries Copied');
