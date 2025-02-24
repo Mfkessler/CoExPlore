@@ -140,7 +140,8 @@
                     <!-- Count info spans (hidden by default) -->
                     <div id="filterInfo" style="display: none; text-align: center; margin-top: 10px;">
                         <span id="keptTranscripts">Kept transcripts: 0</span><br>
-                        <span id="lostTranscripts">Lost transcripts: 0</span>
+                        <span id="lostTranscripts">Lost transcripts: 0</span><br>
+                        <span id="newTranscripts">New transcripts: 0</span>
                     </div>
                 </div>
                 <div class="col-lg-9 mb-3">
@@ -158,12 +159,10 @@
                 </div>
             </div>
 
-
-            
             <!-- Info row: Tokens recognized (left) and Filtered table entries (right) -->
             <div class="row mb-3">
                 <div class="col-6">
-                    <span id="tokensInfo">Tokens recognized: 0</span>
+                    <span id="tokensInfo">Tokens recognized: 0 (0 unique)</span>
                 </div>
                 <div class="col-6 text-end">
                     <span id="tableEntriesInfo">Filtered table entries: 0</span>
@@ -462,16 +461,29 @@
             // Update tokens recognized info and redraw table on transcriptSearch input
             $('#transcriptSearch').on('input', function() {
                 var tokens = $(this).val().trim().split(/[\s,]+/).filter(function(token) { return token; });
-                $('#tokensInfo').text('Tokens recognized: ' + tokens.length);
+                var uniqueTokens = [...new Set(tokens)];
+                $('#tokensInfo').text('Tokens recognized: ' + tokens.length + ' (' + uniqueTokens.length + ' unique)');
+
                 if ($('#orthogroupSearch').is(':checked')) {
-                    // Recompute unique orthogroup tokens from the current filtered data
-                    let dataArray = table.rows({ filter: 'applied' }).data().toArray();
-                    let groups = dataArray.map(row => row.ortho_id).filter(x => x && x.trim() !== '');
-                    groups = [...new Set(groups)];
-                    orthogroupTokens = groups.join(' ');
-                    console.log("Orthogroup tokens:", orthogroupTokens);
+                    // Instead of using the current page data, fetch all filtered rows to compute unique orthogroups
+                    updateOrthogroupTokensAndFilterInfo().then(() => {
+                        table.ajax.reload();
+                    });
+                } else {
+                    $('#filterInfo').hide();
+                    table.ajax.reload();
                 }
-                table.ajax.reload();
+            });
+
+            $('#orthogroupSearch').on('change', function() {
+                if ($(this).is(':checked')) {
+                    updateOrthogroupTokensAndFilterInfo().then(() => {
+                        table.ajax.reload();
+                    });
+                } else {
+                    $('#filterInfo').hide();
+                    table.ajax.reload();
+                }
             });
 
             // Update tokens recognized info and redraw table on columnSelect change
@@ -479,27 +491,97 @@
                 table.draw();
             });
 
-            $('#orthogroupSearch').on('change', function() {
-                let totalBefore = table.rows({ filter: 'applied' }).data().toArray().length;
+            // Update orthogroup tokens and filter info using all filtered rows
+            async function updateOrthogroupTokensAndFilterInfo() {
+                // Get the current filter value and selected column (for original search)
+                let searchVal = $('#transcriptSearch').val().trim();
+                let selectedColumn = $('#columnSelect').val();
 
-                if ($(this).is(':checked')) {
-                    let dataArray = table.rows({ filter: 'applied' }).data().toArray();
-                    let groups = dataArray.map(row => row.ortho_id).filter(x => x && x.trim() !== '');
-                    groups = [...new Set(groups)];
-                    orthogroupTokens = groups.join(' ');
+                // --- 1. Fetch the original selection (without transformation) ---
+                let originalParams = table.ajax.params();
+                originalParams.start = null;      // No limit
+                originalParams.length = null;     // No offset
+                originalParams.transcript_filter = searchVal;
+                originalParams.transcript_filter_column = selectedColumn;
+                originalParams.get_all = true;
 
-                    let totalAfter = groups.length;
-                    let lost = totalBefore - totalAfter;
-
-                    $('#keptTranscripts').text("Kept transcripts: " + totalAfter);
-                    $('#lostTranscripts').text("Lost transcripts: " + lost);
-                    $('#filterInfo').show();
-                } else {
-                    $('#filterInfo').hide();
+                let originalRows = [];
+                try {
+                    const originalResponse = await fetch(BASE_URL + "/api/data", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            ...originalParams,
+                            species_filter: JSON.stringify(initialSpeciesFilter),
+                            table_name: "{{ BROWSER_DB }}"
+                        })
+                    });
+                    if (!originalResponse.ok) throw new Error(`HTTP error! status: ${originalResponse.status}`);
+                    const originalJson = await originalResponse.json();
+                    originalRows = originalJson.data;
+                } catch (error) {
+                    console.error("Error fetching original data:", error);
+                    return;
                 }
                 
-                table.ajax.reload();
-            });
+                // Compute original transcripts (assuming the column "transcript" exists)
+                let originalTranscripts = originalRows
+                    .map(row => row.transcript)
+                    .filter(x => x && x.trim() !== '');
+                originalTranscripts = [...new Set(originalTranscripts.map(t => t.toLowerCase()))];
+
+                // Compute orthogroup tokens from the original rows (using the "ortho_id" column)
+                let orthogroupArray = originalRows
+                    .map(row => row.ortho_id)
+                    .filter(x => x && x.trim() !== '')
+                    .map(token => token.toLowerCase());
+                orthogroupArray = [...new Set(orthogroupArray)];
+                orthogroupTokens = orthogroupArray.join(' ');
+
+                // --- 2. Fetch the transformed selection (using orthogroup tokens) ---
+                let transformedParams = table.ajax.params();
+                transformedParams.start = null;
+                transformedParams.length = null;
+                transformedParams.transcript_filter = orthogroupTokens;
+                transformedParams.transcript_filter_column = "ortho_id";
+                transformedParams.get_all = true;
+
+                let transformedRows = [];
+                try {
+                    const transformedResponse = await fetch(BASE_URL + "/api/data", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            ...transformedParams,
+                            species_filter: JSON.stringify(initialSpeciesFilter),
+                            table_name: "{{ BROWSER_DB }}"
+                        })
+                    });
+                    if (!transformedResponse.ok) throw new Error(`HTTP error! status: ${transformedResponse.status}`);
+                    const transformedJson = await transformedResponse.json();
+                    transformedRows = transformedJson.data;
+                } catch (error) {
+                    console.error("Error fetching transformed data:", error);
+                    return;
+                }
+                
+                // Compute transformed transcripts (again, using the "transcript" column)
+                let transformedTranscripts = transformedRows
+                    .map(row => row.transcript)
+                    .filter(x => x && x.trim() !== '');
+                transformedTranscripts = [...new Set(transformedTranscripts.map(t => t.toLowerCase()))];
+
+                // --- 3. Compute metrics ---
+                let kept = originalTranscripts.filter(t => transformedTranscripts.includes(t));
+                let lost = originalTranscripts.filter(t => !transformedTranscripts.includes(t));
+                let newly = transformedTranscripts.filter(t => !originalTranscripts.includes(t));
+
+                // Update the filter info spans with the computed values
+                $('#keptTranscripts').text('Kept transcripts: ' + kept.length);
+                $('#lostTranscripts').text('Lost transcripts: ' + lost.length);
+                $('#newTranscripts').text('New transcripts: ' + newly.length);
+                $('#filterInfo').show();
+            }
 
             table.buttons().container()
                 .appendTo('#browserRes_wrapper .col-md-6:eq(0)');
