@@ -533,7 +533,7 @@
                 // Compute orthogroup tokens from the original rows (using the "ortho_id" column)
                 let orthogroupArray = originalRows
                     .map(row => row.ortho_id)
-                    .filter(x => x && x.trim() !== '')
+                    .filter(x => x && x.trim() !== '' && x.trim().toLowerCase() !== 'nan')
                     .map(token => token.toLowerCase());
                 orthogroupArray = [...new Set(orthogroupArray)];
                 orthogroupTokens = orthogroupArray.join(' ');
