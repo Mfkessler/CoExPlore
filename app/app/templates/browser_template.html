@@ -5,8 +5,8 @@
     <!-- Meta tags and title -->
     <meta charset="UTF-8">
     <title>CoExPlore Browser</title>
-    <!-- Bootstrap CSS -->
-    <link href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap CSS (Bootstrap 5.3) -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- DataTables CSS -->
     <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.11.3/css/jquery.dataTables.css">
     <!-- Additional DataTables CSS files -->
@@ -44,6 +44,68 @@
         .italic-text {
             font-style: italic;
         }
+        .form-check-input {
+            width: 1.5rem;
+            height: 1.5rem;
+            vertical-align: middle;
+            margin-top: 0;
+            border-color: #ced4da;
+        }
+        /* Enhanced styling for form controls */
+        .form-control {
+            border-radius: 0.5rem;
+            border: 1px solid #ced4da;
+            transition: border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+        }
+
+        .form-control:focus {
+            border-color: #80bdff;
+            box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+        }
+        /* Toggle Section Styling */
+        details>summary {
+            list-style: none;
+            outline: none;
+            cursor: pointer;
+        }
+
+        details>summary::-webkit-details-marker {
+            display: none;
+        }
+
+        .toggle-header {
+            font-size: 1.25rem;
+            display: inline-flex;
+            align-items: center;
+            padding: 0;
+            background: none;
+            border: none;
+        }
+
+        .toggle-header::after {
+            content: "\25BC";
+            margin-left: 5px;
+            transition: transform 0.3s ease;
+        }
+
+        details[open] .toggle-header::after {
+            transform: rotate(180deg);
+        }
+
+        .toggle-content {
+            opacity: 0;
+            transform: translateY(-10px);
+            transition: opacity 0.3s ease, transform 0.3s ease;
+        }
+
+        details[open] .toggle-content {
+            opacity: 1;
+            transform: translateY(0);
+            margin-top: 10px;
+        }
+        .control-input {
+            flex: 1 1 0;
+        }
     </style>
 </head>
 <body>
@@ -77,6 +139,64 @@
         </div>
     </div>
 
+    <!-- Copy Options Toggle -->
+    <div id="copyOptionsToggle">
+        <details id="copyToggle">
+        <summary class="toggle-header">Copy Options</summary>
+        <div class="toggle-content">
+    
+            <!-- Container for controls -->
+            <div class="row justify-content-center">
+            <div class="col-md-6 col-lg-8">
+    
+                <!-- Dropdown for column selection -->
+                <div class="row mb-2">
+                <label for="exportColumnSelect" class="col-sm-6 col-form-label text-end">
+                    Select Column
+                </label>
+                <div class="col-sm-6">
+                    <select id="exportColumnSelect" class="form-control form-control-sm">
+                    {% for key, header in METADATA_DICT.items() %}
+                        <option value="{{ key }}">{{ header }}</option>
+                    {% endfor %}
+                    </select>
+                </div>
+                </div>
+    
+                <!-- Checkbox for unique entries -->
+                <div class="row mb-2">
+                <div class="col-sm-6 text-end">
+                    <label class="form-check-label" for="uniqueEntries">Unique Entries Only</label>
+                </div>
+                <div class="col-sm-6">
+                    <input type="checkbox" class="form-check-input" id="uniqueEntries">
+                </div>
+                </div>
+    
+                <!-- Input field for separator -->
+                <div class="row mb-2">
+                <label for="separatorInput" class="col-sm-6 col-form-label text-end">
+                    Separator
+                </label>
+                <div class="col-sm-6">
+                    <input type="text" id="separatorInput" class="form-control form-control-sm" placeholder="Default: NewLine">
+                </div>
+                </div>
+    
+                <!-- Centered copy button -->
+                <div class="row">
+                <div class="col-12 text-center">
+                    <button id="copyEntriesBtn" class="btn btn-primary btn-sm">Copy Entries</button>
+                </div>
+                </div>
+    
+            </div>
+            </div>
+    
+        </div>
+        </details>
+    </div>
+    <br>
     <!-- jQuery -->
     <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
     <!-- Bootstrap JS Bundle -->
@@ -120,9 +240,8 @@
                 if (!filterText) return true;
                 var tokens = filterText.split(/[\s,]+/).filter(function(token) { return token; });
                 
-                // Select the column to filter from the dropdown
+                // Select column from the dropdown
                 var selectedColumn = $('#columnSelect').val();
-                // Find the index of the selected column in dtColumns
                 var columnIndex = dtColumns.findIndex(function(col) { return col.data === selectedColumn; });
                 var columnData = columnIndex >= 0 ? (data[columnIndex] || "").toLowerCase() : "";
                 
@@ -243,7 +362,6 @@
                         }
                     }
                 ],
-                // Minimal defined columnDefs for responsive priorities
                 columnDefs: [
                     { responsivePriority: 1, targets: 0 },
                     { responsivePriority: 2, targets: 1 }
@@ -260,7 +378,43 @@
                 }
             });
 
-            // Trigger table redraw when transcript filter input changes
+            // Copy column entries to clipboard handling
+            $('#copyEntriesBtn').on('click', async function () {
+                // Get current DataTables parameters (including filters etc.)
+                var params = table.ajax.params();
+                // Add the selected column and unique flag
+                params.selected_column = $('#exportColumnSelect').val();
+                params.unique = $('#uniqueEntries').is(':checked');
+                
+                if (initialSpeciesFilter && Array.isArray(initialSpeciesFilter)) {
+                    params.species_filter = JSON.stringify(initialSpeciesFilter);
+                }
+
+                try {
+                    const response = await fetch(BASE_URL + '/api/get_column_entries', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(params)
+                    });
+                    if (!response.ok) {
+                        throw new Error('Error fetching data');
+                    }
+                    const result = await response.json();
+                    var entries = result.entries;
+                    // Determine the separator: If nothing is entered, use NewLine
+                    var sep = $('#separatorInput').val();
+                    if (!sep || sep.trim() === "") {
+                        sep = "\n";
+                    }
+                    var textToCopy = entries.join(sep);
+                    await navigator.clipboard.writeText(textToCopy);
+                    alert('Entries have been copied to the clipboard.');
+                } catch (error) {
+                    console.error(error);
+                    alert('Error: ' + error.message);
+                }
+            });
+
             $('#transcriptSearch').on('input', function() {
                 table.draw();
             });
