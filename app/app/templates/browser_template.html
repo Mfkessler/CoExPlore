@@ -115,7 +115,21 @@
         #exportColumnSelect {
             width: 20ch;
         }
-
+        @media (max-width: 575.98px) {
+            label.col-form-label {
+                text-align: center !important;
+            }
+            .col-sm-6 {
+                text-align: center !important;
+            }
+            .col-sm-6 input.form-control,
+            .col-sm-6 select.form-control,
+            .col-sm-6 textarea.form-control {
+                margin-left: auto !important;
+                margin-right: auto !important;
+                display: block;
+            }
+        }
 
     </style>
 </head>
