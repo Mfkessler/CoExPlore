@@ -332,8 +332,12 @@ def parse_request_params(request) -> dict:
         values = request.values
 
     # Process start and length
-    params['start'] = int(values.get('start', 0))
-    params['length'] = int(values.get('length', 10))
+    if values.get('get_all'):
+        params['start'] = None  # No limit
+        params['length'] = None  # No offset
+    else:
+        params['start'] = int(values.get('start', 0))
+        params['length'] = int(values.get('length', 10))
 
     # Process global search value
     if request.is_json:
@@ -533,6 +537,9 @@ def data():
         table = params['table_name']
         select_columns = ', '.join([col['name'] for col in params['columns']])
         query, query_params = build_sql_query(params, select_columns)
+        logger.info("Received transcript_filter: %s", params.get('transcript_filter'))
+        logger.info("Received transcript_filter_column: %s", params.get('transcript_filter_column'))
+        logger.info("Columns in request: %s", [col['name'] for col in params['columns']])
 
         # Count total records
         with engine.connect() as conn:
