@@ -128,15 +128,33 @@
         <div class="card-body">
             <!-- Row with select and transcriptSearch -->
             <div class="row">
-                <div class="col-lg-3 mb-3">
-                    <select id="columnSelect" class="form-control">
-                        {% for key, header in METADATA_DICT.items() %}
-                            {% if key != "species" %}
-                                <option value="{{ key }}">{{ header }}</option>
-                            {% endif %}
-                        {% endfor %}
-                    </select>
-
+                <div class="col-lg-5 mb-3">
+                    <!-- TODO: SELECT SPECIES DROPDOWN-->
+                     
+                    <!-- Dropdown for column selection -->
+                    <div class="row mb-2">
+                        <label for="columnSelect" class="col-sm-6 col-form-label">
+                            Select Column
+                        </label>
+                        <div class="col-sm-6">
+                            <select id="columnSelect" class="form-control form-control-sm">
+                                {% for key, header in METADATA_DICT.items() %}
+                                {% if key != "species" %}
+                                    <option value="{{ key }}">{{ header }}</option>
+                                {% endif %}
+                            {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <!-- Checkbox for orthogroups filtering -->
+                    <div class="row mb-2">
+                        <div class="col-sm-6">
+                            <label class="form-check-label" for="orthogroupSearch">Use orthogroups</label>
+                        </div>
+                        <div class="col-sm-6">
+                            <input type="checkbox" class="form-check-input" id="orthogroupSearch">
+                        </div>
+                    </div>
                     <!-- Count info spans (hidden by default) -->
                     <div id="filterInfo" style="display: none; text-align: center; margin-top: 10px;">
                         <span id="keptTranscripts">Kept transcripts: 0</span><br>
@@ -144,18 +162,8 @@
                         <span id="newTranscripts">New transcripts: 0</span>
                     </div>
                 </div>
-                <div class="col-lg-9 mb-3">
+                <div class="col-lg-7 mb-3">
                     <textarea id="transcriptSearch" class="form-control" rows="3" placeholder="Filter: Tokens separated by comma, space, tab, or newline"></textarea>
-                </div>
-            </div>
-
-            <!-- Checkbox for unique orthogroups filtering -->
-            <div class="row mb-2">
-                <div class="col-sm-6 text-end">
-                    <label class="form-check-label" for="orthogroupSearch">Use unique orthogroups for filtering</label>
-                </div>
-                <div class="col-sm-6">
-                    <input type="checkbox" class="form-check-input" id="orthogroupSearch">
                 </div>
             </div>
 
