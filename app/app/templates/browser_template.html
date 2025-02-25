@@ -126,57 +126,66 @@
 <body>
     <div class="card">
         <div class="card-body">
-            <!-- Row with select and transcriptSearch -->
-            <div class="row">
-                <div class="col-lg-5 mb-3">
-                    <!-- TODO: SELECT SPECIES DROPDOWN-->
-                     
-                    <!-- Dropdown for column selection -->
-                    <div class="row mb-2">
-                        <label for="columnSelect" class="col-sm-6 col-form-label">
-                            Select Column
-                        </label>
-                        <div class="col-sm-6">
-                            <select id="columnSelect" class="form-control form-control-sm">
-                                {% for key, header in METADATA_DICT.items() %}
-                                {% if key != "species" %}
-                                    <option value="{{ key }}">{{ header }}</option>
-                                {% endif %}
-                            {% endfor %}
-                            </select>
-                        </div>
-                    </div>
-                    <!-- Checkbox for orthogroups filtering -->
-                    <div class="row mb-2">
-                        <div class="col-sm-6">
-                            <label class="form-check-label" for="orthogroupSearch">Use orthogroups</label>
-                        </div>
-                        <div class="col-sm-6">
-                            <input type="checkbox" class="form-check-input" id="orthogroupSearch">
-                        </div>
-                    </div>
-                    <!-- Count info spans (hidden by default) -->
-                    <div id="filterInfo" style="display: none; text-align: center; margin-top: 10px;">
-                        <span id="keptTranscripts">Kept transcripts: 0</span><br>
-                        <span id="lostTranscripts">Lost transcripts: 0</span><br>
-                        <span id="newTranscripts">New transcripts: 0</span>
-                    </div>
-                </div>
-                <div class="col-lg-7 mb-3">
-                    <textarea id="transcriptSearch" class="form-control" rows="3" placeholder="Filter: Tokens separated by comma, space, tab, or newline"></textarea>
-                </div>
-            </div>
+            <div id="columnSearchDiv">
+                <details id="columnSearchToggle">
+                    <summary class="toggle-header">Column search</summary>
+                    <div class="toggle-content">
+                        <!-- Row with select and transcriptSearch -->
+                        <div class="row">
+                            <div class="col-lg-5 mb-3">
+                                <!-- TODO: SELECT SPECIES DROPDOWN-->
 
-            <!-- Info row: Tokens recognized (left) and Filtered table entries (right) -->
-            <div class="row mb-3">
-                <div class="col-6">
-                    <span id="tokensInfo">Tokens recognized: 0 (0 unique)</span>
-                </div>
-                <div class="col-6 text-end">
-                    <span id="tableEntriesInfo">Filtered table entries: 0</span>
-                </div>
+                                <!-- Dropdown for column selection -->
+                                <div class="row mb-2">
+                                    <label for="columnSelect" class="col-sm-6 col-form-label">
+                                        Select Column
+                                    </label>
+                                    <div class="col-sm-6">
+                                        <select id="columnSelect" class="form-control form-control-sm">
+                                            {% for key, header in METADATA_DICT.items() %}
+                                            {% if key != "species" %}
+                                            <option value="{{ key }}">{{ header }}</option>
+                                            {% endif %}
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                </div>
+                                <!-- Checkbox for orthogroups filtering -->
+                                <div class="row mb-2">
+                                    <div class="col-sm-6">
+                                        <label class="form-check-label" for="orthogroupSearch">Use orthogroups</label>
+                                    </div>
+                                    <div class="col-sm-6">
+                                        <input type="checkbox" class="form-check-input" id="orthogroupSearch">
+                                    </div>
+                                </div>
+                                <!-- Count info spans (hidden by default) -->
+                                <div id="filterInfo" style="display: none; text-align: center; margin-top: 10px;">
+                                    <span id="keptTranscripts">Kept transcripts: 0</span><br>
+                                    <span id="lostTranscripts">Lost transcripts: 0</span><br>
+                                    <span id="newTranscripts">New transcripts: 0</span>
+                                </div>
+                            </div>
+                            <div class="col-lg-7 mb-3">
+                                <textarea id="transcriptSearch" class="form-control" rows="3"
+                                    placeholder="Filter: Tokens separated by comma, space, tab, or newline"></textarea>
+                            </div>
+                        </div>
+
+                        <!-- Info row: Tokens recognized (left) and Filtered table entries (right) -->
+                        <div class="row mb-3">
+                            <div class="col-6">
+                                <span id="tokensInfo">Tokens recognized: 0 (0 unique)</span>
+                            </div>
+                            <div class="col-6 text-end">
+                                <span id="tableEntriesInfo">Filtered table entries: 0</span>
+                            </div>
+                        </div>
+                    </div>
+                </details>
             </div>
-            
+            <br>
+
             <!-- DataTables table -->
             <table id="browserRes" class="display responsive nowrap no-border" style="width:100%; display:none;">
                 <thead>
@@ -187,54 +196,62 @@
                     </tr>
                 </thead>
             </table>
+
+            <!-- Copy column entries to clipboard section -->
+            <br>
+            <div id="copyEntriesDiv">
+                <details id="copyEntriesToggle">
+                    <summary class="toggle-header">Copy entries</summary>
+                    <div class="toggle-content">
+                        <div class="row justify-content-center">
+                            <div class="col-md-6 col-lg-8">
+                                <!-- Dropdown for column selection -->
+                                <div class="row mb-2">
+                                    <label for="exportColumnSelect" class="col-sm-6 col-form-label text-end">
+                                        Select Column
+                                    </label>
+                                    <div class="col-sm-6">
+                                        <select id="exportColumnSelect" class="form-control form-control-sm">
+                                            {% for key, header in METADATA_DICT.items() %}
+                                            <option value="{{ key }}">{{ header }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                </div>
+                                <!-- Checkbox for unique entries -->
+                                <div class="row mb-2">
+                                    <div class="col-sm-6 text-end">
+                                        <label class="form-check-label" for="uniqueEntries">Unique Entries Only</label>
+                                    </div>
+                                    <div class="col-sm-6">
+                                        <input type="checkbox" class="form-check-input" id="uniqueEntries">
+                                    </div>
+                                </div>
+                                <!-- Input field for separator -->
+                                <div class="row mb-2">
+                                    <label for="separatorInput" class="col-sm-6 col-form-label text-end">
+                                        Separator
+                                    </label>
+                                    <div class="col-sm-6">
+                                        <input type="text" id="separatorInput" class="form-control form-control-sm"
+                                            placeholder="Default: NewLine">
+                                    </div>
+                                </div>
+                                <!-- Centered copy button -->
+                                <div class="row">
+                                    <div class="col-12 text-center">
+                                        <button id="copyEntriesBtn" class="btn btn-primary btn-sm">Copy Entries</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                </details>
+            </div>
+            <br>
         </div>
     </div>
 
-    <!-- Copy column entries to clipboard section -->
-    <br>
-    <div class="row justify-content-center">
-        <div class="col-md-6 col-lg-8">
-            <!-- Dropdown for column selection -->
-            <div class="row mb-2">
-                <label for="exportColumnSelect" class="col-sm-6 col-form-label text-end">
-                    Select Column
-                </label>
-                <div class="col-sm-6">
-                    <select id="exportColumnSelect" class="form-control form-control-sm">
-                        {% for key, header in METADATA_DICT.items() %}
-                        <option value="{{ key }}">{{ header }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-            </div>
-            <!-- Checkbox for unique entries -->
-            <div class="row mb-2">
-                <div class="col-sm-6 text-end">
-                    <label class="form-check-label" for="uniqueEntries">Unique Entries Only</label>
-                </div>
-                <div class="col-sm-6">
-                    <input type="checkbox" class="form-check-input" id="uniqueEntries">
-                </div>
-            </div>
-            <!-- Input field for separator -->
-            <div class="row mb-2">
-                <label for="separatorInput" class="col-sm-6 col-form-label text-end">
-                    Separator
-                </label>
-                <div class="col-sm-6">
-                    <input type="text" id="separatorInput" class="form-control form-control-sm"
-                        placeholder="Default: NewLine">
-                </div>
-            </div>
-            <!-- Centered copy button -->
-            <div class="row">
-                <div class="col-12 text-center">
-                    <button id="copyEntriesBtn" class="btn btn-primary btn-sm">Copy Entries</button>
-                </div>
-            </div>
-        </div>
-    </div>
-    <br>
+
 
     <!-- jQuery -->
     <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
