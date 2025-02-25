@@ -3,7 +3,7 @@ import json
 import scanpy as sc
 import wgcna.utils as rutils
 import wgcna.ortho as rortho
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, text, types
 
 def main():
     METADATA_DICT = json.loads(os.getenv("METADATA_DICT", "{}"))
@@ -25,8 +25,9 @@ def main():
 
     # Create browser table
     df = rortho.transcript_ortho_browser("", adatas, possible_columns=columns)
+    dtype_mapping = {col: types.TEXT for col in df.columns}
 
-    df.to_sql('wgcna_browser', engine, if_exists='replace', index=True)
+    df.to_sql('wgcna_browser', engine, if_exists='replace', index=True, dtype=dtype_mapping)
     print("Table wgcna_browser created successfully!")
 
     # Create info table
