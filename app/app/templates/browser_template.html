@@ -586,7 +586,8 @@
                     $('#lostTranscripts').text('Lost transcripts: ' + originalTranscripts.length);
                     $('#newTranscripts').text('New transcripts: 0');
                     $('#filterInfo').show();
-
+                    table.ajax.reload();
+                    
                     return;
                 } else {
                     // --- 2. Fetch the transformed selection (using orthogroup tokens) ---
