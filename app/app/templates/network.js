@@ -21,7 +21,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         if (node.data('highlighted')) {
                             return highlightColor;  // Highlighted node
                         }
-                        return useBackgroundColor ? node.data('moduleColor') : 'black';
+                        return useBackgroundColor ? node.data('module_colors') : 'black';
                     },
                     'shape': 'ellipse',
                     'text-valign': 'center',
@@ -141,6 +141,24 @@ document.addEventListener('DOMContentLoaded', function() {
         };
     }
 
+    const metadataMapping = {
+        "species": "Species",
+        "module_colors": "Module Colors",
+        "go_terms": "GO Terms",
+        "total_counts": "Total Counts",
+        "ortho_id": "Orthogroup",
+        "ortho_count": "Ortho Count",
+        "ipr_id": "InterPro ID",
+        "ipr_desc": "InterPro Description",
+        "pfam_id": "Pfam ID",
+        "pfam_desc": "Pfam Description",
+        "tf_family": "TF Family",
+        "ecnumber": "EC Number",
+        "genename": "Gene Name",
+        "description": "UniProt Description",
+    };
+    const metadataKeys = Object.keys(metadataMapping);
+
     cy.ready(function() {
         /* Init edge visibility */
         const initialZoom = cy.zoom();
@@ -170,7 +188,7 @@ document.addEventListener('DOMContentLoaded', function() {
             let organismShapes = {};
 
             // Determine unique organisms
-            let uniqueOrganisms = [...new Set(cy.nodes().map(node => node.data('organism')))];
+            let uniqueOrganisms = [...new Set(cy.nodes().map(node => node.data('species')))];
             // Assign shapes cyclically
             uniqueOrganisms.forEach((organism, index) => {
                 organismShapes[organism] = availableShapes[index % availableShapes.length];
@@ -179,7 +197,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // Dynamically update node styles
             cy.batch(function() {
                 cy.nodes().forEach(node => {
-                    let organism = node.data('organism');
+                    let organism = node.data('species');
                     let newShape = organismShapes[organism] || 'ellipse';
                     node.style('shape', newShape);
                 });
@@ -553,13 +571,23 @@ document.addEventListener('DOMContentLoaded', function() {
           iprIds = iprIdsArray[0] + ', +' + (iprIdsArray.length - 1);
         }
       
-        var tooltipText = '<b>Species:</b> ' + node.data('organism') +
-          '<br><b>Transcript:</b> ' + node.data('gene') +
-          '<br><b>Module:</b> ' + node.data('moduleColor') +
-          '<br><b>Orthogroup:</b> ' + node.data('ortho_id') +
-          '<br><b>Degree:</b> ' + node.degree() +
-          '<br><b>GO Terms:</b> ' + goTerms +
-          '<br><b>InterPro IDs:</b> ' + iprIds;
+        var tooltipText = '';
+        var dataDict = metadataMapping
+
+        for (var key in dataDict) {
+            if (node.data(key)) {
+                if(key === 'go_terms') {
+                    tooltipText += '<b>' + dataDict[key] + ':</b> ' + goTerms + '<br>';
+                } else if(key === 'ipr_id') {
+                    tooltipText += '<b>' + dataDict[key] + ':</b> ' + iprIds + '<br>';
+                } else {
+                    tooltipText += '<b>' + dataDict[key] + ':</b> ' + node.data(key) + '<br>';
+                }
+            }
+        }
+
+        // Add degree separately as it's not in the dataDict
+        tooltipText += '<b>Degree:</b> ' + node.degree() + '<br>';
                         
         if (useClusterTooltip) { 
             tooltipText += '<br><b>Cluster:</b> ' + node.data('cluster');
@@ -608,17 +636,6 @@ document.addEventListener('DOMContentLoaded', function() {
     adjustNodeAndEdgeSize();
 
     // Jitter effect for all metadata
-    const metadataKeys = ["ortho_id", "degree", "gene", "moduleColor", "organism", "go_terms", "ipr_id"];
-    const metadataMapping = {
-        "ortho_id": "Orthogroup",
-        "degree": "Degree",
-        "gene": "Transcript",
-        "moduleColor": "Module",
-        "organism": "Species",
-        "go_terms": "GO Terms",
-        "ipr_id": "InterPro IDs"
-    };
-
     let currentMetadataIndex = 0;
     let jitterIntervals = {};
 
