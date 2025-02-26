@@ -1,12 +1,11 @@
 import os
-import json
 import scanpy as sc
 import wgcna.utils as rutils
 import wgcna.ortho as rortho
 from sqlalchemy import create_engine, text, types
 
 def main():
-    METADATA_DICT = json.loads(os.getenv("METADATA_DICT", "{}"))
+    METADATA_DICT = rutils.load_metadata_dict("/metadata_dict.json")
     columns = list(METADATA_DICT.keys())
     h5ad_dir = os.environ.get("H5AD_DIR", "h5ad")
 
@@ -25,6 +24,11 @@ def main():
 
     # Create browser table
     df = rortho.transcript_ortho_browser("", adatas, possible_columns=columns)
+
+    # Replace all NaNs with ""
+    df = df.fillna("")
+    
+    # Map all columns to TEXT
     dtype_mapping = {col: types.TEXT for col in df.columns}
 
     df.to_sql('wgcna_browser', engine, if_exists='replace', index=True, dtype=dtype_mapping)
