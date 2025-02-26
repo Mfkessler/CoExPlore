@@ -1916,20 +1916,20 @@ def export_co_expression_network_to_cytoscape(
     threshold: float = 0.5,
     neighbor_info: Union[set, List[set]] = None,
     id_key: str = 'id',
-    gene_key: str = 'gene',
-    module_color_key: str = 'moduleColor',
-    ortho_id_key: str = 'ortho_id',
-    organism_key: str = 'organism',
-    name_key: str = 'name',
-    go_terms_key: str = 'go_terms',
-    ipr_id_key: str = 'ipr_id',
-    is_neighbor_key: str = 'is_neighbor',
     source_key: str = 'source',
     target_key: str = 'target',
-    weight_key: str = 'weight'
+    weight_key: str = 'weight',
+    is_neighbor_key: str = 'is_neighbor'
 ) -> dict:
     """
     Exports the co-expression network(s) in a format compatible with Cytoscape.js.
+    
+    This function dynamically assigns all metadata from a loaded JSON dictionary.
+    It iterates over all keys in METADATA_DICT and for each gene node:
+      - If the key is "transcript", the gene identifier (i.e. the index) is used.
+      - Otherwise, the corresponding value is retrieved from adata.var for that gene.
+    
+    All metadata is assumed to be stored in adata.var under the keys specified in METADATA_DICT.
     
     Parameters:
     - tom (pd.DataFrame or List[pd.DataFrame]): The TOM matrix or list of TOM matrices.
@@ -1938,22 +1938,32 @@ def export_co_expression_network_to_cytoscape(
     - threshold (float): TOM connection threshold for edges.
     - neighbor_info (set or List[set]): Neighbor transcripts for the corresponding TOM(s).
     - id_key (str): Key for node ID in the output dictionary.
-    - gene_key (str): Key for gene in the output dictionary.
-    - module_color_key (str): Key for module color in the output dictionary.
-    - ortho_id_key (str): Key for orthologous ID in the output dictionary.
-    - organism_key (str): Key for organism in the output dictionary.
-    - name_key (str): Key for name in the output dictionary.
-    - go_terms_key (str): Key for GO terms in the output dictionary.
-    - ipr_id_key (str): Key for IPR ID in the output dictionary.
-    - is_neighbor_key (str): Key for neighbor flag in the output dictionary.
     - source_key (str): Key for edge source in the output dictionary.
     - target_key (str): Key for edge target in the output dictionary.
     - weight_key (str): Key for edge weight in the output dictionary.
+    - is_neighbor_key (str): Key for neighbor flag in the output dictionary.
     
     Returns:
-    - dict: Dictionary with nodes, edges, and a list of neighbors per TOM.
+    - dict: Dictionary with nodes, edges, and neighbors for each TOM.
     """
 
+    def is_dockerized() -> bool:
+        """Check if the script is running inside a Docker container."""
+        try:
+            with open("/proc/1/cgroup", "rt") as f:
+                return "docker" in f.read() or "containerd" in f.read()
+        except FileNotFoundError:
+            return False
+
+    # Load metadata based on environment
+    if is_dockerized():
+        METADATA_DICT = load_metadata_dict("/metadata_dict.json")
+    else:
+        METADATA_DICT = load_metadata_dict("/vol/blast/wgcna/Project-Setup/wgcna-app/envs/metadata_dict.json")
+    
+    print(METADATA_DICT)
+
+    # Ensure the inputs are either both lists or both single objects
     if isinstance(tom, list) and isinstance(adata, list):
         if len(tom) != len(adata):
             raise ValueError("The number of TOMs and AnnData objects must be the same.")
@@ -1968,42 +1978,56 @@ def export_co_expression_network_to_cytoscape(
     nodes = []
     edges = []
     neighbors_output = []
-    organism_id = 0
 
     for idx, (current_tom, current_adata) in enumerate(tom_adata_pairs):
         gene_metadata = current_adata.var
+
+        # Filter genes based on selected module colors if provided
         if selected_module_colors:
-            mod_genes = gene_metadata[gene_metadata['module_colors'].isin(selected_module_colors)].index
+            mod_genes = gene_metadata[gene_metadata["module_colors"].isin(selected_module_colors)].index
         else:
             mod_genes = gene_metadata.index
+
+        # Keep only genes that are present in the TOM matrix
         mod_genes = [gene for gene in mod_genes if gene in current_tom.index]
-        if 'species' in current_adata.uns:
-            organism = current_adata.uns['species']
-        else:
-            organism = f"Organism_{organism_id}"
-            organism_id += 1
 
+        species_value = current_adata.uns['species']
+        species_key = METADATA_DICT.get("species", "Species")
+
+        # Prepare neighbor output using species information
         current_neighbors = neighbor_list[idx] if neighbor_list[idx] is not None else set()
-        neighbors_output.append({organism_key: organism, 'neighbors': list(current_neighbors)})
+        neighbors_output.append({species_key: species_value, 'neighbors': list(current_neighbors)})
 
+        # Build nodes with dynamic metadata from METADATA_DICT
         for gene in mod_genes:
-            node_data = {
-                'data': {
-                    id_key: f"{organism}_{gene}",
-                    gene_key: gene,
-                    module_color_key: gene_metadata.loc[gene, 'module_colors'],
-                    ortho_id_key: gene_metadata.loc[gene, 'ortho_id'] if "ortho_id" in gene_metadata.columns else "",
-                    organism_key: organism,
-                    name_key: current_adata.uns['name'],
-                    go_terms_key: gene_metadata.loc[gene, 'go_terms'] if "go_terms" in gene_metadata.columns else "",
-                    ipr_id_key: gene_metadata.loc[gene, 'ipr_id'] if "ipr_id" in gene_metadata.columns else ""
-                }
-            }
+            node_data = {'data': {}}
+            # Set the node ID
+            node_data['data'][id_key] = f"{species_value}_{gene}"
+            # Iterate over all keys in METADATA_DICT to add metadata dynamically
+            for meta_key, output_key in METADATA_DICT.items():
+                if meta_key == "transcript":
+                    value = gene
+                    meta_key = "gene"
+                elif meta_key == "species":
+                    value = species_value
+                else:
+                    value = gene_metadata.loc[gene, meta_key] if meta_key in gene_metadata.columns else ""
+                # Replace NaN values with empty string
+                if pd.isna(value):
+                    value = ""
+                else:
+                    value = str(value)
+
+                node_data['data'][meta_key] = value
+            # Mark as neighbor if the gene is in the neighbor set
             if gene in current_neighbors:
                 node_data['data'][is_neighbor_key] = True
-            node_data['data'] = {k: v if not pd.isna(v) else "" for k, v in node_data['data'].items()}
+
+            # Add the dataset name    
+            node_data['data']['name'] = current_adata.uns['name']
             nodes.append(node_data)
 
+        # Build edges based on TOM threshold (without extra metadata)
         for i in range(len(mod_genes)):
             for j in range(i + 1, len(mod_genes)):
                 gene_i = mod_genes[i]
@@ -2011,10 +2035,9 @@ def export_co_expression_network_to_cytoscape(
                 if current_tom.loc[gene_i, gene_j] > threshold:
                     edge_data = {
                         'data': {
-                            source_key: f"{organism}_{gene_i}",
-                            target_key: f"{organism}_{gene_j}",
-                            weight_key: current_tom.loc[gene_i, gene_j],
-                            organism_key: organism
+                            source_key: f"{species_value}_{gene_i}",
+                            target_key: f"{species_value}_{gene_j}",
+                            weight_key: current_tom.loc[gene_i, gene_j]
                         }
                     }
                     edges.append(edge_data)

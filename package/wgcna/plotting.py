@@ -2046,7 +2046,7 @@ def plot_hub_connectivity(adata: AnnData, config: PlotConfig, top_n: int = 1, pr
     all_data = []
     for module, df in adata.uns['hub_genes'].items():
         df = df.nlargest(top_n, primary_y_column)
-        df['moduleColor'] = module
+        df['module_colors'] = module
         df['Transcript'] = df.index
         if 'gene_id' in df.columns:
             df = df.set_index('gene_id')
@@ -2097,7 +2097,7 @@ def plot_hub_connectivity(adata: AnnData, config: PlotConfig, top_n: int = 1, pr
         xaxis=dict(
             tickmode='array',
             tickvals=x_positions,
-            ticktext=combined_df['moduleColor']
+            ticktext=combined_df['module_colors']
         ),
         xaxis_tickangle=-45,
         barmode='group'
@@ -3611,9 +3611,9 @@ def plot_cyto_network(config: PlotConfig, custom_filename: str = "cyto_network",
 
     if use_shapes:
         shape_dict = generate_cyto_shape_dict(
-            [node['data']['moduleColor'] for node in network_data['nodes']], None)
+            [node['data']['module_colors'] for node in network_data['nodes']], None)
         for node in network_data['nodes']:
-            module_color = node['data']['moduleColor']
+            module_color = node['data']['module_colors']
             node['data']['shape'] = shape_dict.get(module_color, 'ellipse')
 
     if highlight:

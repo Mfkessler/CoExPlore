@@ -502,7 +502,7 @@ def prepare_dataframe(data: List[Dict[str, Dict[str, str]]],
                       data_key: str = 'data', 
                       id_key: str = 'id', 
                       ortho_id_key: str = 'ortho_id', 
-                      organism_key: str = 'organism', 
+                      organism_key: str = 'species', 
                       cluster_col: str = 'Cluster', 
                       no_clusters_label: str = 'No clusters', 
                       no_orthogroup_label: str = 'No orthogroup') -> pd.DataFrame:
@@ -545,7 +545,7 @@ def prepare_dataframe(data: List[Dict[str, Dict[str, str]]],
 def summarize_orthogroups(df: pd.DataFrame, 
                           ortho_id_col: str = 'ortho_id', 
                           id_col: str = 'id', 
-                          organism_col: str = 'organism', 
+                          organism_col: str = 'species', 
                           cluster_col: str = 'Cluster', 
                           transcripts_col: str = 'Transcripts', 
                           species_col: str = 'Species', 
@@ -587,7 +587,7 @@ def summarize_orthogroups(df: pd.DataFrame,
     return df_summary
 
 
-def calculate_jaccard_matrix(df: pd.DataFrame, cluster_col: str = "Cluster", ortho_id_col: str = "ortho_id", organism_col: str = "organism") -> pd.DataFrame:
+def calculate_jaccard_matrix(df: pd.DataFrame, cluster_col: str = "Cluster", ortho_id_col: str = "ortho_id", organism_col: str = "species") -> pd.DataFrame:
     """
     Calculates a square matrix containing the Jaccard Index between clusters
     based on shared 'ortho_id' values, including species information in the index.
