@@ -14,6 +14,7 @@ from .plotting import (PlotConfig,
                        plot_filtered_go_terms,
                        plot_cyto_network,
                        plot_overlap,
+                       plot_expression_heatmaps,
                        plot_eigengene_expression_bokeh)
 from anndata import AnnData
 from jinja2 import Environment, FileSystemLoader
@@ -163,7 +164,7 @@ def analyze_co_expression_network(adata: Union[AnnData, List[AnnData]], config: 
 
     if progress_callback:
         progress_callback(f"Calculating eigengenes")
-    eigengene_files, module_trait_files, table_html, combined_plot_path = process_eigengenes(adata, cluster_map, config, topic,
+    eigengene_files, module_trait_files, table_html, combined_plot_path, heatmap_paths = process_eigengenes(adata, cluster_map, config, topic,
                                                                                              plot_module_trait_relationships, plot_bar_plots,
                                                                                              custom_filename=custom_filename, tool=tool,
                                                                                              progress_callback=progress_callback,
@@ -191,6 +192,8 @@ def analyze_co_expression_network(adata: Union[AnnData, List[AnnData]], config: 
         network_plot_path = f"{custom_filename}.html"
         combined_plot_path = os.path.basename(
             combined_plot_path) if combined_plot_path else None
+        heatmap_paths = ([os.path.basename(path) if path else None for path in heatmap_paths]
+                    if heatmap_paths else None)
 
         if progress_callback:
             progress_callback(f"Generating HTML report")
@@ -202,6 +205,7 @@ def analyze_co_expression_network(adata: Union[AnnData, List[AnnData]], config: 
             ortho_table_html=ortho_table_html if tool == "cytoscape" else None,
             images=images,
             combined_plot_path=combined_plot_path,
+            heatmap_paths=heatmap_paths,
             topic=topic,
             ortho_plot_path=ortho_plot_path if tool == "cytoscape" else None,
             network_plot_path=network_plot_path,
@@ -345,6 +349,7 @@ def process_eigengenes(adata: Union[AnnData, List[AnnData]], cluster_map: dict, 
     columns = ["Species", "Total Transcripts",
                "Top Module", "Top Module (%)", "Unique Modules"]
     combined_plot_path = None
+    heatmap_paths = None
 
     if isinstance(adata, list):
         # Handle the case where adata is a list of AnnData objects
@@ -481,9 +486,13 @@ def process_eigengenes(adata: Union[AnnData, List[AnnData]], cluster_map: dict, 
             progress_callback(f"Plotting combined eigengene expression")
         combined_plot_path = plot_eigengene_expression_bokeh(combined_eigengene_data, config,
                                                             custom_filename=f"{custom_filename}_combined_bokeh")
+        heatmap_paths = plot_expression_heatmaps(combined_eigengene_data, "All Clusters", False, config, height=None, width=None,
+                                                 custom_filename=f"{custom_filename}_heatmap")
+        print(f"Heatmap paths: {heatmap_paths}")
     else:
         print("No eigengene data found for combined plotting")
         combined_plot_path = None
+        heatmap_paths = None
 
     # Combine all module info DataFrames if needed
     combined_module_info_df = pd.concat(
@@ -494,7 +503,7 @@ def process_eigengenes(adata: Union[AnnData, List[AnnData]], cluster_map: dict, 
     table_html = combined_module_info_df.to_html(
         classes='dynamic-table display dataTable no-border', index=False, border=0, header=True, table_id="infoResults")
 
-    return eigengene_files, module_trait_files, table_html, combined_plot_path
+    return eigengene_files, module_trait_files, table_html, combined_plot_path, heatmap_paths
 
 
 def filter_cluster_map(cluster_map: dict, species: str) -> dict:
@@ -551,7 +560,8 @@ def map_tissue_info(cluster_eigengenes: pd.DataFrame, ad: AnnData) -> pd.DataFra
 
 
 def generate_co_expression_html(adata: Union[AnnData, List[AnnData]], config: PlotConfig, table_html: str, tom_table_html: str,
-                                ortho_table_html: str, images: List[str], combined_plot_path: str, topic: str, ortho_plot_path: str, network_plot_path: str,
+                                ortho_table_html: str, images: List[str], combined_plot_path: str, heatmap_paths: List[str],
+                                topic: str, ortho_plot_path: str, network_plot_path: str,
                                 threshold: int, template_path: str, custom_filename: str = None) -> str:
     """
     Generate an HTML report for the co-expression analysis.
@@ -562,6 +572,7 @@ def generate_co_expression_html(adata: Union[AnnData, List[AnnData]], config: Pl
     - table_html (str): HTML table with module information.
     - images (List[str]): List of image file names.
     - combined_plot_path (str): Path to the combined eigengene plot.
+    - heatmap_paths (List[str]): List of paths to the heatmap plots.
     - topic (str): Headline for the analysis.
     - ortho_plot_path (str): Path to the HTML file of the orthogroup overlap plot
     - network_plot_path (str): Path to the HTML file of the co-expression network plot.
@@ -587,6 +598,7 @@ def generate_co_expression_html(adata: Union[AnnData, List[AnnData]], config: Pl
         ortho_table_html=ortho_table_html,
         images=images,
         combined_plot_path=combined_plot_path,
+        heatmap_paths=heatmap_paths,
         network_plot_path=network_plot_path,
         ortho_plot_path=ortho_plot_path
     )

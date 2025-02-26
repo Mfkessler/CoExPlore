@@ -1309,7 +1309,7 @@ def plot_overlap(overlap_matrix: pd.DataFrame, config: PlotConfig, column: str =
 
 def _generate_heatmap(df_filtered: pd.DataFrame, title: str, file_suffix: str,
                       config, row_cluster: bool, col_cluster: bool,
-                      width: int, height: int) -> None:
+                      width: int, height: int, custom_filename: str = None) -> None:
     """
     This helper function generates and saves/displays a heatmap from a filtered DataFrame.
     
@@ -1322,12 +1322,16 @@ def _generate_heatmap(df_filtered: pd.DataFrame, title: str, file_suffix: str,
     - col_cluster (bool): Whether to perform hierarchical clustering on columns.
     - width (int): Plot width.
     - height (int): Plot height.
+    - custom_filename (str): Custom filename for the plot.
+
+    Returns:
+    - str: Absolute path to the saved plot.
     """
 
     # Pivot: rows = Cluster, columns = Tissue; value = median(Expression)
     pivot_table = df_filtered.pivot_table(index='Cluster', columns='Tissue', 
-                                          values='Expression', aggfunc=np.median)
-    
+                                        values='Expression', aggfunc="median")
+
     # Create custom hover text matrix with the desired order and information
     hover_text = []
     for cluster in pivot_table.index:
@@ -1415,16 +1419,21 @@ def _generate_heatmap(df_filtered: pd.DataFrame, title: str, file_suffix: str,
     fig.update_yaxes(automargin=True)
     
     if config.save_plots:
-        filename = f"median_expression_heatmap_{file_suffix}.html"
+        if custom_filename:
+            filename = f"{custom_filename}_{file_suffix}.html"
+        else:
+            filename = f"median_expression_heatmap_{file_suffix}.html"
         fig.write_html(f"{config.output_path}/{filename}")
     
     if config.show:
         fig.show()
 
+    return os.path.abspath(f"{config.output_path}/{filename}")
+
 
 def plot_expression_heatmaps(df: pd.DataFrame, cluster_keyword: str, include_all_clusters: bool,
-                             config, title: str = "Cluster-trait Eigengenexpression", row_cluster: bool = True, col_cluster: bool = False,
-                             width: int = 1200, height: int = 800) -> None:
+                             config, title: str = "", row_cluster: bool = True, col_cluster: bool = False,
+                             width: int = 1200, height: int = 800, custom_filename: str = None) -> None:
     """
     This function creates heatmaps of median gene expression per tissue per cluster.
     
@@ -1446,29 +1455,37 @@ def plot_expression_heatmaps(df: pd.DataFrame, cluster_keyword: str, include_all
     - col_cluster (bool): Whether to perform hierarchical clustering on columns.
     - width (int): Plot width.
     - height (int): Plot height.
+    - custom_filename (str): Custom filename for the plot.
+
+    Returns:
+    - List of file paths for the generated heatmaps.
     """
+
+    paths = []
 
     if include_all_clusters:
         # Use the full DataFrame (all clusters)
-        _generate_heatmap(df, title=title or "Heatmap: All Clusters Included",
+        paths.append(_generate_heatmap(df, title=title or "Heatmap: All Clusters Included",
                           file_suffix="all_clusters", config=config,
                           row_cluster=row_cluster, col_cluster=col_cluster,
-                          width=width, height=height)
+                          width=width, height=height, custom_filename=custom_filename))
     else:
         # Heatmap 1: Exclude clusters that contain the keyword ("All Clusters")
         df_exclude = df[~df['Cluster'].str.contains(cluster_keyword)]
-        _generate_heatmap(df_exclude,
-                          title=title or "Heatmap: Excluding 'All Clusters'",
+        paths.append(_generate_heatmap(df_exclude,
+                          title=f"Cluster-trait Eigengenexpression",
                           file_suffix="exclude_all_clusters", config=config,
                           row_cluster=row_cluster, col_cluster=col_cluster,
-                          width=width, height=height)
+                          width=width, height=height, custom_filename=custom_filename))
         # Heatmap 2: Only clusters that contain the keyword ("All Clusters")
         df_include = df[df['Cluster'].str.contains(cluster_keyword)]
-        _generate_heatmap(df_include,
-                          title=title or "Heatmap: Only 'All Clusters'",
+        paths.append(_generate_heatmap(df_include,
+                          title=f"Species-trait Eigengenexpression",
                           file_suffix="only_all_clusters", config=config,
                           row_cluster=row_cluster, col_cluster=col_cluster,
-                          width=width, height=height)
+                          width=width, height=height, custom_filename=custom_filename))
+        
+    return paths
 
 
 def plot_stacked_results(results: Dict[str, pd.DataFrame], config: PlotConfig, custom_filename: str = None) -> Tuple[go.Figure, go.Figure]:
