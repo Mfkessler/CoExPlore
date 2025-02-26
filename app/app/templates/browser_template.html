@@ -289,6 +289,19 @@
           {% endfor %}
         ];
 
+        // Visible columns for DataTables
+        var visibleColumns = ["species", "transcript"]; 
+        var hasModuleColors = dtColumns.some(col => col.data === "module_colors");
+        var hasOrthoId = dtColumns.some(col => col.data === "ortho_id");
+
+        if (hasModuleColors) visibleColumns.push("module_colors");
+        if (hasOrthoId) visibleColumns.push("ortho_id");
+
+        var columnDefs = dtColumns.map((col, index) => ({
+            targets: index,
+            visible: visibleColumns.includes(col.data)
+        }));
+
         $(document).ready(function() {
             // Custom DataTables search filter with selectable column
             $.fn.dataTable.ext.search.push(function(settings, data, dataIndex) {
@@ -429,10 +442,7 @@
                         }
                     }
                 ],
-                columnDefs: [
-                    { responsivePriority: 1, targets: 0 },
-                    { responsivePriority: 2, targets: 1 }
-                ],
+                columnDefs: columnDefs,
                 initComplete: function() {
                     toggleEmptyColumns(this.api());
                     $('#browserRes').on('draw.dt', function() {
