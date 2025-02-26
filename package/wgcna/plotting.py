@@ -1307,6 +1307,170 @@ def plot_overlap(overlap_matrix: pd.DataFrame, config: PlotConfig, column: str =
         overlap_matrix.to_csv(raw_data_filepath)
 
 
+def _generate_heatmap(df_filtered: pd.DataFrame, title: str, file_suffix: str,
+                      config, row_cluster: bool, col_cluster: bool,
+                      width: int, height: int) -> None:
+    """
+    This helper function generates and saves/displays a heatmap from a filtered DataFrame.
+    
+    Parameters:
+    - df_filtered (pd.DataFrame): Filtered DataFrame with columns 'Sample', 'Species', 'Tissue', 'Cluster', 'Expression'.
+    - title (str): Title for the heatmap.
+    - file_suffix (str): Suffix for the output filename.
+    - config: Plot configuration object (must have 'show', 'save_plots', and 'output_path' attributes).
+    - row_cluster (bool): Whether to perform hierarchical clustering on rows.
+    - col_cluster (bool): Whether to perform hierarchical clustering on columns.
+    - width (int): Plot width.
+    - height (int): Plot height.
+    """
+
+    # Pivot: rows = Cluster, columns = Tissue; value = median(Expression)
+    pivot_table = df_filtered.pivot_table(index='Cluster', columns='Tissue', 
+                                          values='Expression', aggfunc=np.median)
+    
+    # Create custom hover text matrix with the desired order and information
+    hover_text = []
+    for cluster in pivot_table.index:
+        row_text = []
+        for tissue in pivot_table.columns:
+            # Filter the original DataFrame for the given cluster and tissue
+            group = df_filtered[(df_filtered['Cluster'] == cluster) & (df_filtered['Tissue'] == tissue)]
+            if group.empty:
+                row_text.append("No data")
+            else:
+                # Get unique species names (if multiple, join them with a comma)
+                species_unique = group['Species'].unique()
+                species_str = ", ".join(species_unique)
+                # Calculate the median expression value (rounded to 2 decimals)
+                median_val = group['Expression'].median()
+                # Build a string with one line per sample in the format "SampleName: Expression"
+                samples_str = "<br>".join([f"{row['Sample']}: {row['Expression']:.2f}" for _, row in group.iterrows()])
+                # Compose the hover text in the desired order
+                row_text.append(
+                    f"Species: {species_str}<br>"
+                    f"Tissue: {tissue}<br>"
+                    f"Median: {median_val:.2f}<br>"
+                    f"Samples:<br>{samples_str}"
+                )
+        hover_text.append(row_text)
+    
+    # Optional: Cluster rows
+    if row_cluster and pivot_table.shape[0] > 1:
+        row_linkage = linkage(pivot_table.fillna(0).values, method='ward')
+        row_order = leaves_list(row_linkage)
+        pivot_table = pivot_table.iloc[row_order, :]
+        hover_text = [hover_text[i] for i in row_order]
+    
+    # Optional: Cluster columns
+    if col_cluster and pivot_table.shape[1] > 1:
+        col_linkage = linkage(pivot_table.fillna(0).T.values, method='ward')
+        col_order = leaves_list(col_linkage)
+        pivot_table = pivot_table.iloc[:, col_order]
+        hover_text = [[row[i] for i in col_order] for row in hover_text]
+    
+    # Determine data range
+    if not np.isnan(pivot_table.values).all():
+        data_min = np.nanmin(pivot_table.values)
+        data_max = np.nanmax(pivot_table.values)
+    else:
+        data_min, data_max = 0, 1
+    
+    mask = pivot_table.isna()
+    
+    # Main heatmap trace with custom hover text
+    heatmap_trace = go.Heatmap(
+        z=pivot_table.values,
+        x=pivot_table.columns,
+        y=pivot_table.index,
+        colorscale='Viridis',
+        zmin=data_min,
+        zmax=data_max,
+        text=hover_text,
+        hoverinfo='text',
+        texttemplate="%{z:.2f}",
+        hoverongaps=False
+    )
+    
+    # Trace for missing values (displayed in grey)
+    missing_trace = go.Heatmap(
+        z=np.where(mask, data_max, np.nan),
+        x=pivot_table.columns,
+        y=pivot_table.index,
+        colorscale=[[0, 'grey'], [1, 'grey']],
+        showscale=False,
+        hoverinfo='none'
+    )
+    
+    fig = go.Figure(data=[missing_trace, heatmap_trace])
+    fig.update_layout(
+        title=dict(text=title, font=dict(size=20), x=0.5),
+        xaxis_title="Tissues",
+        yaxis_title="Clusters",
+        width=width,
+        height=height,
+        margin=dict(l=150, r=10, b=150, t=80),
+        hovermode='closest'
+    )
+    fig.update_xaxes(tickangle=45, automargin=True)
+    fig.update_yaxes(automargin=True)
+    
+    if config.save_plots:
+        filename = f"median_expression_heatmap_{file_suffix}.html"
+        fig.write_html(f"{config.output_path}/{filename}")
+    
+    if config.show:
+        fig.show()
+
+
+def plot_expression_heatmaps(df: pd.DataFrame, cluster_keyword: str, include_all_clusters: bool,
+                             config, title: str = "Cluster-trait Eigengenexpression", row_cluster: bool = True, col_cluster: bool = False,
+                             width: int = 1200, height: int = 800) -> None:
+    """
+    This function creates heatmaps of median gene expression per tissue per cluster.
+    
+    If 'include_all_clusters' is True, a single heatmap is generated including all clusters.
+    If False, two heatmaps are produced:
+      - One excluding clusters that contain the keyword (e.g. excluding "All Clusters")
+      - One including only clusters that contain the keyword.
+    
+    Hover text shows the median (2 decimals), the tissue, and the individual sample expression values (2 decimals each).
+    
+    Parameters:
+    - df (pd.DataFrame): DataFrame with columns 'Sample', 'Species', 'Tissue', 'Cluster', and 'Expression'.
+    - cluster_keyword (str): Keyword to identify clusters (e.g. "All Clusters").
+    - include_all_clusters (bool): If True, include all clusters in one heatmap.
+                                  If False, generate two separate heatmaps.
+    - config: Plot configuration object (with 'show', 'save_plots', and 'output_path').
+    - title (str): Base title for the plots.
+    - row_cluster (bool): Whether to perform hierarchical clustering on rows.
+    - col_cluster (bool): Whether to perform hierarchical clustering on columns.
+    - width (int): Plot width.
+    - height (int): Plot height.
+    """
+
+    if include_all_clusters:
+        # Use the full DataFrame (all clusters)
+        _generate_heatmap(df, title=title or "Heatmap: All Clusters Included",
+                          file_suffix="all_clusters", config=config,
+                          row_cluster=row_cluster, col_cluster=col_cluster,
+                          width=width, height=height)
+    else:
+        # Heatmap 1: Exclude clusters that contain the keyword ("All Clusters")
+        df_exclude = df[~df['Cluster'].str.contains(cluster_keyword)]
+        _generate_heatmap(df_exclude,
+                          title=title or "Heatmap: Excluding 'All Clusters'",
+                          file_suffix="exclude_all_clusters", config=config,
+                          row_cluster=row_cluster, col_cluster=col_cluster,
+                          width=width, height=height)
+        # Heatmap 2: Only clusters that contain the keyword ("All Clusters")
+        df_include = df[df['Cluster'].str.contains(cluster_keyword)]
+        _generate_heatmap(df_include,
+                          title=title or "Heatmap: Only 'All Clusters'",
+                          file_suffix="only_all_clusters", config=config,
+                          row_cluster=row_cluster, col_cluster=col_cluster,
+                          width=width, height=height)
+
+
 def plot_stacked_results(results: Dict[str, pd.DataFrame], config: PlotConfig, custom_filename: str = None) -> Tuple[go.Figure, go.Figure]:
     """
     Visualizes stacked results for transcripts and GO terms per module from AnnData analysis.
