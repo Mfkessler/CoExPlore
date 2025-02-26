@@ -2693,13 +2693,12 @@ def add_metadata_columns(adata: AnnData, mapping_file: str, columns: Dict[str, s
 
 def add_metadata_uniprot(adata: AnnData, up_file: str, selected_columns: List[str] = None) -> AnnData:
     """
-    Parses a uniprot annotation file and annotates the adata.var DataFrame of an AnnData object with selected columns.
+    Parses a Uniprot annotation file and annotates the adata.var DataFrame of an AnnData object with selected columns.
     
     Parameters:
     - adata (AnnData): The AnnData object to annotate.
-    - up_file (str): Path to the uniprot annotation file.
-    - selected_columns (List[str]): List of column names from the up file to add to adata.var.
-      Default is ["ECNumber", "Genname", "Description", "Description long"].
+    - up_file (str): Path to the Uniprot annotation file.
+    - selected_columns (List[str]): List of column names from the Uniprot file to add to adata.var.
     
     Returns:
     - AnnData: The updated AnnData object with adata.var annotated.
@@ -2707,37 +2706,43 @@ def add_metadata_uniprot(adata: AnnData, up_file: str, selected_columns: List[st
 
     # Set default selected columns if not provided
     if selected_columns is None:
-        selected_columns = ["ECNumber", "Genname", "Description", "Description long"]
+        selected_columns = ["ECNumber", "Genename", "Description", "Description long"]
 
-    # Read the up annotation file as a pandas DataFrame with tab delimiter
+    # Read the Uniprot annotation file as a pandas DataFrame with tab delimiter
     df_up = pd.read_csv(up_file, sep='\t', dtype=str)
-    
+
     # Replace missing values with empty strings in the selected columns
     for col in selected_columns:
         if col not in df_up.columns:
-            # For the 'Genname' column, try to use 'Genename' if available
-            if col == "Genname" and "Genename" in df_up.columns:
-                df_up[col] = df_up["Genename"].fillna("")
-            else:
-                df_up[col] = ""
+            df_up[col] = ""
         else:
             df_up[col] = df_up[col].fillna("")
     
-    # Check if the up file contains the mandatory "ID" column for mapping
+    # Check if the Uniprot file contains the mandatory "ID" column for mapping
     if "ID" not in df_up.columns:
-        raise ValueError("The up annotation file must contain an 'ID' column.")
+        raise ValueError("The Uniprot annotation file must contain an 'ID' column.")
     
     # Set the "ID" column as the index to enable mapping to adata.var
     df_up.set_index("ID", inplace=True)
     
     # Extract the selected columns and align them with adata.var index; fill missing genes with empty string
     df_annot = df_up[selected_columns].copy().reindex(adata.var.index, fill_value="")
-
-    # Parse columns: replace space with underscore, and lowercase
-    df_annot.columns = df_annot.columns.str.replace(" ", "_").str.lower()
     
+    # Parse columns: replace spaces with underscores, and lowercase
+    df_annot.columns = df_annot.columns.str.replace(" ", "_").str.lower()
+
+    # Check if any of the new columns already exist in adata.var
+    existing_columns = list(set(df_annot.columns) & set(adata.var.columns))
+    if existing_columns:
+        print(f"WARNING: The following columns already exist in adata.var and will be overwritten: {existing_columns}")
+        adata.var.drop(columns=existing_columns, inplace=True)
+
     # Concatenate the annotation DataFrame with the existing adata.var DataFrame
     adata.var = pd.concat([adata.var, df_annot], axis=1)
+
+    # Display differences between IDs in adata.var and IDs in the Uniprot file
+    missing_in_uniprot = adata.var.index.difference(df_up.index)
+    print("IDs in adata.var that are missing in the Uniprot file:", missing_in_uniprot)
     
     return adata
 
