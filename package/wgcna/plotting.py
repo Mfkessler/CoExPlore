@@ -1244,6 +1244,8 @@ def plot_overlap(overlap_matrix: pd.DataFrame, config: PlotConfig, column: str =
             # Tick formatting
             ticktext=[f'{data_min:.2f}',
                       f'{(data_min + data_max) / 2:.2f}', f'{data_max:.2f}'],
+            thickness=15,
+            len=0.5
         ),
         hoverongaps=False,  # Don't show tooltips on masked areas
         texttemplate="%{z:.2f}",  # Display values inside the cells
@@ -1284,7 +1286,7 @@ def plot_overlap(overlap_matrix: pd.DataFrame, config: PlotConfig, column: str =
 
     # Responsive resizing for axis labels and title
     fig.update_xaxes(tickangle=45, automargin=True)
-    fig.update_yaxes(automargin=True)
+    fig.update_yaxes(automargin=True, scaleanchor="x", scaleratio=1)
 
     # Add zoom and pan
     fig.update_layout(
@@ -1309,7 +1311,7 @@ def plot_overlap(overlap_matrix: pd.DataFrame, config: PlotConfig, column: str =
 
 def _generate_heatmap(df_filtered: pd.DataFrame, title: str, file_suffix: str,
                       config, row_cluster: bool, col_cluster: bool,
-                      width: int, height: int, custom_filename: str = None) -> None:
+                      width: int, height: int, custom_filename: str = None) -> str:
     """
     This helper function generates and saves/displays a heatmap from a filtered DataFrame.
     
@@ -1327,29 +1329,24 @@ def _generate_heatmap(df_filtered: pd.DataFrame, title: str, file_suffix: str,
     Returns:
     - str: Absolute path to the saved plot.
     """
-
+    
     # Pivot: rows = Cluster, columns = Tissue; value = median(Expression)
     pivot_table = df_filtered.pivot_table(index='Cluster', columns='Tissue', 
-                                        values='Expression', aggfunc="median")
+                                          values='Expression', aggfunc="median")
 
     # Create custom hover text matrix with the desired order and information
     hover_text = []
     for cluster in pivot_table.index:
         row_text = []
         for tissue in pivot_table.columns:
-            # Filter the original DataFrame for the given cluster and tissue
             group = df_filtered[(df_filtered['Cluster'] == cluster) & (df_filtered['Tissue'] == tissue)]
             if group.empty:
                 row_text.append("No data")
             else:
-                # Get unique species names (if multiple, join them with a comma)
                 species_unique = group['Species'].unique()
                 species_str = ", ".join(species_unique)
-                # Calculate the median expression value (rounded to 2 decimals)
                 median_val = group['Expression'].median()
-                # Build a string with one line per sample in the format "SampleName: Expression"
                 samples_str = "<br>".join([f"{row['Sample']}: {row['Expression']:.2f}" for _, row in group.iterrows()])
-                # Compose the hover text in the desired order
                 row_text.append(
                     f"Species: {species_str}<br>"
                     f"Tissue: {tissue}<br>"
@@ -1381,7 +1378,7 @@ def _generate_heatmap(df_filtered: pd.DataFrame, title: str, file_suffix: str,
     
     mask = pivot_table.isna()
     
-    # Main heatmap trace with custom hover text
+    # Main heatmap trace with updated colorbar design (only three tick labels: min, mid, max)
     heatmap_trace = go.Heatmap(
         z=pivot_table.values,
         x=pivot_table.columns,
@@ -1392,7 +1389,14 @@ def _generate_heatmap(df_filtered: pd.DataFrame, title: str, file_suffix: str,
         text=hover_text,
         hoverinfo='text',
         texttemplate="%{z:.2f}",
-        hoverongaps=False
+        hoverongaps=False,
+        colorbar=dict(
+            title=dict(text="Median Expression", side="right"),
+            tickvals=[data_min, (data_min + data_max) / 2, data_max],
+            ticktext=[f"{data_min:.2f}", f"{(data_min + data_max) / 2:.2f}", f"{data_max:.2f}"],
+            thickness=15,
+            len=0.5
+        )
     )
     
     # Trace for missing values (displayed in grey)
@@ -1405,6 +1409,7 @@ def _generate_heatmap(df_filtered: pd.DataFrame, title: str, file_suffix: str,
         hoverinfo='none'
     )
     
+    # Build figure with main trace first, then overlay missing trace
     fig = go.Figure(data=[missing_trace, heatmap_trace])
     fig.update_layout(
         title=dict(text=title, font=dict(size=20), x=0.5),
@@ -1413,10 +1418,12 @@ def _generate_heatmap(df_filtered: pd.DataFrame, title: str, file_suffix: str,
         width=width,
         height=height,
         margin=dict(l=150, r=10, b=150, t=80),
-        hovermode='closest'
+        hovermode='closest',
+        dragmode='zoom',
+        hoverlabel=dict(bgcolor="white", font_size=12)
     )
     fig.update_xaxes(tickangle=45, automargin=True)
-    fig.update_yaxes(automargin=True)
+    fig.update_yaxes(automargin=True, scaleanchor="x", scaleratio=1)
     
     if config.save_plots:
         if custom_filename:
@@ -1427,7 +1434,7 @@ def _generate_heatmap(df_filtered: pd.DataFrame, title: str, file_suffix: str,
     
     if config.show:
         fig.show()
-
+    
     return os.path.abspath(f"{config.output_path}/{filename}")
 
 
