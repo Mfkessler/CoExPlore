@@ -2,7 +2,7 @@
     "species": "Species",
     "transcript": "Transcript",
     "module_colors": "Module Colors",
-    "module_labels": "Module Labels",
+    "modules_labels": "Module Labels",
     "go_terms": "GO Terms",
     "total_counts": "Total Counts",
     "ortho_id": "Orthogroup",
