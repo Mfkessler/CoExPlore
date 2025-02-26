@@ -25,6 +25,7 @@ services:
       - ./scripts/generate_db.py:/generate_db.py
       - ./scripts/wait_for_postgres.py:/wait_for_postgres.py
       - ./package:/CoExPlore/package
+      - ./metadata_dict.json:/metadata_dict.json
     working_dir: /
     command: >
       bash -c "python wait_for_postgres.py && python generate_db.py && touch /output/db_done.txt"
@@ -43,6 +44,7 @@ services:
       - ./app:/app
       - ./output:/output
       - ./package:/CoExPlore/package
+      - ./metadata_dict.json:/metadata_dict.json
     working_dir: /app
     command: >
       bash -c "
@@ -69,6 +71,7 @@ services:
       - ./app:/app
       - ./output:/output
       - ./package:/CoExPlore/package
+      - ./metadata_dict.json:/metadata_dict.json
     working_dir: /app
     command: >
       bash -c "

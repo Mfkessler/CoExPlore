@@ -10,6 +10,7 @@ services:
       - ./pipeline/config.yml:/CoExPlore/config.yml:z
       - ./pipeline/Snakefile:/CoExPlore/Snakefile:z
       - ./app:/app:z
+      - ./metadata_dict.json:/metadata_dict.json
     working_dir: /CoExPlore
     command: >
       bash -c "snakemake --cores 4 && touch /CoExPlore/output/pipeline_done.txt"
