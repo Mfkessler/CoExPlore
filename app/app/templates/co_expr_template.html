@@ -270,6 +270,43 @@
         </div>
         {% endif %}
 
+        {% if heatmap_paths %}
+        <!-- Heatmap of Clusters -->
+        <div class="card mb-3">
+            <div class="card-header">
+                <h5 class="mb-0 d-flex justify-content-between align-items-center">
+                    Cluster-trait Expression Heatmap
+                    <button class="btn btn-link toggle-button" data-toggle="collapse" data-target="#plotClusterHeatmap" aria-expanded="true">
+                        <span>Show</span>
+                    </button>
+                </h5>
+            </div>
+            <div id="plotClusterHeatmap" class="collapse show">
+                <div class="card-body">
+                    <iframe src="{{ heatmap_paths[0] }}" width="100%" height="800px" class="content-section"></iframe>
+                </div>
+            </div>
+        </div>
+
+        <!-- Heatmap of Species -->
+        <div class="card mb-3">
+            <div class="card-header">
+                <h5 class="mb-0 d-flex justify-content-between align-items-center">
+                    Species-trait Expression Heatmap
+                    <button class="btn btn-link toggle-button" data-toggle="collapse" data-target="#plotSpeciesHeatmap" aria-expanded="true">
+                        <span>Show</span>
+                    </button>
+                </h5>
+            </div>
+            <div id="plotSpeciesHeatmap" class="collapse show">
+                <div class="card-body">
+                    <iframe src="{{ heatmap_paths[1] }}" width="100%" height="800px" class="content-section"></iframe>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        <!-- Heatmap of Species -->
+
         {% if combined_plot_path %}
         <!-- Eigengene Expression Combined -->
         <div class="card mb-3">
