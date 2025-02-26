@@ -1,6 +1,7 @@
 import os
 import random
 import h5py
+import json
 import pandas as pd
 import numpy as np
 import scanpy as sc
@@ -2688,3 +2689,76 @@ def add_metadata_columns(adata: AnnData, mapping_file: str, columns: Dict[str, s
         adata.var[col_key] = adata.var[col_key].fillna('')
     
     return adata
+
+
+def add_metadata_uniprot(adata: AnnData, up_file: str, selected_columns: List[str] = None) -> AnnData:
+    """
+    Parses a uniprot annotation file and annotates the adata.var DataFrame of an AnnData object with selected columns.
+    
+    Parameters:
+    - adata (AnnData): The AnnData object to annotate.
+    - up_file (str): Path to the uniprot annotation file.
+    - selected_columns (List[str]): List of column names from the up file to add to adata.var.
+      Default is ["ECNumber", "Genname", "Description", "Description long"].
+    
+    Returns:
+    - AnnData: The updated AnnData object with adata.var annotated.
+    """
+
+    # Set default selected columns if not provided
+    if selected_columns is None:
+        selected_columns = ["ECNumber", "Genname", "Description", "Description long"]
+
+    # Read the up annotation file as a pandas DataFrame with tab delimiter
+    df_up = pd.read_csv(up_file, sep='\t', dtype=str)
+    
+    # Replace missing values with empty strings in the selected columns
+    for col in selected_columns:
+        if col not in df_up.columns:
+            # For the 'Genname' column, try to use 'Genename' if available
+            if col == "Genname" and "Genename" in df_up.columns:
+                df_up[col] = df_up["Genename"].fillna("")
+            else:
+                df_up[col] = ""
+        else:
+            df_up[col] = df_up[col].fillna("")
+    
+    # Check if the up file contains the mandatory "ID" column for mapping
+    if "ID" not in df_up.columns:
+        raise ValueError("The up annotation file must contain an 'ID' column.")
+    
+    # Set the "ID" column as the index to enable mapping to adata.var
+    df_up.set_index("ID", inplace=True)
+    
+    # Extract the selected columns and align them with adata.var index; fill missing genes with empty string
+    df_annot = df_up[selected_columns].copy().reindex(adata.var.index, fill_value="")
+
+    # Parse columns: replace space with underscore, and lowercase
+    df_annot.columns = df_annot.columns.str.replace(" ", "_").str.lower()
+    
+    # Concatenate the annotation DataFrame with the existing adata.var DataFrame
+    adata.var = pd.concat([adata.var, df_annot], axis=1)
+    
+    return adata
+
+
+def load_metadata_dict(metadata_json_path: str) -> dict:
+    """
+    Loads the metadata dictionary from a JSON file.
+
+    Parameters:
+    - metadata_json_path (str): Path to the metadata JSON file.
+
+    Returns:
+    - dict: The loaded metadata dictionary
+    """
+
+    try:
+        with open(metadata_json_path, "r") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        print(f"Warning: {metadata_json_path} not found. Using an empty dictionary.")
+        return {}
+    except json.JSONDecodeError:
+        print(f"Error: {metadata_json_path} contains invalid JSON. Using an empty dictionary.")
+        return {}
