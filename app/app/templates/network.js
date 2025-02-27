@@ -9,6 +9,7 @@ document.addEventListener('DOMContentLoaded', function() {
     var highlightColor = '{{ highlight_color }}';  // Highlight color from Python
     var useEdgeTransparency = {{ use_edge_transparency|tojson }};  // Transparency flag
     var useEdgeColoring = {{ use_edge_coloring|tojson }};  // Edge coloring flag
+    var metadataMapping = {{ metadata_dict|tojson }};  // Metadata dictionary from Python
 
     var cy = cytoscape({
         container: document.getElementById('cy'),
@@ -141,22 +142,6 @@ document.addEventListener('DOMContentLoaded', function() {
         };
     }
 
-    const metadataMapping = {
-        "species": "Species",
-        "module_colors": "Module Colors",
-        "go_terms": "GO Terms",
-        "total_counts": "Total Counts",
-        "ortho_id": "Orthogroup",
-        "ortho_count": "Ortho Count",
-        "ipr_id": "InterPro ID",
-        "ipr_desc": "InterPro Description",
-        "pfam_id": "Pfam ID",
-        "pfam_desc": "Pfam Description",
-        "tf_family": "TF Family",
-        "ecnumber": "EC Number",
-        "genename": "Gene Name",
-        "description": "UniProt Description",
-    };
     const metadataKeys = Object.keys(metadataMapping);
 
     cy.ready(function() {
