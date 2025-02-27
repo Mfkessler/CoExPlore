@@ -9,7 +9,12 @@ document.addEventListener('DOMContentLoaded', function() {
     var highlightColor = '{{ highlight_color }}';  // Highlight color from Python
     var useEdgeTransparency = {{ use_edge_transparency|tojson }};  // Transparency flag
     var useEdgeColoring = {{ use_edge_coloring|tojson }};  // Edge coloring flag
-    var metadataMapping = {{ metadata_dict|tojson }};  // Metadata dictionary from Python
+
+    // Metadata
+    const METADATA_MAPPING = {{ metadata_dict|tojson }};
+    METADATA_MAPPING['gene'] = 'Transcript';
+    const FORMATTED_KEYS = ['go_terms', 'ipr_id'];
+    const HIDDEN_KEYS = ['description_long', 'modules_labels', 'module_count', 'unique_modules', 'unique_go_terms', 'transcript'];
 
     var cy = cytoscape({
         container: document.getElementById('cy'),
@@ -142,7 +147,7 @@ document.addEventListener('DOMContentLoaded', function() {
         };
     }
 
-    const metadataKeys = Object.keys(metadataMapping);
+    const metadataKeys = Object.keys(METADATA_MAPPING).filter(key => !HIDDEN_KEYS.includes(key));
 
     cy.ready(function() {
         /* Init edge visibility */
@@ -536,38 +541,37 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    function formatList(value) {
+        if (typeof value !== 'string' || value.trim() === '') {
+            return 'N/A'; 
+        }
+        if (!value.includes(',')) {
+            return value; 
+        }
+        let valuesArray = value.split(',');
+        return valuesArray[0] + ', +' + (valuesArray.length - 1);
+    }    
+
     /* Tooltip */
 
     // Tooltip on hover
     cy.on('mouseover', 'node', function(evt) {
         var node = evt.target;
-        var goTerms = node.data('go_terms');
-        var iprIds = node.data('ipr_id');
-      
-        // Adjust GO Terms
-        if (goTerms && goTerms.includes(',')) {
-          var goTermsArray = goTerms.split(',');
-          goTerms = goTermsArray[0] + ', +' + (goTermsArray.length - 1);
-        }
-          
-        // Adjust InterPro IDs
-        if (iprIds && iprIds.includes(',')) {
-          var iprIdsArray = iprIds.split(',');
-          iprIds = iprIdsArray[0] + ', +' + (iprIdsArray.length - 1);
-        }
       
         var tooltipText = '';
-        var dataDict = metadataMapping
+        var dataDict = METADATA_MAPPING
 
         for (var key in dataDict) {
-            if (node.data(key)) {
-                if(key === 'go_terms') {
-                    tooltipText += '<b>' + dataDict[key] + ':</b> ' + goTerms + '<br>';
-                } else if(key === 'ipr_id') {
-                    tooltipText += '<b>' + dataDict[key] + ':</b> ' + iprIds + '<br>';
-                } else {
-                    tooltipText += '<b>' + dataDict[key] + ':</b> ' + node.data(key) + '<br>';
-                }
+            if (HIDDEN_KEYS.includes(key)) {
+                continue;
+            }
+        
+            var value = node.data(key);
+        
+            if (value !== undefined && value !== null) {
+                let formattedValue = FORMATTED_KEYS.includes(key) ? formatList(value) : value;
+                
+                tooltipText += `<b>${dataDict[key]}:</b> ${formattedValue}<br>`;
             }
         }
 
@@ -575,7 +579,7 @@ document.addEventListener('DOMContentLoaded', function() {
         tooltipText += '<b>Degree:</b> ' + node.degree() + '<br>';
                         
         if (useClusterTooltip) { 
-            tooltipText += '<br><b>Cluster:</b> ' + node.data('cluster');
+            tooltipText += '<b>Cluster:</b> ' + node.data('cluster');
         }
 
         tooltip.style.display = 'block';
@@ -768,7 +772,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function updateTooltipText() {
         if (metadataActive) { // Show metadata only if active
-            buttonTooltip.innerHTML = "Current Metadata: <b>" + metadataMapping[metadataKeys[currentMetadataIndex]] + "</b>";
+            buttonTooltip.innerHTML = "Current Metadata: <b>" + METADATA_MAPPING[metadataKeys[currentMetadataIndex]] + "</b>";
         } else {
             buttonTooltip.innerHTML = "Current Metadata: <b>None</b>"; // Show "None" when inactive
         }
