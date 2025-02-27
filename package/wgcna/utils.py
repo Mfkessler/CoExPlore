@@ -2136,7 +2136,7 @@ def identify_network_clusters_from_json(network_data: dict, cluster_name: str,
     return cluster_map
 
 
-def calculate_all_tom_metrics(
+def get_node_table(
     tom: Union[pd.DataFrame, List[pd.DataFrame]],
     adata: Union[AnnData, List[AnnData]],
     cluster_info: Dict[str, str],

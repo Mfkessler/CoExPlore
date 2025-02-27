@@ -6,7 +6,7 @@ from .utils import (load_subset_from_hdf5,
                     get_goea_df,
                     export_co_expression_network_to_cytoscape,
                     identify_network_clusters_from_json,
-                    calculate_all_tom_metrics)
+                    get_node_table)
 from .plotting import (PlotConfig,
                        plot_co_expression_network,
                        plot_module_trait_relationships_heatmap,
@@ -155,11 +155,12 @@ def analyze_co_expression_network(adata: Union[AnnData, List[AnnData]], config: 
     if progress_callback:
         progress_callback(f"Calculating TOM metrics")
 
-    # TODO Remove TOM metrics and use metadata information from AnnData
-    
-    tom_metrics = calculate_all_tom_metrics(
+    # Node table including all metadata
+    node_table = get_node_table(
         tom, adata, cluster_map, tool, progress_callback).reset_index()
-    node_table_html = tom_metrics.to_html(
+    node_table = node_table.fillna("")
+    node_table = node_table.astype(str)
+    node_table_html = node_table.to_html(
         classes='dynamic-table display dataTable no-border', index=False, border=0, header=True, table_id="nodeResults")
 
     if progress_callback:
