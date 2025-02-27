@@ -2136,267 +2136,126 @@ def identify_network_clusters_from_json(network_data: dict, cluster_name: str,
     return cluster_map
 
 
-def calculate_tom_metrics(tom: pd.DataFrame) -> pd.DataFrame:
+def calculate_all_tom_metrics(
+    tom: Union[pd.DataFrame, List[pd.DataFrame]],
+    adata: Union[AnnData, List[AnnData]],
+    cluster_info: Dict[str, str],
+    tool: str,
+    progress_callback: Callable[[str], None] = None
+) -> pd.DataFrame:
     """
-    Calculates TOM-based metrics: Degree, Clustering Coefficient, Connected Components.
-
+    Combines TOM-based degree metrics with cluster assignments and metadata from adata.var.
+    
+    This function calculates only the necessary metrics:
+    - Node: Gene/transcript identifier.
+    - Species: Species name from adata.uns.
+    - Degree: Number of non-zero connections in the TOM matrix.
+    - Orthogroup: Orthogroup assignment from adata.var (if available, otherwise 'No orthogroup').
+    - Cluster: Cluster assignment from the provided cluster_info.
+    
+    Additional metadata columns are added from adata.var based on the global METADATA_DICT mapping.
+    METADATA_DICT keys correspond to adata.var column names and their values are the desired DataFrame column names.
+    The keys 'transcript', 'species', and 'ortho_id' are excluded from additional metadata.
+    
     Parameters:
-    - tom (pd.DataFrame): The TOM matrix.
-
+    - tom (pd.DataFrame or List[pd.DataFrame]): TOM matrix or list of matrices.
+    - adata (AnnData or List[AnnData]): AnnData object(s) containing gene metadata in .var and species info in .uns.
+    - cluster_info (dict): Dictionary mapping node identifiers to cluster assignments.
+    - tool (str): Tool used to generate cluster assignments (e.g., "cytoscape").
+    - progress_callback (Callable[[str], None], optional): Callback for reporting progress.
+    
     Returns:
-    - pd.DataFrame: DataFrame containing TOM-based metrics.
+    - pd.DataFrame: Combined DataFrame with columns "Node", "Species", "Degree", "Orthogroup", "Cluster"
+      and additional metadata columns from adata.var.
     """
-
-    degrees = (tom > 0).sum(axis=1)
-    clustering_coefficient = []
-
-    for gene in tom.index:
-        neighbors = tom.loc[gene][tom.loc[gene] > 0].index.tolist()
-        if len(neighbors) <= 1:
-            clustering_coefficient.append(0)
-        else:
-            sub_tom = tom.loc[neighbors, neighbors]
-            actual_edges = (sub_tom > 0).sum().sum() / 2
-            possible_edges = len(neighbors) * (len(neighbors) - 1) / 2
-            clustering_coefficient.append(
-                actual_edges / possible_edges if possible_edges > 0 else 0)
-
-    connected_components = (degrees > 0).astype(int)
-
-    return pd.DataFrame({
-        'degree': degrees,
-        'clustering_coefficient': clustering_coefficient,
-        'connected_components': connected_components
-    })
-
-
-def calculate_graph_metrics_from_clusters(tom: pd.DataFrame, cluster_info: dict) -> pd.DataFrame:
-    """
-    Calculates graph-based metrics: Betweenness Centrality, Closeness Centrality, Eccentricity using igraph,
-    and ensures all nodes in cluster_info are added to the graph.
-
-    Parameters:
-    - tom (pd.DataFrame): The TOM matrix.
-    - cluster_info (dict): Dictionary containing cluster assignments.
-
-    Returns:
-    - pd.DataFrame: DataFrame containing graph-based metrics.
-    """
-
-    # Initialize the iGraph graph with node names
-    G = ig.Graph(directed=False)
-    G.add_vertices(tom.index.tolist())
-
-    # Add edges with weights (no self-loops)
-    edges = [(i, j) for i in range(tom.shape[0])
-             for j in range(i + 1, tom.shape[1]) if tom.iat[i, j] > 0]
-    weights = [tom.iat[i, j] for i, j in edges]
-    G.add_edges(edges)
-    G.es['weight'] = weights
-
-    # Check if all nodes in `cluster_info` exist in the graph `G`
-    missing_nodes = [node for node in cluster_info if node not in G.vs['name']]
-    if missing_nodes:
-        # Print missing nodes and filter them out from `cluster_info`
-        print(
-            f"The following nodes are missing from the graph and will be excluded: {missing_nodes}")
-        cluster_info = {node: cluster for node,
-                        cluster in cluster_info.items() if node not in missing_nodes}
-
-    # Divide cluster information into subgraphs
-    cluster_to_nodes = {}
-    for node, cluster in cluster_info.items():
-        cluster_to_nodes.setdefault(cluster, []).append(node)
-
-    metrics_list = []
-    for cluster, nodes in cluster_to_nodes.items():
-        # Create subgraph and ensure it contains nodes
-        subgraph = G.subgraph(nodes)
-        if not subgraph.vcount():
-            continue
-
-        # Calculate metrics for each connected component within the cluster
-        components = subgraph.components()
-        for component in components:
-            component_subgraph = subgraph.subgraph(component)
-            num_nodes = len(component_subgraph.vs)
-
-            # Betweenness Centrality, normalized to [0, 1] for the component
-            betweenness_centrality = component_subgraph.betweenness(
-                weights='weight')
-            if num_nodes > 2:
-                betweenness_centrality = [
-                    b / ((num_nodes - 1) * (num_nodes - 2) / 2) for b in betweenness_centrality]
-
-            # Closeness Centrality and Eccentricity
-            closeness_centrality = component_subgraph.closeness()
-            eccentricity = [
-                int(e) if e is not None else None for e in component_subgraph.eccentricity()]
-
-            # Assign metrics to node names
-            for i, node in enumerate(component_subgraph.vs['name']):
-                metrics_list.append({
-                    'node': node,
-                    'cluster': cluster,
-                    'betweenness_centrality': betweenness_centrality[i],
-                    'closeness_centrality': closeness_centrality[i],
-                    'eccentricity': eccentricity[i],
-                })
-
-    return pd.DataFrame(metrics_list)
-
-
-def calculate_all_tom_metrics(tom: Union[pd.DataFrame, List[pd.DataFrame]], adata: Union[AnnData, List[AnnData]],
-                              cluster_info: Dict[str, str], tool: str, progress_callback: Callable[[str], None] = None) -> pd.DataFrame:
-    """
-    Combines TOM-based metrics, cluster-based graph metrics, connectivity, and average TOM value into a single table.
-    Can handle a single TOM matrix or a list of TOM matrices.
-
-    Parameters:
-    - tom (pd.DataFrame or List[pd.DataFrame]): The TOM matrix or a list of TOM matrices.
-    - adata (Union[AnnData, List[AnnData]]): AnnData object(s) to analyze.
-    - cluster_info (Dict[str, str]): Dictionary containing cluster assignments for all nodes across all TOMs.
-    - tool (str): The tool used to generate the cluster assignments (e.g., "cytoscape").
-    - progress_callback (Callable[[str], None]): Callback function to report progress.
-
-    Returns:
-    - pd.DataFrame: A combined table containing TOM metrics.
-      Each node appears only once, and metrics are calculated based on the TOM it belongs to.
-    """
-
-    def calculate_metrics_single(tom_single: pd.DataFrame, adata: AnnData, cluster_info_single: Dict[str, str], ortho_id_col: str = 'ortho_id') -> pd.DataFrame:
-        if tool == "cytoscape":
-            # Keep everything after the first "_"
-            cluster_info_single = {"_".join(
-                key.split("_")[1:]): value for key, value in cluster_info_single.items()}
-
-        if progress_callback:
-            progress_callback(
-                f"Calculating TOM metrics for dataset {adata.uns['name']}")
-
-        # Fill NaN values with 0
+    
+    def process_single_tom(tom_single: pd.DataFrame, adata_obj: AnnData, cluster_info_local: Dict[str, str]) -> pd.DataFrame:
+        # Fill missing values in the TOM matrix
         tom_filled = tom_single.fillna(0)
+        
+        # Raw node identifiers (assumed to match adata.var index)
+        raw_nodes = tom_filled.index
+        
+        # Get species name from adata.uns (default 'Unknown' if not provided)
+        species = adata_obj.uns.get('species', 'Unknown')
+        
+        # Compute degree: count of non-zero connections per row
+        degree = (tom_filled > 0).sum(axis=1)
+        
+        # Create base DataFrame with required columns
+        df_metrics = pd.DataFrame({
+            'Node': raw_nodes,
+            'Species': species,
+            'Degree': degree
+        }, index=raw_nodes)
+        
+        # Add Orthogroup from adata.var; if missing, assign 'No orthogroup'
+        if 'ortho_id' in adata_obj.var.columns:
+            ortho_series = adata_obj.var['ortho_id']
+        else:
+            ortho_series = pd.Series('No orthogroup', index=adata_obj.var.index)
+        df_metrics = df_metrics.join(ortho_series.rename('Orthogroup'), how='left')
+        
+        # Falls Orthogroup als Categorical vorliegt, fehlende Kategorie hinzufügen
+        if pd.api.types.is_categorical_dtype(df_metrics['Orthogroup']):
+            if 'No orthogroup' not in df_metrics['Orthogroup'].cat.categories:
+                df_metrics['Orthogroup'] = df_metrics['Orthogroup'].cat.add_categories('No orthogroup')
+        df_metrics['Orthogroup'] = df_metrics['Orthogroup'].fillna('No orthogroup')
+        
+        # Determine Cluster assignment.
+        # For "cytoscape", adjust keys by removing species prefix if present.
+        if tool == "cytoscape":
+            adjusted_cluster_info = {"_".join(key.split("_")[1:]): val for key, val in cluster_info_local.items()}
+            clusters = [adjusted_cluster_info.get(node, None) for node in raw_nodes]
+        else:
+            # For non-cytoscape, try both raw and species-prefixed node names.
+            species_prefixed = [f"{species}_{node}" for node in raw_nodes]
+            clusters = []
+            for raw, pref in zip(raw_nodes, species_prefixed):
+                clusters.append(cluster_info_local.get(raw, cluster_info_local.get(pref, None)))
+        df_metrics['Cluster'] = clusters
+        
+        # Add additional metadata from adata.var based on METADATA_DICT (excluding specified keys)
+        extra_keys = [k for k in METADATA_DICT.keys() if k not in ['transcript', 'species', 'ortho_id']]
+        available_keys = [k for k in extra_keys if k in adata_obj.var.columns]
+        if available_keys:
+            extra_metadata = adata_obj.var.loc[raw_nodes, available_keys]
+            extra_metadata = extra_metadata.rename(columns={k: METADATA_DICT[k] for k in available_keys})
+            df_metrics = df_metrics.join(extra_metadata, how='left')
+        
+        # Set 'Node' as index and remove duplicate Index-Spalte
+        df_metrics = df_metrics.set_index('Node', drop=True)
+        return df_metrics
 
-        # Get species name
-        tom_species = adata.uns['species']
-
-        # Calculate TOM-based metrics
-        tom_metrics = calculate_tom_metrics(tom_filled)
-
-        # Calculate graph-based metrics from clusters
-        graph_metrics = calculate_graph_metrics_from_clusters(
-            tom_filled, cluster_info_single)
-
-        # Calculate Connectivity (sum over rows minus self-loops)
-        connectivity = tom_filled.sum(axis=1) - tom_filled.values.diagonal()
-
-        # Calculate average TOM value for each node (excluding self-loops)
-        average_tom = (tom_filled.sum(
-            axis=1) - tom_filled.values.diagonal()) / ((tom_filled > 0).sum(axis=1))
-        # Handle NaN values for isolated nodes
-        average_tom = average_tom.fillna(0)
-
-        # Set indices for merging
-        graph_metrics.set_index('node', inplace=True)
-        tom_metrics.index.name = 'node'
-        tom_metrics['connectivity'] = connectivity
-        tom_metrics['average_tom'] = average_tom
-
-        # Merge TOM metrics and graph metrics
-        combined_metrics = pd.merge(
-            tom_metrics, graph_metrics, left_index=True, right_index=True)
-        combined_metrics['species'] = tom_species
-
-        ortho_ID = adata.var[ortho_id_col] if ortho_id_col in adata.var.columns else pd.Series(
-            [""] * len(adata.var), index=adata.var.index)
-        combined_metrics[ortho_id_col] = combined_metrics.index.map(ortho_ID)
-
-        # Set ortho_id_col as the second column
-        combined_metrics = combined_metrics[[
-            ortho_id_col] + [col for col in combined_metrics.columns if col != ortho_id_col]]
-        combined_metrics[ortho_id_col] = combined_metrics[ortho_id_col].cat.rename_categories({
-            '': 'No orthogroup'})
-        # Check if 'No orthogroup' is not already in the categories; add it if missing
-        if 'No orthogroup' not in combined_metrics[ortho_id_col].cat.categories:
-            combined_metrics[ortho_id_col] = combined_metrics[ortho_id_col].cat.add_categories(
-                'No orthogroup')
-
-        # Replace NaN values with 'No orthogroup'
-        combined_metrics[ortho_id_col] = combined_metrics[ortho_id_col].fillna(
-            'No orthogroup')
-
-        # Set Species as the first column
-        combined_metrics = combined_metrics[[
-            'species'] + [col for col in combined_metrics.columns if col != 'species']]
-
-        # Set node as index
-        combined_metrics.index.name = 'Node'
-
-        # Rename columns for consistency
-        combined_metrics.columns = [
-            'Species', 'Orthogroup', 'Degree', 'Clustering Coefficient', 'Connected Components', 'Connectivity',
-            'Average TOM Value', 'Cluster', 'Betweenness Centrality', 'Closeness Centrality', 'Eccentricity'
-        ]
-
-        # Drop columns Connectivity, Average TOM Value, and Connected Components
-        combined_metrics.drop(
-            columns=['Connectivity', 'Average TOM Value', 'Connected Components'], inplace=True)
-
-        return combined_metrics
-
+    # Process multiple TOM matrices if provided
     if isinstance(tom, list):
-        if not isinstance(cluster_info, dict):
-            raise ValueError(
-                "When 'tom' is a list, 'cluster_info' must be a single dictionary containing cluster assignments for all nodes.")
         if not isinstance(adata, list):
-            raise ValueError(
-                "When 'tom' is a list, 'adata' must be a list of AnnData objects.")
-        if not len(tom) == len(adata):
-            raise ValueError(
-                "The number of TOMs and AnnData objects must be the same.")
-
-        all_metrics = []
-
+            raise ValueError("When 'tom' is a list, 'adata' must be a list of AnnData objects.")
+        if len(tom) != len(adata):
+            raise ValueError("The number of TOM matrices and AnnData objects must match.")
+        df_list = []
         for i, tom_single in enumerate(tom):
-            # Check if tom_single is empty
             if tom_single.empty:
                 continue
-
-            # Get nodes in this TOM
-            nodes = tom_single.index
-
-            # Add species prefix to nodes
-            nodes = [f"{adata[i].uns['species']}_{node}" for node in nodes]
-
-            # Extract cluster_info for these nodes
-            cluster_info_single = {
-                node: cluster_info[node] for node in nodes if node in cluster_info}
-
-            # Calculate metrics for the current TOM
-            metrics_single = calculate_metrics_single(
-                tom_single, adata[i], cluster_info_single)
-
-            # Append to the list
-            all_metrics.append(metrics_single)
-
-        # Concatenate all metrics into a single DataFrame
-        combined_all_metrics = pd.concat(all_metrics)
-
-        return combined_all_metrics
-
+            # For multiple TOMs, assume cluster_info keys are species-prefixed.
+            species = adata[i].uns.get('species', 'Unknown')
+            raw_nodes = tom_single.index
+            prefixed_nodes = [f"{species}_{node}" for node in raw_nodes]
+            # Filter cluster_info for nodes in the current dataset
+            cluster_info_single = {node: cluster_info[node] for node in prefixed_nodes if node in cluster_info}
+            
+            if progress_callback:
+                progress_callback(f"Processing dataset: {adata[i].uns.get('name', 'Unnamed')}")
+            
+            df_single = process_single_tom(tom_single, adata[i], cluster_info_single)
+            df_list.append(df_single)
+        return pd.concat(df_list)
+    
     elif isinstance(tom, pd.DataFrame):
-        if not isinstance(cluster_info, dict):
-            raise ValueError(
-                "When 'tom' is a single DataFrame, 'cluster_info' must be a single dictionary containing cluster assignments.")
-
-        # Calculate metrics for the single TOM
-        combined_metrics = calculate_metrics_single(tom, adata, cluster_info)
-
-        return combined_metrics
-
+        return process_single_tom(tom, adata, cluster_info)
+    
     else:
-        raise TypeError(
-            "'tom' must be either a pandas DataFrame or a list of DataFrames.")
+        raise TypeError("'tom' must be a pandas DataFrame or a list of DataFrames.")
 
 
 def add_go_terms_to_adata(adata: AnnData, go_mapping_file: str) -> AnnData:
@@ -2580,7 +2439,7 @@ def add_tf_columns(adata: AnnData, tf_mapping_file: str) -> AnnData:
 
     # Load the transcription factor mapping file.
     # The file is assumed to be whitespace-separated with a header ("Gene Family").
-    tf_df = pd.read_csv(tf_mapping_file, sep="\s+", header=0)
+    tf_df = pd.read_csv(tf_mapping_file, sep=r"\s+", header=0)
     # Rename columns to consistent names.
     tf_df.columns = ["transcript", "tf_family"]
 
