@@ -279,6 +279,62 @@
             <div id="nodeTableSection" class="collapse show">
                 <!-- Add a custom class "tom-table-container" -->
                 <div class="card-body tom-table-container">
+                    <div id="columnSearchDiv">
+                        <details id="columnSearchToggle">
+                            <summary class="toggle-header">Column search</summary>
+                            <div class="toggle-content">
+                                <!-- Row with select and transcriptSearch -->
+                                <div class="row">
+                                    <div class="col-lg-5 mb-3">
+                                        <!-- TODO: SELECT SPECIES DROPDOWN-->
+        
+                                        <!-- Dropdown for column selection -->
+                                        <div class="row mb-2">
+                                            <label for="columnSelect" class="col-sm-6 col-form-label">
+                                                Select Column
+                                            </label>
+                                            <div class="col-sm-6">
+                                                <select id="columnSelect" class="form-control form-control-sm">
+
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <!-- Checkbox for orthogroups filtering -->
+                                        <div class="row mb-2">
+                                            <div class="col-sm-6">
+                                                <label class="form-check-label" for="orthogroupSearch">Use orthogroups</label>
+                                            </div>
+                                            <div class="col-sm-6">
+                                                <input type="checkbox" class="form-check-input" id="orthogroupSearch">
+                                            </div>
+                                        </div>
+                                        <!-- Count info spans (hidden by default) -->
+                                        <div id="filterInfo" style="display: none; text-align: center; margin-top: 10px;">
+                                            <span id="keptTranscripts">Kept transcripts: 0</span><br>
+                                            <span id="lostTranscripts">Lost transcripts: 0</span><br>
+                                            <span id="newTranscripts">New transcripts: 0</span>
+                                        </div>
+                                    </div>
+                                    <div class="col-lg-7 mb-3">
+                                        <textarea id="transcriptSearch" class="form-control" rows="3"
+                                            placeholder="Filter: Tokens separated by comma, space, tab, or newline"></textarea>
+                                    </div>
+                                </div>
+        
+                                <!-- Info row: Tokens recognized (left) and Filtered table entries (right) -->
+                                <div class="row mb-3">
+                                    <div class="col-6">
+                                        <span id="tokensInfo">Tokens recognized: 0 (0 unique)</span>
+                                    </div>
+                                    <div class="col-6 text-end">
+                                        <span id="tableEntriesInfo">Filtered table entries: 0</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </details>
+                    </div>
+                    <br>
+
                     {{ node_table_html | safe }}
 
                     <!-- Copy column entries to clipboard section -->
@@ -458,6 +514,8 @@
 
     <script>
         $(document).ready(function() {
+            window.currentOrthogroupTokens = '';
+
             // Initialize button text based on the collapse state
             $('.toggle-button').each(function() {
                 var target = $(this).data('target');
@@ -508,38 +566,57 @@
                 $('button[data-target="#' + this.id + '"]').find('span').text('Show');
             });
 
-            // Apply DataTable functionality to all tables with the class "dynamic-table"
-            $('.dynamic-table').each(function() {
-                // Basic options for all tables
-                var options = {
-                    responsive: true,
-                    dom: 'Bfrtip',
-                    buttons: [
-                        {
-                            extend: 'colvis',
-                            text: 'Column Visibility'
+            // Common options for all DataTables
+            var commonOptions = {
+                responsive: true,
+                dom: 'Bfrtip',
+                buttons: [
+                    {
+                        extend: 'colvis',
+                        text: 'Column Visibility'
+                    },
+                    {
+                        extend: 'csvHtml5',
+                        text: 'Download Table',
+                        filename: function() {
+                            return prompt('Enter filename') || 'download';
                         },
-                        {
-                            extend: 'csvHtml5',
-                            text: 'Download Table',
-                            filename: function() {
-                                // Prompt user to enter the filename
-                                return prompt('Enter filename') || 'download';
-                            },
-                            exportOptions: {
-                                columns: ':visible'
-                            }
+                        exportOptions: {
+                            columns: ':visible'
                         }
-                    ]
-                };
+                    }
+                ]
+            };
 
-                // Initialize the DataTable
-                var dataTable = $(this).DataTable(options);
+            // Initialize all tables with the class "dynamic-table" except #nodeResults
+            $('.dynamic-table').not('#nodeResults').each(function() {
+                $(this).DataTable(commonOptions);
             });
 
-            var nodeResultsTable = $('#nodeResults').DataTable();
+            // Add specific options for the nodeResults table
+            var nodeOptions = $.extend(true, {}, commonOptions, {
+                language: { search: "Global Search:" },
+                initComplete: function() {
+                    $('#nodeResults').on('draw.dt', function() {
+                        var info = nodeResultsTable.page.info();
+                        $('#tableEntriesInfo').text('Filtered table entries: ' + info.recordsDisplay);
+                    });
+                }
+            });
+
+            var nodeResultsTable = $('#nodeResults').DataTable(nodeOptions);
             var infoResultsTable = $('#infoResults').DataTable();
             var orthoResultsTable = $('#orthoResults').DataTable();
+
+            // Determine the index of the "Orthogroup" column
+            var orthogroupColIndex = $('#nodeResults thead th')
+                .toArray()
+                .findIndex(th => $(th).text().trim().toLowerCase() === "orthogroup");
+
+            // Determine the index of the "Node" column
+            var transcriptColIndex = $('#nodeResults thead th')
+                .toArray()
+                .findIndex(th => $(th).text().trim().toLowerCase() === "node");
 
             // Keep track of the last selected node
             var lastSelectedNode = null;
@@ -720,6 +797,148 @@
                     $('<option>').attr('value', index).text(headerText)
                 );
             });
+
+            var $select = $('#columnSelect');
+            $select.empty();
+            
+            headers.forEach(function (header, index) {
+                var headerText = $(header).text().trim();
+                // Skip the header "species" (case-insensitive)
+                if (headerText.toLowerCase() !== 'species') {
+                    $select.append(
+                        $('<option>').attr('value', index).text(headerText)
+                    );
+                }
+            });
+
+            // Custom DataTables filter function
+            $.fn.dataTable.ext.search.push(function(settings, rowData, rowIndex, rowArray) {
+                if ($('#orthogroupSearch').is(':checked')) {
+                    // Get and normalize the stored orthogroup tokens
+                    let ogTokens = (window.currentOrthogroupTokens || '')
+                        .split(/\s+/)
+                        .filter(t => t)
+                        .map(t => t.toLowerCase());
+                    if (ogTokens.length === 0) return true;
+                    // Use the determined column index
+                    let orthoCell = rowData[orthogroupColIndex];
+                    if (!orthoCell) return false;
+                    orthoCell = orthoCell.toString().toLowerCase();
+                    // Exact OR comparison
+                    return ogTokens.some(token => orthoCell === token);
+                } else {
+                    let searchVal = $('#transcriptSearch').val().trim();
+                    if (!searchVal) return true;
+                    // Split and normalize the search tokens (exact comparison, OR logic)
+                    let tokens = searchVal.split(/[\s,]+/).filter(token => token).map(t => t.toLowerCase());
+                    let selectedColumnIndex = parseInt($('#columnSelect').val(), 10);
+                    let cell = rowData[selectedColumnIndex];
+                    if (!cell) return false;
+                    cell = cell.toString().toLowerCase();
+                    return tokens.some(token => cell === token);
+                }
+            });
+
+            // Event-Handler: Update tokens recognized und Tabelle neu zeichnen
+            $('#transcriptSearch').on('input', function() {
+                let tokens = $(this).val().trim().split(/[\s,]+/).filter(token => token);
+                let uniqueTokens = [...new Set(tokens)];
+                $('#tokensInfo').text('Tokens recognized: ' + tokens.length + ' (' + uniqueTokens.length + ' unique)');
+
+                if ($('#orthogroupSearch').is(':checked')) {
+                    updateOrthogroupTokensAndFilterInfo();
+                } else {
+                    $('#filterInfo').hide();
+                    window.currentOrthogroupTokens = '';
+                    nodeResultsTable.draw();
+                }
+            });
+
+            // Event-Handler: Bei Änderung der Orthogroup-Checkbox
+            $('#orthogroupSearch').on('change', function() {
+                if ($(this).is(':checked')) {
+                    updateOrthogroupTokensAndFilterInfo();
+                } else {
+                    $('#filterInfo').hide();
+                    window.currentOrthogroupTokens = '';
+                    nodeResultsTable.draw();
+                }
+            });
+
+            // Event-Handler: Bei Änderung des Spalten-Dropdowns
+            $('#columnSelect').on('change', function() {
+                if ($('#orthogroupSearch').is(':checked')) {
+                    updateOrthogroupTokensAndFilterInfo();
+                }
+                nodeResultsTable.draw();
+            });
+
+            function updateOrthogroupTokensAndFilterInfo() {
+                let searchVal = $('#transcriptSearch').val().trim();
+                let selectedColumnIndex = parseInt($('#columnSelect').val(), 10);
+                let allRows = nodeResultsTable.rows().data().toArray();
+
+                // Filter rows based on the current column search (exact OR comparison)
+                let tokens = searchVal.split(/[\s,]+/).filter(token => token).map(t => t.toLowerCase());
+                let originalRows = allRows.filter(row => {
+                    let cell = row[selectedColumnIndex];
+                    if (!cell) return false;
+                    cell = cell.toString().toLowerCase();
+                    // If no tokens are entered, include all rows
+                    return tokens.length ? tokens.some(token => cell === token) : true;
+                });
+
+                // Extract original transcripts
+                let originalTranscripts = originalRows
+                    .map(row => row[transcriptColIndex])
+                    .filter(x => x && x.trim() !== '')
+                    .map(t => t.toLowerCase());
+                originalTranscripts = [...new Set(originalTranscripts)];
+
+
+                // Extract orthogroups from the original filtered rows
+                let orthogroupArray = originalRows
+                    .map(row => row[orthogroupColIndex])
+                    .filter(x => x && x.trim() !== '' && x.trim().toLowerCase() !== 'nan')
+                    .map(token => token.toLowerCase());
+                orthogroupArray = [...new Set(orthogroupArray)];
+                let orthogroupTokens = orthogroupArray.join(' ');
+
+                if (!orthogroupTokens || orthogroupTokens.trim() === '') {
+                    $('#keptTranscripts').text('Kept transcripts: 0');
+                    $('#lostTranscripts').text('Lost transcripts: ' + originalTranscripts.length);
+                    $('#newTranscripts').text('New transcripts: 0');
+                    $('#filterInfo').show();
+                    window.currentOrthogroupTokens = '';
+                    nodeResultsTable.draw();
+                    return;
+                } else {
+                    // Use exact OR comparison when applying the new filter
+                    let ogTokens = orthogroupTokens.split(/\s+/).filter(t => t).map(t => t.toLowerCase());
+                    let transformedRows = allRows.filter(row => {
+                        let cell = row[orthogroupColIndex];
+                        if (!cell) return false;
+                        cell = cell.toString().toLowerCase();
+                        return ogTokens.some(token => cell === token);
+                    });
+                    let transformedTranscripts = transformedRows
+                        .map(row => row[transcriptColIndex])
+                        .filter(x => x && x.trim() !== '')
+                        .map(t => t.toLowerCase());
+                    transformedTranscripts = [...new Set(transformedTranscripts)];
+
+                    let kept = originalTranscripts.filter(t => transformedTranscripts.includes(t));
+                    let lost = originalTranscripts.filter(t => !transformedTranscripts.includes(t));
+                    let newly = transformedTranscripts.filter(t => !originalTranscripts.includes(t));
+
+                    $('#keptTranscripts').text('Kept transcripts: ' + kept.length);
+                    $('#lostTranscripts').text('Lost transcripts: ' + lost.length);
+                    $('#newTranscripts').text('New transcripts: ' + newly.length);
+                    $('#filterInfo').show();
+                    window.currentOrthogroupTokens = orthogroupTokens;
+                    nodeResultsTable.draw();
+                }
+            }
 
             // Copy column entries to clipboard handling
             $('#copyEntriesBtn').on('click', async function () {
