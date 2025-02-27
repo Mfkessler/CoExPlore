@@ -1,7 +1,6 @@
 import os
 import random
 import h5py
-import json
 import pandas as pd
 import numpy as np
 import scanpy as sc
@@ -23,6 +22,7 @@ from pandas.api.types import is_numeric_dtype
 from jinja2 import Environment, FileSystemLoader
 from collections import defaultdict
 from scipy.spatial.distance import squareform
+from .config import METADATA_DICT
 
 
 def create_dir(path: str) -> None:
@@ -696,18 +696,21 @@ def add_ortho_id_to_anndata(adata: AnnData, mapping_file: str, column_name: str,
     """
 
     if not os.path.exists(mapping_file):
-        print(f"Warning: Mapping file '{mapping_file}' not found. Filling '{ortho_id_col_name}' with '{fill_value}'.")
+        print(
+            f"Warning: Mapping file '{mapping_file}' not found. Filling '{ortho_id_col_name}' with '{fill_value}'.")
         adata.var[ortho_id_col_name] = fill_value
         return
 
-    ortho_df = pd.read_csv(mapping_file, sep="\t", usecols=[ortho_col_name, column_name], index_col=ortho_col_name)
+    ortho_df = pd.read_csv(mapping_file, sep="\t", usecols=[
+                           ortho_col_name, column_name], index_col=ortho_col_name)
 
     id_to_ortho = {}
     for ortho_id, identifiers in ortho_df[column_name].dropna().items():
         for identifier in identifiers.split(separator):
             id_to_ortho[identifier] = ortho_id
 
-    adata.var[ortho_id_col_name] = adata.var.index.map(id_to_ortho).fillna(fill_value)
+    adata.var[ortho_id_col_name] = adata.var.index.map(
+        id_to_ortho).fillna(fill_value)
     add_ortho_count(adata)
 
 
@@ -732,7 +735,8 @@ def add_ortho_ids_to_anndata(adata: AnnData, column_name: str, base_path: str = 
     for level in ortho_levels:
         node_key = f"{ortho_prefix}{level}{ortho_suffix}"
         mapping_file = f"{base_path}/{ortho_prefix}{level}.tsv"
-        ortho_df = pd.read_csv(mapping_file, sep="\t", usecols=["HOG", column_name], index_col="HOG")
+        ortho_df = pd.read_csv(mapping_file, sep="\t", usecols=[
+                               "HOG", column_name], index_col="HOG")
 
         id_to_ortho = {}
         for ortho_id, identifiers in ortho_df[column_name].dropna().items():
@@ -741,7 +745,8 @@ def add_ortho_ids_to_anndata(adata: AnnData, column_name: str, base_path: str = 
                     id_to_ortho[identifier] = []
                 id_to_ortho[identifier].append(ortho_id)
 
-        adata.var[node_key] = adata.var.index.map(lambda x: separator.join(id_to_ortho.get(x, []))).fillna("")
+        adata.var[node_key] = adata.var.index.map(
+            lambda x: separator.join(id_to_ortho.get(x, []))).fillna("")
 
     adata.var[ortho_id_col] = adata.var[f"{ortho_prefix}0{ortho_suffix}"]
     add_ortho_count(adata)
@@ -1273,14 +1278,14 @@ def reduce_tom_matrix(TOM: pd.DataFrame, reduction_percentage: float) -> pd.Data
 def save_matrix_to_hdf5(table: pd.DataFrame, filename: str, save_sym_only: bool = False, include_diagonal: bool = True) -> None:
     """
     Saves the table (pd.DataFrame) into an HDF5 file with optimized row-wise chunking.
-    
+
     Parameters:
     - table (pd.DataFrame): The table to be saved.
     - filename (str): The name of the HDF5 file.
     - save_sym_only (bool): If True, saves only the upper triangle of a symmetric matrix.
     - include_diagonal (bool): When saving only the upper triangle, specifies whether to include
       the diagonal elements.
-    
+
     The function saves the index and column labels, and either the full data matrix or only
     the upper triangle, depending on the value of 'save_sym_only'. In the full-matrix mode,
     the data is saved with row-wise chunking (i.e. each row is stored in a separate chunk)
@@ -1314,7 +1319,8 @@ def save_matrix_to_hdf5(table: pd.DataFrame, filename: str, save_sym_only: bool 
         else:
             # Save the full data matrix with optimized row-wise chunking.
             data = table.values
-            chunk_size = (1, data.shape[1])  # Jeder Chunk entspricht einer Zeile.
+            # Jeder Chunk entspricht einer Zeile.
+            chunk_size = (1, data.shape[1])
             f.create_dataset('data', data=data, chunks=chunk_size)
             f.attrs['save_sym_only'] = False
             f.attrs['include_diagonal'] = True
@@ -1327,7 +1333,7 @@ def load_subset_from_hdf5(filename: str, rows: list, cols: list = None, threshol
     Loads a subset of a large HDF5 file into a pandas DataFrame.
     Optionally, if include_neighbours is True, for each transcript in rows the function
     adds neighbors with connection value >= threshold (up to max_neighbors).
-    
+
     Parameters:
     - filename (str): HDF5 file name.
     - rows (list): List of transcript labels (for both rows and columns).
@@ -1338,7 +1344,7 @@ def load_subset_from_hdf5(filename: str, rows: list, cols: list = None, threshol
     - use_symmetry (bool): If True, uses symmetry (not supported with include_neighbours).
     - include_neighbours (bool): If True, add neighbors with connection >= threshold.
     - max_neighbors (int): Maximum number of neighbors to add per transcript.
-    
+
     Returns:
     - pd.DataFrame: The filtered TOM subset.
     - set: Set of neighbor transcripts (if include_neighbours is True), else empty set.
@@ -1353,15 +1359,18 @@ def load_subset_from_hdf5(filename: str, rows: list, cols: list = None, threshol
     neighbor_set = set()
     if include_neighbours:
         if threshold is None:
-            raise ValueError("A threshold must be provided if include_neighbours is True.")
+            raise ValueError(
+                "A threshold must be provided if include_neighbours is True.")
         if use_symmetry:
-            raise NotImplementedError("include_neighbours is not supported with use_symmetry=True.")
+            raise NotImplementedError(
+                "include_neighbours is not supported with use_symmetry=True.")
         if index_map is None or columns_map is None:
             with h5py.File(filename, 'r') as f:
                 file_index = [s.decode('utf-8') for s in f['index'][:]]
                 file_columns = [s.decode('utf-8') for s in f['columns'][:]]
             index_map = {label: idx for idx, label in enumerate(file_index)}
-            columns_map = {label: idx for idx, label in enumerate(file_columns)}
+            columns_map = {label: idx for idx,
+                           label in enumerate(file_columns)}
         new_transcripts = set(rows)
         inv_columns_map = {v: k for k, v in columns_map.items()}
         with h5py.File(filename, 'r') as f:
@@ -1374,7 +1383,8 @@ def load_subset_from_hdf5(filename: str, rows: list, cols: list = None, threshol
                 neighbor_idxs = np.where(row_data >= threshold)[0]
                 neighbor_idxs = neighbor_idxs[neighbor_idxs != r_idx]
                 if len(neighbor_idxs) > max_neighbors:
-                    sorted_idx = neighbor_idxs[np.argsort(row_data[neighbor_idxs])[::-1]]
+                    sorted_idx = neighbor_idxs[np.argsort(
+                        row_data[neighbor_idxs])[::-1]]
                     neighbor_idxs = sorted_idx[:max_neighbors]
                 for col_idx in neighbor_idxs:
                     neighbor = inv_columns_map.get(col_idx)
@@ -1411,7 +1421,8 @@ def load_subset_from_hdf5(filename: str, rows: list, cols: list = None, threshol
                 if full_matrix.shape[0] < n:
                     full_matrix = np.pad(full_matrix, ((0, 1), (0, 1)),
                                          mode='constant', constant_values=0)
-                block_data = full_matrix[np.ix_(row_indices_sorted, col_indices_sorted)]
+                block_data = full_matrix[np.ix_(
+                    row_indices_sorted, col_indices_sorted)]
             else:
                 data = f['data']
                 data_rows = data[row_indices_sorted, :]
@@ -1429,7 +1440,8 @@ def load_subset_from_hdf5(filename: str, rows: list, cols: list = None, threshol
         np.fill_diagonal(df_subset.values, np.nan)
         mask = df_subset > threshold
         df_subset = df_subset.where(mask, other=np.nan)
-        df_subset = df_subset.dropna(how='all', axis=0).dropna(how='all', axis=1)
+        df_subset = df_subset.dropna(
+            how='all', axis=0).dropna(how='all', axis=1)
 
     return df_subset, neighbor_set
 
@@ -1923,14 +1935,14 @@ def export_co_expression_network_to_cytoscape(
 ) -> dict:
     """
     Exports the co-expression network(s) in a format compatible with Cytoscape.js.
-    
+
     This function dynamically assigns all metadata from a loaded JSON dictionary.
     It iterates over all keys in METADATA_DICT and for each gene node:
       - If the key is "transcript", the gene identifier (i.e. the index) is used.
       - Otherwise, the corresponding value is retrieved from adata.var for that gene.
-    
+
     All metadata is assumed to be stored in adata.var under the keys specified in METADATA_DICT.
-    
+
     Parameters:
     - tom (pd.DataFrame or List[pd.DataFrame]): The TOM matrix or list of TOM matrices.
     - adata (AnnData or List[AnnData]): Annotated data object(s).
@@ -1942,38 +1954,28 @@ def export_co_expression_network_to_cytoscape(
     - target_key (str): Key for edge target in the output dictionary.
     - weight_key (str): Key for edge weight in the output dictionary.
     - is_neighbor_key (str): Key for neighbor flag in the output dictionary.
-    
+
     Returns:
     - dict: Dictionary with nodes, edges, and neighbors for each TOM.
     """
 
-    def is_dockerized() -> bool:
-        """Check if the script is running inside a Docker container."""
-        try:
-            with open("/proc/1/cgroup", "rt") as f:
-                return "docker" in f.read() or "containerd" in f.read()
-        except FileNotFoundError:
-            return False
-
-    # Load metadata based on environment
-    if is_dockerized():
-        METADATA_DICT = load_metadata_dict("/metadata_dict.json")
-    else:
-        METADATA_DICT = load_metadata_dict("/vol/blast/wgcna/Project-Setup/wgcna-app/envs/metadata_dict.json")
-    
     print(METADATA_DICT)
 
     # Ensure the inputs are either both lists or both single objects
     if isinstance(tom, list) and isinstance(adata, list):
         if len(tom) != len(adata):
-            raise ValueError("The number of TOMs and AnnData objects must be the same.")
+            raise ValueError(
+                "The number of TOMs and AnnData objects must be the same.")
         tom_adata_pairs = list(zip(tom, adata))
-        neighbor_list = neighbor_info if isinstance(neighbor_info, list) else [neighbor_info] * len(tom)
+        neighbor_list = neighbor_info if isinstance(neighbor_info, list) else [
+            neighbor_info] * len(tom)
     elif isinstance(tom, pd.DataFrame) and isinstance(adata, AnnData):
         tom_adata_pairs = [(tom, adata)]
-        neighbor_list = [neighbor_info] if neighbor_info is not None else [set()]
+        neighbor_list = [
+            neighbor_info] if neighbor_info is not None else [set()]
     else:
-        raise TypeError("Both tom and adata must be either lists or single objects of their respective types.")
+        raise TypeError(
+            "Both tom and adata must be either lists or single objects of their respective types.")
 
     nodes = []
     edges = []
@@ -1984,7 +1986,8 @@ def export_co_expression_network_to_cytoscape(
 
         # Filter genes based on selected module colors if provided
         if selected_module_colors:
-            mod_genes = gene_metadata[gene_metadata["module_colors"].isin(selected_module_colors)].index
+            mod_genes = gene_metadata[gene_metadata["module_colors"].isin(
+                selected_module_colors)].index
         else:
             mod_genes = gene_metadata.index
 
@@ -1995,8 +1998,10 @@ def export_co_expression_network_to_cytoscape(
         species_key = METADATA_DICT.get("species", "Species")
 
         # Prepare neighbor output using species information
-        current_neighbors = neighbor_list[idx] if neighbor_list[idx] is not None else set()
-        neighbors_output.append({species_key: species_value, 'neighbors': list(current_neighbors)})
+        current_neighbors = neighbor_list[idx] if neighbor_list[idx] is not None else set(
+        )
+        neighbors_output.append(
+            {species_key: species_value, 'neighbors': list(current_neighbors)})
 
         # Build nodes with dynamic metadata from METADATA_DICT
         for gene in mod_genes:
@@ -2011,7 +2016,8 @@ def export_co_expression_network_to_cytoscape(
                 elif meta_key == "species":
                     value = species_value
                 else:
-                    value = gene_metadata.loc[gene, meta_key] if meta_key in gene_metadata.columns else ""
+                    value = gene_metadata.loc[gene,
+                                              meta_key] if meta_key in gene_metadata.columns else ""
                 # Replace NaN values with empty string
                 if pd.isna(value):
                     value = ""
@@ -2023,7 +2029,7 @@ def export_co_expression_network_to_cytoscape(
             if gene in current_neighbors:
                 node_data['data'][is_neighbor_key] = True
 
-            # Add the dataset name    
+            # Add the dataset name
             node_data['data']['name'] = current_adata.uns['name']
             nodes.append(node_data)
 
@@ -2309,13 +2315,15 @@ def calculate_all_tom_metrics(tom: Union[pd.DataFrame, List[pd.DataFrame]], adat
         combined_metrics = combined_metrics[[
             ortho_id_col] + [col for col in combined_metrics.columns if col != ortho_id_col]]
         combined_metrics[ortho_id_col] = combined_metrics[ortho_id_col].cat.rename_categories({
-                                                                                          '': 'No orthogroup'})
+            '': 'No orthogroup'})
         # Check if 'No orthogroup' is not already in the categories; add it if missing
         if 'No orthogroup' not in combined_metrics[ortho_id_col].cat.categories:
-            combined_metrics[ortho_id_col] = combined_metrics[ortho_id_col].cat.add_categories('No orthogroup')
+            combined_metrics[ortho_id_col] = combined_metrics[ortho_id_col].cat.add_categories(
+                'No orthogroup')
 
         # Replace NaN values with 'No orthogroup'
-        combined_metrics[ortho_id_col] = combined_metrics[ortho_id_col].fillna('No orthogroup')
+        combined_metrics[ortho_id_col] = combined_metrics[ortho_id_col].fillna(
+            'No orthogroup')
 
         # Set Species as the first column
         combined_metrics = combined_metrics[[
@@ -2479,14 +2487,14 @@ def add_ipr_columns(adata: AnnData, ipr_mapping_file: str) -> AnnData:
 def add_pfam_columns(adata: AnnData, pfam_mapping_file: str) -> AnnData:
     """
     Add 'pfam_id' and 'pfam_desc' columns to adata.var based on a PFAM mapping file.
-    
+
     The mapping file is expected to use the first whitespace or tab to separate the transcript ID
     from the PFAM ID and the second whitespace or tab to separate the PFAM ID from its description.
-    
+
     Parameters:
     - adata (AnnData): AnnData object with var index matching transcript IDs.
     - pfam_mapping_file (str): Path to the file containing PFAM ID and description mappings.
-    
+
     Returns:
     - AnnData: Updated AnnData object with new 'pfam_id' and 'pfam_desc' columns.
     """
@@ -2494,7 +2502,8 @@ def add_pfam_columns(adata: AnnData, pfam_mapping_file: str) -> AnnData:
     import pandas as pd
 
     if not os.path.exists(pfam_mapping_file):
-        print(f"Warning: PFAM mapping file '{pfam_mapping_file}' not found. Filling 'pfam_id' and 'pfam_desc' with empty strings.")
+        print(
+            f"Warning: PFAM mapping file '{pfam_mapping_file}' not found. Filling 'pfam_id' and 'pfam_desc' with empty strings.")
         adata.var["pfam_id"] = ''
         adata.var["pfam_desc"] = ''
         return adata
@@ -2513,7 +2522,8 @@ def add_pfam_columns(adata: AnnData, pfam_mapping_file: str) -> AnnData:
             if len(parts) < 3:
                 continue  # Skip lines that do not have all three fields
             rows.append(parts)
-    pfam_df = pd.DataFrame(rows, columns=["transcript", "pfam_id", "pfam_desc"])
+    pfam_df = pd.DataFrame(
+        rows, columns=["transcript", "pfam_id", "pfam_desc"])
     pfam_df["transcript"] = pfam_df["transcript"].astype(str).str.strip()
 
     # Group PFAM IDs and descriptions by transcript, concatenating multiple entries with a comma
@@ -2524,7 +2534,8 @@ def add_pfam_columns(adata: AnnData, pfam_mapping_file: str) -> AnnData:
 
     # Create dictionaries for fast mapping
     pfam_dict_ids = grouped_pfam.set_index("transcript")["pfam_id"].to_dict()
-    pfam_dict_desc = grouped_pfam.set_index("transcript")["pfam_desc"].to_dict()
+    pfam_dict_desc = grouped_pfam.set_index(
+        "transcript")["pfam_desc"].to_dict()
 
     # Drop existing pfam columns if they exist to avoid conflicts with categorical dtype
     for col in ["pfam_id", "pfam_desc"]:
@@ -2563,7 +2574,7 @@ def add_tf_columns(adata: AnnData, tf_mapping_file: str) -> AnnData:
         )
         adata.var["tf_family"] = ''
         return adata
-    
+
     # Drop column if it already exists
     adata.var = adata.var.drop(columns=["tf_family"], errors="ignore")
 
@@ -2649,35 +2660,38 @@ def add_metadata_columns(adata: AnnData, mapping_file: str, columns: Dict[str, s
     - ValueError: If the mapping file format is incorrect, if the number of provided column mappings does not match,
       or if a provided column name is invalid.
     """
-    
+
     # Check if mapping file exists
     if not os.path.exists(mapping_file):
         raise FileNotFoundError(f"Mapping file '{mapping_file}' not found.")
-    
+
     # Read the mapping file (tab-separated, no header)
     try:
         df = pd.read_csv(mapping_file, sep="\t", header=None, dtype=str)
     except Exception as e:
         raise ValueError(f"Error reading mapping file '{mapping_file}': {e}")
-    
+
     # Ensure there is at least one metadata column (i.e. at least 2 columns total)
     if df.shape[1] < 2:
-        raise ValueError(f"Mapping file '{mapping_file}' must have at least two columns (gene names and metadata).")
-    
+        raise ValueError(
+            f"Mapping file '{mapping_file}' must have at least two columns (gene names and metadata).")
+
     # Process gene names (first column)
     df.iloc[:, 0] = df.iloc[:, 0].astype(str).str.strip()
-    
+
     # Determine number of metadata columns
     n_meta = df.shape[1] - 1
 
     # Process columns parameter: keys determine column names, values are the human readable names.
     if columns is not None:
         if len(columns) != n_meta:
-            raise ValueError(f"Provided columns length ({len(columns)}) does not match number of metadata columns in file ({n_meta}).")
+            raise ValueError(
+                f"Provided columns length ({len(columns)}) does not match number of metadata columns in file ({n_meta}).")
         # Validate keys in columns dict
         for key in columns.keys():
             if not re.fullmatch(r"[a-z0-9_]+", key):
-                raise ValueError(f"Invalid column name '{key}'. Column names must only contain lowercase letters, digits, and underscores without whitespace.")
+                raise ValueError(
+                    f"Invalid column name '{key}'. Column names must only contain lowercase letters, digits, and underscores without whitespace.")
         col_items = list(columns.items())
     else:
         # Auto-generate column names in the format "metadata_n"
@@ -2690,12 +2704,12 @@ def add_metadata_columns(adata: AnnData, mapping_file: str, columns: Dict[str, s
             col_items.append((col_name, col_name))
             current_index += 1
         columns = dict(col_items)
-    
+
     # Update adata.uns['metadata'] with the provided mapping, or initialize if not exists
     if 'metadata' not in adata.uns or not isinstance(adata.uns['metadata'], dict):
         adata.uns['metadata'] = {}
     adata.uns['metadata'].update(columns)
-    
+
     # Map each metadata column from the file to adata.var
     for i, (col_key, _) in enumerate(col_items):
         # Extract the i-th metadata column (column index i+1 in the file)
@@ -2706,30 +2720,33 @@ def add_metadata_columns(adata: AnnData, mapping_file: str, columns: Dict[str, s
             "meta": meta_series
         })
         # Group by gene and join unique entries with commas
-        grouped = temp_df.groupby("gene")["meta"].apply(lambda x: ",".join(x.dropna().unique())).to_dict()
+        grouped = temp_df.groupby("gene")["meta"].apply(
+            lambda x: ",".join(x.dropna().unique())).to_dict()
         # Map the grouped metadata to adata.var.index; missing values become empty strings
-        adata.var[col_key] = adata.var.index.map(lambda gene: grouped.get(gene, ""))
+        adata.var[col_key] = adata.var.index.map(
+            lambda gene: grouped.get(gene, ""))
         adata.var[col_key] = adata.var[col_key].fillna('')
-    
+
     return adata
 
 
 def add_metadata_uniprot(adata: AnnData, up_file: str, selected_columns: List[str] = None) -> AnnData:
     """
     Parses a Uniprot annotation file and annotates the adata.var DataFrame of an AnnData object with selected columns.
-    
+
     Parameters:
     - adata (AnnData): The AnnData object to annotate.
     - up_file (str): Path to the Uniprot annotation file.
     - selected_columns (List[str]): List of column names from the Uniprot file to add to adata.var.
-    
+
     Returns:
     - AnnData: The updated AnnData object with adata.var annotated.
     """
 
     # Set default selected columns if not provided
     if selected_columns is None:
-        selected_columns = ["ECNumber", "Genename", "Description", "Description long"]
+        selected_columns = ["ECNumber", "Genename",
+                            "Description", "Description long"]
 
     # Read the Uniprot annotation file as a pandas DataFrame with tab delimiter
     df_up = pd.read_csv(up_file, sep='\t', dtype=str)
@@ -2740,24 +2757,27 @@ def add_metadata_uniprot(adata: AnnData, up_file: str, selected_columns: List[st
             df_up[col] = ""
         else:
             df_up[col] = df_up[col].fillna("")
-    
+
     # Check if the Uniprot file contains the mandatory "ID" column for mapping
     if "ID" not in df_up.columns:
-        raise ValueError("The Uniprot annotation file must contain an 'ID' column.")
-    
+        raise ValueError(
+            "The Uniprot annotation file must contain an 'ID' column.")
+
     # Set the "ID" column as the index to enable mapping to adata.var
     df_up.set_index("ID", inplace=True)
-    
+
     # Extract the selected columns and align them with adata.var index; fill missing genes with empty string
-    df_annot = df_up[selected_columns].copy().reindex(adata.var.index, fill_value="")
-    
+    df_annot = df_up[selected_columns].copy().reindex(
+        adata.var.index, fill_value="")
+
     # Parse columns: replace spaces with underscores, and lowercase
     df_annot.columns = df_annot.columns.str.replace(" ", "_").str.lower()
 
     # Check if any of the new columns already exist in adata.var
     existing_columns = list(set(df_annot.columns) & set(adata.var.columns))
     if existing_columns:
-        print(f"WARNING: The following columns already exist in adata.var and will be overwritten: {existing_columns}")
+        print(
+            f"WARNING: The following columns already exist in adata.var and will be overwritten: {existing_columns}")
         adata.var.drop(columns=existing_columns, inplace=True)
 
     # Concatenate the annotation DataFrame with the existing adata.var DataFrame
@@ -2766,27 +2786,5 @@ def add_metadata_uniprot(adata: AnnData, up_file: str, selected_columns: List[st
     # Display differences between IDs in adata.var and IDs in the Uniprot file
     missing_in_uniprot = adata.var.index.difference(df_up.index)
     print("IDs in adata.var that are missing in the Uniprot file:", missing_in_uniprot)
-    
+
     return adata
-
-
-def load_metadata_dict(metadata_json_path: str) -> dict:
-    """
-    Loads the metadata dictionary from a JSON file.
-
-    Parameters:
-    - metadata_json_path (str): Path to the metadata JSON file.
-
-    Returns:
-    - dict: The loaded metadata dictionary
-    """
-
-    try:
-        with open(metadata_json_path, "r") as f:
-            return json.load(f)
-    except FileNotFoundError:
-        print(f"Warning: {metadata_json_path} not found. Using an empty dictionary.")
-        return {}
-    except json.JSONDecodeError:
-        print(f"Error: {metadata_json_path} contains invalid JSON. Using an empty dictionary.")
-        return {}

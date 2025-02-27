@@ -36,6 +36,7 @@ from bokeh.models import (
 from bokeh.layouts import column
 from bokeh.transform import dodge, factor_cmap
 from bokeh.palettes import Category20, viridis
+from .config import METADATA_DICT
 
 
 plt.rcParams['savefig.bbox'] = 'tight'
@@ -3633,6 +3634,7 @@ def plot_cyto_network(config: PlotConfig, custom_filename: str = "cyto_network",
     # Render the JS template
     js_template = env.get_template("network.js")
     js_content = js_template.render(network_data=network_data,
+                                    metadata_dict=METADATA_DICT,
                                     filter_edges=filter_edges,
                                     use_background_color=use_colors,
                                     use_shapes=use_shapes,
