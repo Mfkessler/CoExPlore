@@ -3,9 +3,10 @@ import scanpy as sc
 import wgcna.utils as rutils
 import wgcna.ortho as rortho
 from sqlalchemy import create_engine, text, types
+from wgcna.config import load_metadata_dict
 
 def main():
-    METADATA_DICT = rutils.load_metadata_dict("/metadata_dict.json")
+    METADATA_DICT = load_metadata_dict("/metadata_dict.json")
     columns = list(METADATA_DICT.keys())
     h5ad_dir = os.environ.get("H5AD_DIR", "h5ad")
 

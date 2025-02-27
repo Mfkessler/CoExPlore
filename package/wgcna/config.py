@@ -2,15 +2,32 @@
 
 
 import json
+import os
 
 
 def is_dockerized() -> bool:
     """Check if the script is running inside a Docker container."""
+    if os.path.exists("/.dockerenv"):
+        return True
+
+    if os.getenv("container") == "docker":
+        return True
+
     try:
         with open("/proc/1/cgroup", "rt") as f:
-            return "docker" in f.read() or "containerd" in f.read()
+            if "docker" in f.read() or "containerd" in f.read():
+                return True
     except FileNotFoundError:
-        return False
+        pass
+
+    try:
+        with open("/proc/self/mounts", "rt") as f:
+            if any("docker" in line or "containerd" in line for line in f):
+                return True
+    except FileNotFoundError:
+        pass
+
+    return False
 
 
 def load_metadata_dict(metadata_json_path: str) -> dict:

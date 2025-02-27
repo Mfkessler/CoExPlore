@@ -1,5 +1,5 @@
 import os
-from wgcna.utils import load_metadata_dict
+from wgcna.config import load_metadata_dict
 
 class Config:
     ENV_NAME = os.getenv("ENV_NAME", "default")

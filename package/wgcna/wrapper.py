@@ -158,6 +158,8 @@ def analyze_co_expression_network(adata: Union[AnnData, List[AnnData]], config: 
     # Node table including all metadata
     node_table = get_node_table(
         tom, adata, cluster_map, tool, progress_callback).reset_index()
+    for col in node_table.select_dtypes(include=['category']).columns:
+        node_table[col] = node_table[col].astype(str)
     node_table = node_table.fillna("")
     node_table = node_table.astype(str)
     node_table_html = node_table.to_html(
