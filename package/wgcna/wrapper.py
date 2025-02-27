@@ -6,7 +6,7 @@ from .utils import (load_subset_from_hdf5,
                     get_goea_df,
                     export_co_expression_network_to_cytoscape,
                     identify_network_clusters_from_json,
-                    calculate_all_tom_metrics)
+                    get_node_table)
 from .plotting import (PlotConfig,
                        plot_co_expression_network,
                        plot_module_trait_relationships_heatmap,
@@ -14,6 +14,7 @@ from .plotting import (PlotConfig,
                        plot_filtered_go_terms,
                        plot_cyto_network,
                        plot_overlap,
+                       plot_expression_heatmaps,
                        plot_eigengene_expression_bokeh)
 from anndata import AnnData
 from jinja2 import Environment, FileSystemLoader
@@ -33,7 +34,7 @@ def analyze_co_expression_network(adata: Union[AnnData, List[AnnData]], config: 
                                   highlight_color: str = "magenta", tool: str = "cytoscape",
                                   use_colors: bool = False, use_shapes: bool = False,
                                   node_size: int = 10, use_symmetry: bool = False, progress_callback: Callable[[str], None] = None,
-                                  trait: str = "tissue", filter_edges: bool = True, include_neighbours: bool = False,
+                                  trait: str = "tissue", filter_edges: bool = True, include_neighbors: bool = False,
                                   max_neighbors: int = 10) -> dict:
     """
     Analyze co-expression network for a given topic:
@@ -83,31 +84,35 @@ def analyze_co_expression_network(adata: Union[AnnData, List[AnnData]], config: 
     if tool not in ["cytoscape", "plotly"]:
         raise ValueError(f"Invalid tool: {tool}, use 'cytoscape' or 'plotly'")
 
-    # Check if adata is a list of AnnData objects
     if tool == "cytoscape" and isinstance(adata, list):
         if custom_filename is None:
             custom_filename = f"{topic}"
-
     elif tool == "plotly" and isinstance(adata, list):
-        raise ValueError(
-            "Plotly is not supported for multiple AnnData objects")
+        raise ValueError("Plotly is not supported for multiple AnnData objects")
     else:
         if custom_filename is None:
             custom_filename = f"{adata.uns['name']}_{topic}"
 
     print(f"Analyzing co-expression network for {topic} using {tool}")
     if progress_callback:
-        progress_callback(
-            f"Analyzing co-expression network for {topic} using {tool}")
+        progress_callback(f"Analyzing co-expression network for {topic} using {tool}")
 
+    # Load TOM data (with neighbor information)
     if isinstance(adata, list):
-        tom, adata = get_tom_data(tom_path, adata, transcripts=transcripts, query=query, threshold=threshold, tom_prefix=tom_prefix,
-                                  use_symmetry=use_symmetry, progress_callback=progress_callback, include_neighbours=include_neighbours,
+        tom, adata, neighbor_info = get_tom_data(tom_path, adata, transcripts=transcripts, query=query, threshold=threshold, tom_prefix=tom_prefix,
+                                  use_symmetry=use_symmetry, progress_callback=progress_callback, include_neighbours=include_neighbors,
                                   max_neighbors=max_neighbors)
     else:
-        tom = get_tom_data(tom_path, adata, transcripts=transcripts, query=query, threshold=threshold, tom_prefix=tom_prefix,
-                           use_symmetry=use_symmetry, progress_callback=progress_callback, include_neighbours=include_neighbours,
+        tom, neighbor_info = get_tom_data(tom_path, adata, transcripts=transcripts, query=query, threshold=threshold, tom_prefix=tom_prefix,
+                           use_symmetry=use_symmetry, progress_callback=progress_callback, include_neighbours=include_neighbors,
                            max_neighbors=max_neighbors)
+        
+    # Check, if ALL TOM matrices are empty
+    if isinstance(tom, list):
+        if all(tom.empty for tom in tom):
+            return {"message": "No transcripts passed the threshold for any dataset"}
+    elif tom.empty and isinstance(adata, AnnData):
+        return {"message": "No transcripts passed the threshold for any dataset"}
 
     title_suffix = topic
     print(f"Plotting co-expression network for {topic}")
@@ -115,7 +120,7 @@ def analyze_co_expression_network(adata: Union[AnnData, List[AnnData]], config: 
         if progress_callback:
             progress_callback(f"Preparing data for {tool} visualization")
         cyto_data = export_co_expression_network_to_cytoscape(
-            tom, adata, threshold=threshold)
+            tom, adata, threshold=threshold, neighbor_info=neighbor_info)
 
         if progress_callback:
             progress_callback(f"Identifying clusters")
@@ -149,14 +154,20 @@ def analyze_co_expression_network(adata: Union[AnnData, List[AnnData]], config: 
     # Calculate TOM metrics and generate Datatable
     if progress_callback:
         progress_callback(f"Calculating TOM metrics")
-    tom_metrics = calculate_all_tom_metrics(
+
+    # Node table including all metadata
+    node_table = get_node_table(
         tom, adata, cluster_map, tool, progress_callback).reset_index()
-    tom_table_html = tom_metrics.to_html(
-        classes='dynamic-table display dataTable no-border', index=False, border=0, header=True, table_id="tomResults")
+    for col in node_table.select_dtypes(include=['category']).columns:
+        node_table[col] = node_table[col].astype(str)
+    node_table = node_table.fillna("")
+    node_table = node_table.astype(str)
+    node_table_html = node_table.to_html(
+        classes='dynamic-table display dataTable no-border', index=False, border=0, header=True, table_id="nodeResults")
 
     if progress_callback:
         progress_callback(f"Calculating eigengenes")
-    eigengene_files, module_trait_files, table_html, combined_plot_path = process_eigengenes(adata, cluster_map, config, topic,
+    eigengene_files, module_trait_files, table_html, combined_plot_path, heatmap_paths = process_eigengenes(adata, cluster_map, config, topic,
                                                                                              plot_module_trait_relationships, plot_bar_plots,
                                                                                              custom_filename=custom_filename, tool=tool,
                                                                                              progress_callback=progress_callback,
@@ -184,6 +195,8 @@ def analyze_co_expression_network(adata: Union[AnnData, List[AnnData]], config: 
         network_plot_path = f"{custom_filename}.html"
         combined_plot_path = os.path.basename(
             combined_plot_path) if combined_plot_path else None
+        heatmap_paths = ([os.path.basename(path) if path else None for path in heatmap_paths]
+                    if heatmap_paths else None)
 
         if progress_callback:
             progress_callback(f"Generating HTML report")
@@ -191,10 +204,11 @@ def analyze_co_expression_network(adata: Union[AnnData, List[AnnData]], config: 
             adata=adata,
             config=config,
             table_html=table_html,
-            tom_table_html=tom_table_html,
+            node_table_html=node_table_html,
             ortho_table_html=ortho_table_html if tool == "cytoscape" else None,
             images=images,
             combined_plot_path=combined_plot_path,
+            heatmap_paths=heatmap_paths,
             topic=topic,
             ortho_plot_path=ortho_plot_path if tool == "cytoscape" else None,
             network_plot_path=network_plot_path,
@@ -211,109 +225,99 @@ def analyze_co_expression_network(adata: Union[AnnData, List[AnnData]], config: 
 def get_tom_data(tom_path: Union[str, List[str]], adata: Union[AnnData, List[AnnData]], transcripts: Dict[str, List[str]] = None, query: str = "GO:0009908",
                  threshold: float = 0.2, tom_prefix: str = "/vol/share/ranomics_app/data/tom", use_symmetry: bool = False, index_map: dict = None,
                  columns_map: dict = None, progress_callback: Callable[[str], None] = None,
-                 include_neighbours: bool = False, max_neighbors: int = 10) -> Union[pd.DataFrame, List[pd.DataFrame]]:
+                 include_neighbours: bool = False, max_neighbors: int = 10) -> Union[Tuple[pd.DataFrame, set], Tuple[List[pd.DataFrame], List[AnnData], List[set]]]:
     """
-    This function loads the TOM matrix for one or multiple AnnData objects.
-
+    Loads the TOM matrix for one or multiple AnnData objects.
+    
     Parameters:
-    - tom_path (Union[str, List[str]]): Path to the TOM matrix file or a list of paths if multiple.
-    - adata (Union[AnnData, List[AnnData]]): The AnnData object or a list of AnnData objects.
-    - transcripts (Dict[str, List[str]]): List of transcripts to be used for subsetting.
-    - query (str): The query for filtering transcripts. Defaults to "GO:0009908".
-    - threshold (float): Threshold for filtering the TOM matrix. Defaults to 0.2.
-    - tom_prefix (str): The prefix for the TOM file if tom_path is not provided.
-    - use_symmetry (bool): Whether to use a symmetric TOM matrix.
-    - index_map (dict): A dictionary mapping row labels to indices.
-    - columns_map (dict): A dictionary mapping column labels to indices.
-    - progress_callback (Callable[[str], None]): Callback function to report progress.
-    - include_neighbours (bool): If True, for each transcript in rows,
-                                check for neighbours with value >= threshold and include them.  
-    - max_neighbors (int): Maximum number of neighbours to include.
-
+    - tom_path (str or List[str]): Path(s) to the TOM file(s).
+    - adata (AnnData or List[AnnData]): The AnnData object(s).
+    - transcripts (Dict[str, List[str]]): Transcripts to subset.
+    - query (str): Query for filtering transcripts.
+    - threshold (float): Threshold for TOM filtering.
+    - tom_prefix (str): Prefix for TOM file if tom_path is not provided.
+    - use_symmetry (bool): Whether to use symmetry.
+    - index_map (dict): Optional index mapping.
+    - columns_map (dict): Optional columns mapping.
+    - progress_callback (Callable): Progress callback.
+    - include_neighbours (bool): If True, include neighbor transcripts.
+    - max_neighbors (int): Maximum neighbors per transcript.
+    
     Returns:
-    - tom (Union[np.ndarray, List[np.ndarray]]): The loaded TOM matrix or a list of TOM matrices.
+    - (pd.DataFrame, set): TOM matrix and neighbor set for a single AnnData.
+    - (List[pd.DataFrame], List[AnnData], List[set]): Lists for multiple objects.
     """
 
     valid_adatas = []
-
     if isinstance(adata, list):
-        # Handle the case where adata is a list of AnnData objects
         toms = []
+        neighbor_info_list = []
         for idx, ad in enumerate(adata):
-            current_tom_path = tom_path[idx] if isinstance(
-                tom_path, list) else f"{tom_prefix}/tom_matrix_{ad.uns['name']}.h5"
-
+            current_tom_path = tom_path[idx] if isinstance(tom_path, list) else f"{tom_prefix}/tom_matrix_{ad.uns['name']}.h5"
             if not os.path.exists(current_tom_path):
                 print(f"File not found: {current_tom_path}")
                 continue
-
             if not transcripts:
-                current_transcripts = [t[1] for t in list(
-                    transcript_ortho_browser(query, ad).index)]
-
-            if transcripts:
+                current_transcripts = [t[1] for t in list(transcript_ortho_browser(query, ad).index)]
+            else:
                 current_species = ad.uns['species']
                 if current_species in transcripts:
-                    # Filter transcripts specific to the current species that are present in ad.var_names
-                    current_transcripts = [
-                        t for t in transcripts[current_species] if t in ad.var_names]
+                    current_transcripts = [t for t in transcripts[current_species] if t in ad.var_names]
                 else:
-                    print(
-                        f"No transcripts found for species {current_species} in dataset {ad.uns['name']}")
+                    print(f"No transcripts found for species {current_species} in dataset {ad.uns['name']}")
                     continue
-
             if not current_transcripts:
-                print(
-                    f"No transcripts found for the query in dataset {ad.uns['name']}")
+                print(f"No transcripts found for the query in dataset {ad.uns['name']}")
                 continue
-
-            print(
-                f"Loading {len(current_transcripts)} transcripts from {current_tom_path}")
+            print(f"Loading {len(current_transcripts)} transcripts from {current_tom_path}")
             if progress_callback:
-                progress_callback(
-                    f"Loading {len(current_transcripts)} transcripts from TOM of dataset {ad.uns['name']}")
-            tom = load_subset_from_hdf5(filename=current_tom_path, rows=current_transcripts, cols=current_transcripts,
-                                        threshold=threshold, use_symmetry=use_symmetry, index_map=index_map, columns_map=columns_map,
-                                        include_neighbours=include_neighbours, max_neighbors=max_neighbors)
+                progress_callback(f"Loading {len(current_transcripts)} transcripts from TOM of dataset {ad.uns['name']}")
+            tom, neighbor_set = load_subset_from_hdf5(
+                filename=current_tom_path,
+                rows=current_transcripts,
+                cols=current_transcripts,
+                threshold=threshold,
+                use_symmetry=use_symmetry,
+                index_map=index_map,
+                columns_map=columns_map,
+                include_neighbours=include_neighbours,
+                max_neighbors=max_neighbors
+            )
             print(f"Transcripts after filtering: {tom.shape[0]}")
-            toms.append(tom)
+            toms.append(tom.astype("float64"))
+            neighbor_info_list.append(neighbor_set)
             valid_adatas.append(ad)
-
         for idx, t in enumerate(toms):
             toms[idx] = t.astype("float64")
-
-        return toms, valid_adatas
+        return toms, valid_adatas, neighbor_info_list
     else:
         if not tom_path:
             tom_path = f"{tom_prefix}/tom_matrix_{adata.uns['name']}.h5"
-
         if not os.path.exists(tom_path):
             print(f"File not found: {tom_path}")
             return None
-
         if transcripts:
-            transcripts = [
-                t for t in transcripts[adata.uns['species']] if t in adata.var_names]
+            transcripts = [t for t in transcripts[adata.uns['species']] if t in adata.var_names]
         else:
-            transcripts = [t[1] for t in list(
-                transcript_ortho_browser(query, adata).index)]
-
+            transcripts = [t[1] for t in list(transcript_ortho_browser(query, adata).index)]
         if not transcripts:
-            print(
-                f"No transcripts found for the query in dataset {adata.uns['name']}")
+            print(f"No transcripts found for the query in dataset {adata.uns['name']}")
             return None
-
         print(f"Loading {len(transcripts)} transcripts from {tom_path}")
         if progress_callback:
-            progress_callback(
-                f"Loading {len(transcripts)} transcripts from TOM of dataset {adata.uns['name']}")
-        tom = load_subset_from_hdf5(filename=tom_path, rows=transcripts, cols=transcripts, threshold=threshold, use_symmetry=use_symmetry,
-                                    include_neighbours=include_neighbours, max_neighbors=max_neighbors)
+            progress_callback(f"Loading {len(transcripts)} transcripts from TOM of dataset {adata.uns['name']}")
+        tom, neighbor_set = load_subset_from_hdf5(
+            filename=tom_path,
+            rows=transcripts,
+            cols=transcripts,
+            threshold=threshold,
+            use_symmetry=use_symmetry,
+            include_neighbours=include_neighbours,
+            max_neighbors=max_neighbors
+        )
         print(f"Transcripts after filtering: {tom.shape[0]}")
-
         tom = tom.astype("float64")
-
-        return tom
+        return tom, neighbor_set
 
 
 def process_eigengenes(adata: Union[AnnData, List[AnnData]], cluster_map: dict, config: dict, topic: str,
@@ -348,6 +352,7 @@ def process_eigengenes(adata: Union[AnnData, List[AnnData]], cluster_map: dict, 
     columns = ["Species", "Total Transcripts",
                "Top Module", "Top Module (%)", "Unique Modules"]
     combined_plot_path = None
+    heatmap_paths = None
 
     if isinstance(adata, list):
         # Handle the case where adata is a list of AnnData objects
@@ -367,8 +372,7 @@ def process_eigengenes(adata: Union[AnnData, List[AnnData]], cluster_map: dict, 
 
             if tool == "cytoscape":
                 # Filter cluster_map to only include clusters from the current species
-                cluster_map_temp = {"_".join(k.split("_")[1:]): v for k, v in cluster_map.items(
-                ) if k.startswith(ad.uns['species'])}
+                cluster_map_temp = filter_cluster_map(cluster_map, ad.uns['species'])
 
             # Check if the cluster_map is empty
             if not cluster_map_temp:
@@ -430,8 +434,7 @@ def process_eigengenes(adata: Union[AnnData, List[AnnData]], cluster_map: dict, 
         # Handle the case where adata is a single AnnData object
         if tool == "cytoscape":
             # Filter cluster_map to only include clusters from the current species
-            cluster_map = {k.split("_")[1]: v for k, v in cluster_map.items(
-            ) if k.startswith(adata.uns['species'])}
+            cluster_map = filter_cluster_map(cluster_map, adata.uns['species'])
 
         print(f"Calculating eigengenes for clusters in {topic}")
         if progress_callback:
@@ -480,10 +483,19 @@ def process_eigengenes(adata: Union[AnnData, List[AnnData]], cluster_map: dict, 
     if progress_callback:
         progress_callback(f"Combining eigengene data for plotting")
     combined_eigengene_data = pd.concat(eigenene_data, ignore_index=True)
-    if progress_callback:
-        progress_callback(f"Plotting combined eigengene expression")
-    combined_plot_path = plot_eigengene_expression_bokeh(combined_eigengene_data, config,
-                                                         custom_filename=f"{custom_filename}_combined_bokeh")
+
+    if not combined_eigengene_data.empty:
+        if progress_callback:
+            progress_callback(f"Plotting combined eigengene expression")
+        combined_plot_path = plot_eigengene_expression_bokeh(combined_eigengene_data, config,
+                                                            custom_filename=f"{custom_filename}_combined_bokeh")
+        heatmap_paths = plot_expression_heatmaps(combined_eigengene_data, "All Clusters", False, config, height=None, width=None,
+                                                 custom_filename=f"{custom_filename}_heatmap")
+        print(f"Heatmap paths: {heatmap_paths}")
+    else:
+        print("No eigengene data found for combined plotting")
+        combined_plot_path = None
+        heatmap_paths = None
 
     # Combine all module info DataFrames if needed
     combined_module_info_df = pd.concat(
@@ -494,7 +506,24 @@ def process_eigengenes(adata: Union[AnnData, List[AnnData]], cluster_map: dict, 
     table_html = combined_module_info_df.to_html(
         classes='dynamic-table display dataTable no-border', index=False, border=0, header=True, table_id="infoResults")
 
-    return eigengene_files, module_trait_files, table_html, combined_plot_path
+    return eigengene_files, module_trait_files, table_html, combined_plot_path, heatmap_paths
+
+
+def filter_cluster_map(cluster_map: dict, species: str) -> dict:
+    """
+    Filters the cluster map to include only entries from the given species and removes the species prefix.
+
+    Parameters:
+    - cluster_map (dict): The original cluster map with keys starting with species name.
+    - species (str): The species name to filter for.
+
+    Returns:
+    - dict: A new cluster map with the species prefix (and underscore) removed from the keys.
+    """
+
+    species_prefix = species + "_"  # Define the species prefix with underscore.
+
+    return {k[len(species_prefix):]: v for k, v in cluster_map.items() if k.startswith(species_prefix)}
 
 
 def map_tissue_info(cluster_eigengenes: pd.DataFrame, ad: AnnData) -> pd.DataFrame:
@@ -533,8 +562,9 @@ def map_tissue_info(cluster_eigengenes: pd.DataFrame, ad: AnnData) -> pd.DataFra
     return cluster_eigengenes
 
 
-def generate_co_expression_html(adata: Union[AnnData, List[AnnData]], config: PlotConfig, table_html: str, tom_table_html: str,
-                                ortho_table_html: str, images: List[str], combined_plot_path: str, topic: str, ortho_plot_path: str, network_plot_path: str,
+def generate_co_expression_html(adata: Union[AnnData, List[AnnData]], config: PlotConfig, table_html: str, node_table_html: str,
+                                ortho_table_html: str, images: List[str], combined_plot_path: str, heatmap_paths: List[str],
+                                topic: str, ortho_plot_path: str, network_plot_path: str,
                                 threshold: int, template_path: str, custom_filename: str = None) -> str:
     """
     Generate an HTML report for the co-expression analysis.
@@ -545,6 +575,7 @@ def generate_co_expression_html(adata: Union[AnnData, List[AnnData]], config: Pl
     - table_html (str): HTML table with module information.
     - images (List[str]): List of image file names.
     - combined_plot_path (str): Path to the combined eigengene plot.
+    - heatmap_paths (List[str]): List of paths to the heatmap plots.
     - topic (str): Headline for the analysis.
     - ortho_plot_path (str): Path to the HTML file of the orthogroup overlap plot
     - network_plot_path (str): Path to the HTML file of the co-expression network plot.
@@ -566,10 +597,11 @@ def generate_co_expression_html(adata: Union[AnnData, List[AnnData]], config: Pl
     rendered_html = template.render(
         topic=topic,
         table_html=table_html,
-        tom_table_html=tom_table_html,
+        node_table_html=node_table_html,
         ortho_table_html=ortho_table_html,
         images=images,
         combined_plot_path=combined_plot_path,
+        heatmap_paths=heatmap_paths,
         network_plot_path=network_plot_path,
         ortho_plot_path=ortho_plot_path
     )

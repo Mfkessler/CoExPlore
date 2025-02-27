@@ -1,6 +1,6 @@
 services:
   wgcna_pipeline:
-    image: coexplore:latest
+    image: coexplore-pipeline:latest
     container_name: wgcna_pipeline
     env_file:
       - .env
@@ -10,6 +10,7 @@ services:
       - ./pipeline/config.yml:/CoExPlore/config.yml:z
       - ./pipeline/Snakefile:/CoExPlore/Snakefile:z
       - ./app:/app:z
+      - ./metadata_dict.json:/metadata_dict.json
     working_dir: /CoExPlore
     command: >
       bash -c "snakemake --cores 4 && touch /CoExPlore/output/pipeline_done.txt"

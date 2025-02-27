@@ -56,23 +56,28 @@ def plot_co_expression_network_task(self, data):
 
     plant = data['plant']
     tom_path = f"{Config.DATA_DIR}/tom/tom_matrix_{plant}.h5"
+
     transcripts = data.get('transcripts')
-    logger.info(f"Transcripts before filtering: {len(transcripts)}")
+    total_transcripts = sum(len(t_list) for t_list in transcripts.values())  # Sum of all transcript lists
+    logger.info(f"Total transcripts before filtering: {total_transcripts}")
+
     threshold = float(data.get('threshold', 0.1))
     use_shapes = data.get('useShapesSpecies', False)
     use_colors = data.get('useColors', False)
-    plot_only = data.get('plotOnly', False)
     highlight_list = data.get('highlightList', None)
-    tool = data.get('selectedPlotType', 'plotly')
     custom_filename = f"{prefix}co_expression_network_{plant}_{threshold}"
     template_path = os.path.join(current_app.root_path, 'templates')
     topic = ""
+    max_neighbors = data.get('maxNeighbors', 0)
+
+    if max_neighbors > 0:
+        logger.info(f"Max neighbors: {max_neighbors}")
+        include_neighbors = True
+    else:
+        include_neighbors = False
 
     if isinstance(plant, list):
-        adata = [adata_cache.get_adata(p) for p in plant]
         custom_filename = f"{prefix}co_expression_network_{'_'.join(plant)}_{threshold}"
-        # One tom path per plant:
-        tom_path = [f"{Config.DATA_DIR}/tom/tom_matrix_{p}.h5" for p in plant]
 
     if plant in adata_cache.keys() or isinstance(plant, list):
         if isinstance(plant, list):
@@ -81,44 +86,20 @@ def plot_co_expression_network_task(self, data):
             adata = adata_cache.get_adata(plant)
 
         total_transcripts = sum(len(v) for v in transcripts.values())
-        if total_transcripts > 10000:
-            return {"status": "FAILURE", "result": {"status": "error", "message": "Too many transcripts selected, please select fewer than 10000"}}
+        if total_transcripts > 5000:
+            return {"status": "FAILURE", "result": {"status": "error", "message": "Too many transcripts selected, please select fewer than 5000"}}
 
-        if not plot_only:
-            html_path = rwrap.analyze_co_expression_network(adata, plot_config, transcripts=transcripts, threshold=threshold,
-                                                            obo_path=f"{Config.DATA_DIR}/go-basic.obo", topic=topic, plot_go_enrichment=False,
-                                                            template_path=template_path, highlight=highlight_list, tool=tool, custom_filename=custom_filename,
-                                                            use_colors=use_colors, use_shapes=use_shapes, progress_callback=progress_callback,
-                                                            tom_prefix=f"{Config.DATA_DIR}/tom")
-            
-            return {"status": "SUCCESS", "result": {"status": "success", "plot_url": f"{Config.BASE_URL}/{plot_config.output_path}/{html_path}"}}
-        else:
-            progress_callback("Loading TOM data")
-            if isinstance(plant, list):
-                tom, adata = rwrap.get_tom_data(tom_path, adata, transcripts=transcripts, query=None, threshold=threshold, progress_callback=progress_callback)
-            else:
-                tom = rwrap.get_tom_data(tom_path, adata, transcripts=transcripts, query=None, threshold=threshold, progress_callback=progress_callback)
+        html_path = rwrap.analyze_co_expression_network(adata, plot_config, transcripts=transcripts, threshold=threshold,
+                                                        obo_path=f"{Config.DATA_DIR}/go-basic.obo", topic=topic, plot_go_enrichment=False,
+                                                        template_path=template_path, highlight=highlight_list, custom_filename=custom_filename,
+                                                        use_colors=use_colors, use_shapes=use_shapes, progress_callback=progress_callback,
+                                                        tom_prefix=f"{Config.DATA_DIR}/tom", filter_edges=False, max_neighbors=max_neighbors,
+                                                        include_neighbors=include_neighbors)
+        
+        if isinstance(html_path, dict):
+            return {"status": "FAILURE", "result": {"status": "error", "message": f"{html_path.get('message')}"}}
 
-            progress_callback("Plotting co-expression network")
-            if tool == "cytoscape":
-                cyto_data = rutils.export_co_expression_network_to_cytoscape(tom, adata, threshold=threshold)
-                rplot.plot_cyto_network(plot_config, custom_filename=custom_filename, network_data=cyto_data, use_colors=use_colors, 
-                                        use_shapes=use_shapes, cluster_info=None, searchpath=template_path)
-                
-                plot_filename_full = f"{custom_filename}.html"
-            else:
-                rplot.plot_co_expression_network(tom, adata, plot_config, threshold=threshold, custom_filename=custom_filename,
-                                                use_shapes=use_shapes, use_colors=use_colors, show_symbol_legend=True, show_edge_legend=True,
-                                                width=None, height=None, identify_clusters=None, highlight=highlight_list)
-                if tom.shape[0] > 1000:
-                    return {"status": "FAILURE", "result": {"status": "error", "message": "Please use Cytoscape for large networks (nodes > 1000)"}}
-
-                if tom.shape[0] > 300:
-                    plot_filename_full = f"{custom_filename}.png"
-                else:
-                    plot_filename_full = f"{custom_filename}.html"
-                
-            return {"status": "SUCCESS", "result": {"status": "success", "plot_url": f"{Config.BASE_URL}/{plot_config.output_path}/{plot_filename_full}"}}
+        return {"status": "SUCCESS", "result": {"status": "success", "plot_url": f"{Config.BASE_URL}/{plot_config.output_path}/{html_path}"}}
     else:
         return {"status": "FAILURE", "result": {"status": "error", "message": "Data not loaded", "info": f"{adata_cache.keys()}"}}    
 
@@ -243,7 +224,7 @@ def plot_filtered_jaccard_modules_task(self, data):
     adata_list = [adata_cache.get_adata(plant) for plant in plants]
 
     if len(adata_list) > 0:
-        mds = [rutils.create_mapping_dict(adata, value_column='ortho_ID', transcripts=transcripts, min_count=min_orthos) for adata in adata_list]
+        mds = [rutils.create_mapping_dict(adata, value_column='ortho_id', transcripts=transcripts, min_count=min_orthos) for adata in adata_list]
         j_df_modules = rutils.get_jaccard_df(mds)
 
         custom_filename = f"{prefix}modules_network_filtered_{threshold}"
@@ -282,7 +263,7 @@ def plot_filtered_jaccard_species_task(self, data):
     adata_list = [adata_cache.get_adata(plant) for plant in plants]
 
     if len(adata_list) > 1:
-        mds = [rutils.create_mapping_dict(adata, value_column='ortho_ID', transcripts=transcripts, mapping_column="species", min_count=min_orthos) for adata in adata_list]
+        mds = [rutils.create_mapping_dict(adata, value_column='ortho_id', transcripts=transcripts, mapping_column="species", min_count=min_orthos) for adata in adata_list]
         j_df_species = rutils.get_jaccard_df(mds)
 
         custom_filename = f"{prefix}species_network_filtered_{threshold}"
@@ -459,7 +440,7 @@ def plot_jaccard_tissues_task(self, data):
     adata_list = [adata_cache.get_adata(plant) for plant in plants]
 
     if len(adata_list) > 1:
-        dicts = rutils.get_top_expressed_genes_by_tissue(adata_list, n=nTop, column='ortho_ID')
+        dicts = rutils.get_top_expressed_genes_by_tissue(adata_list, n=nTop, column='ortho_id')
         j_df_tissues = rutils.get_jaccard_df(dicts)
 
         custom_filename = f"{prefix}tissues_network_{threshold}"
@@ -489,7 +470,7 @@ def plot_tissues_corr_task(self, data):
     adata_list = [adata_cache.get_adata(plant) for plant in plants]
 
     if len(adata_list) > 1:
-        dicts = rutils.get_top_expressed_genes_by_tissue(adata_list, n=nTop, column='ortho_ID')
+        dicts = rutils.get_top_expressed_genes_by_tissue(adata_list, n=nTop, column='ortho_id')
         j_df_tissues = rutils.get_jaccard_df(dicts)
 
         custom_filename = f"{prefix}tissues_heatmap_{nTop}"
@@ -519,7 +500,7 @@ def plot_jaccard_modules_task(self, data):
     adata_list = [adata_cache.get_adata(plant) for plant in plants]
 
     if len(adata_list) > 1:
-        mds = [rutils.create_mapping_dict(adata, value_column='ortho_ID') for adata in adata_list]
+        mds = [rutils.create_mapping_dict(adata, value_column='ortho_id') for adata in adata_list]
         j_df_modules = rutils.get_jaccard_df(mds)
 
         custom_filename = f"{prefix}modules_network_{threshold}"
@@ -552,7 +533,7 @@ def plot_modules_corr_task(self, data):
     adata_list = [adata_cache.get_adata(plant) for plant in plants]
 
     if len(adata_list) > 1:
-        mds = [rutils.create_mapping_dict(adata, value_column='ortho_ID') for adata in adata_list]
+        mds = [rutils.create_mapping_dict(adata, value_column='ortho_id') for adata in adata_list]
         j_df_modules = rutils.get_jaccard_df(mds)
 
         custom_filename = f"{prefix}modules_heatmap"

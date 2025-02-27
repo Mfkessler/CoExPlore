@@ -2,9 +2,12 @@ import os
 import scanpy as sc
 import wgcna.utils as rutils
 import wgcna.ortho as rortho
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, text, types
+from wgcna.config import load_metadata_dict
 
 def main():
+    METADATA_DICT = load_metadata_dict("/metadata_dict.json")
+    columns = list(METADATA_DICT.keys())
     h5ad_dir = os.environ.get("H5AD_DIR", "h5ad")
 
     # Environment variables for the DB from Docker Compose
@@ -21,23 +24,15 @@ def main():
     adatas = [sc.read_h5ad(os.path.join(h5ad_dir, f)) for f in h5ad_files]
 
     # Create browser table
-    df = rortho.transcript_ortho_browser("", adatas)
+    df = rortho.transcript_ortho_browser("", adatas, possible_columns=columns)
 
-    # Add optional columns if they do not exist
-    if 'ortho_id' not in df.columns:
-        df['ortho_id'] = ""
-    if 'ortho_count' not in df.columns:
-        df['ortho_count'] = 0
-    if 'ipr_id' not in df.columns:
-        df['ipr_id'] = ""
-    if 'ipr_desc' not in df.columns:
-        df['ipr_desc'] = ""
-    if 'go_terms' not in df.columns:
-        df['go_terms'] = ""
-    if 'unique_go_terms' not in df.columns:
-        df['unique_go_terms'] = ""
+    # Replace all NaNs with ""
+    df = df.fillna("")
+    
+    # Map all columns to TEXT
+    dtype_mapping = {col: types.TEXT for col in df.columns}
 
-    df.to_sql('wgcna_browser', engine, if_exists='replace', index=True)
+    df.to_sql('wgcna_browser', engine, if_exists='replace', index=True, dtype=dtype_mapping)
     print("Table wgcna_browser created successfully!")
 
     # Create info table

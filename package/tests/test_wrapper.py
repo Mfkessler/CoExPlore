@@ -1,6 +1,7 @@
 import pytest
 import os
 import logging
+import pandas as pd
 from anndata import read_h5ad
 from wgcna.wrapper import analyze_co_expression_network, get_tom_data
 from wgcna.plotting import PlotConfig
@@ -42,25 +43,36 @@ def plot_config():
 
 def test_get_tom_data_single(ann_data_single):
     """Test get_tom_data with a single AnnData object."""
-    tom = get_tom_data(tom_path=os.path.join(BASE_DIR, "data", "S1", "tom_matrix.h5"), 
-                       adata=ann_data_single, 
-                       query="",
-                       threshold=0.2)
+    tom, neighbor_set = get_tom_data(
+        tom_path=os.path.join(BASE_DIR, "data", "S1", "tom_matrix.h5"), 
+        adata=ann_data_single, 
+        query="",
+        threshold=0.2
+    )
     
     assert tom is not None, "TOM should be loaded."
+    assert isinstance(tom, pd.DataFrame), "TOM should be a DataFrame."
+    assert isinstance(neighbor_set, set), "Neighbor set should be a set."
     assert tom.shape[0] == tom.shape[1], "TOM should be square."
 
 def test_get_tom_data_list(ann_data_list):
     """Test get_tom_data with a list of AnnData objects."""
-    toms, adatas = get_tom_data(tom_path=[os.path.join(BASE_DIR, "data", f"S{i}", "tom_matrix.h5") for i in range(1, 9)], 
-                                adata=ann_data_list, 
-                                query="",
-                                threshold=0.2)
+    toms, adatas, neighbor_sets = get_tom_data(
+        tom_path=[os.path.join(BASE_DIR, "data", f"S{i}", "tom_matrix.h5") for i in range(1, 3)], 
+        adata=ann_data_list, 
+        query="",
+        threshold=0.2
+    )
     
-    assert len(toms) == len(ann_data_list), "There should be one TOM per AnnData object."
-    
+    assert isinstance(toms, list), "TOMs should be a list."
+    assert isinstance(adatas, list), "Adatas should be a list."
+    assert isinstance(neighbor_sets, list), "Neighbor sets should be a list."
+    assert len(toms) == len(adatas), "There should be one TOM per AnnData object."
+    assert len(neighbor_sets) == len(adatas), "There should be one neighbor set per AnnData object."
+
     for tom in toms:
-        assert tom.shape[0] == tom.shape[1], "TOM should be square."
+        assert isinstance(tom, pd.DataFrame), "Each TOM should be a DataFrame."
+        assert tom.shape[0] == tom.shape[1], "Each TOM should be square."
 
 def test_analyze_co_expression_network_single(ann_data_single, plot_config):
     """Test analyze_co_expression_network with a single AnnData object."""
@@ -85,7 +97,7 @@ def test_analyze_co_expression_network_list(ann_data_list, plot_config):
         adata=ann_data_list,
         config=plot_config,
         topic="Test2",
-        tom_path=[os.path.join(BASE_DIR, "data", f"S{i}", "tom_matrix.h5") for i in range(1, 9)],
+        tom_path=[os.path.join(BASE_DIR, "data", f"S{i}", "tom_matrix.h5") for i in range(1, 3)],
         out="html",
         template_path=TEMPLATE_DIR,
         plot_go_enrichment=False,

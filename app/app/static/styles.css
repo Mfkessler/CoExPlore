@@ -257,6 +257,34 @@ h6 {
   flex: 1 1 0;
 }
 
+@media (max-width: 575.98px) {
+  .row.mb-3 label.col-form-label {
+    text-align: center !important;
+  }
+
+  .row.mb-3>div[class^="col-"] {
+    text-align: center !important;
+  }
+
+  .row.mb-3 input.form-control,
+  .row.mb-3 select.form-control,
+  .row.mb-3 textarea.form-control {
+    display: block;
+    margin-left: auto !important;
+    margin-right: auto !important;
+  }
+
+  .row.mb-3 .col-sm-8 {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+
+  .row.mb-3 .form-check.form-check-inline {
+    margin-left: 0 !important;
+  }
+}
+
 @media (min-width: 768px) {
 
   .control-input input,

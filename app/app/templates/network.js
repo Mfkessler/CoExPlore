@@ -10,6 +10,12 @@ document.addEventListener('DOMContentLoaded', function() {
     var useEdgeTransparency = {{ use_edge_transparency|tojson }};  // Transparency flag
     var useEdgeColoring = {{ use_edge_coloring|tojson }};  // Edge coloring flag
 
+    // Metadata
+    const METADATA_MAPPING = {{ metadata_dict|tojson }};
+    METADATA_MAPPING['gene'] = 'Transcript';
+    const FORMATTED_KEYS = ['go_terms', 'ipr_id'];
+    const HIDDEN_KEYS = ['description_long', 'modules_labels', 'module_count', 'unique_modules', 'unique_go_terms', 'transcript'];
+
     var cy = cytoscape({
         container: document.getElementById('cy'),
         elements: {{ network_data|tojson }},  // Data from Python
@@ -21,7 +27,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         if (node.data('highlighted')) {
                             return highlightColor;  // Highlighted node
                         }
-                        return useBackgroundColor ? node.data('moduleColor') : 'black';
+                        return useBackgroundColor ? node.data('module_colors') : 'black';
                     },
                     'shape': 'ellipse',
                     'text-valign': 'center',
@@ -30,6 +36,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     'border-width': 1,
                     'font-size': 10,
                     'label': '',  // No direct label on nodes
+                }
+            },
+            {
+                selector: 'node[is_neighbor]',
+                style: {
+                    'opacity': 0.5
                 }
             },
             {
@@ -108,11 +120,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 break;
             case 'vee':
                 shapeElement = document.createElementNS(svgNS, "polygon");
-                shapeElement.setAttribute("points", "2,2 10,18 18,2");
+                shapeElement.setAttribute("points", "2,2 10,8 18,2 10,18");
                 break;
             case 'rhomboid':
                 shapeElement = document.createElementNS(svgNS, "polygon");
-                shapeElement.setAttribute("points", "4,2 16,2 12,18 0,18");
+                shapeElement.setAttribute("points", "4,18 16,18 12,2 0,2");
                 break;
             default:
                 shapeElement = document.createElementNS(svgNS, "rect");
@@ -127,7 +139,27 @@ document.addEventListener('DOMContentLoaded', function() {
         return svg;
     }    
 
+    function debounce(func, wait) {
+        let timeout;
+        return function(...args) {
+            clearTimeout(timeout);
+            timeout = setTimeout(() => func.apply(this, args), wait);
+        };
+    }
+
+    const metadataKeys = Object.keys(METADATA_MAPPING).filter(key => !HIDDEN_KEYS.includes(key));
+
     cy.ready(function() {
+        /* Init edge visibility */
+        const initialZoom = cy.zoom();
+        cy.scratch('initialZoom', initialZoom);
+        updateEdgesVisibility();
+        
+        const debouncedUpdateEdgesVisibility = debounce(updateEdgesVisibility, 100);
+        document.getElementById('edge-visibility-range').addEventListener('input', debouncedUpdateEdgesVisibility);
+        cy.on('zoom', debouncedUpdateEdgesVisibility);
+        cy.on('pan', debouncedUpdateEdgesVisibility);
+
         /* Shape assignment based on organism */
         if (useShapes) {
             const availableShapes = [
@@ -146,7 +178,7 @@ document.addEventListener('DOMContentLoaded', function() {
             let organismShapes = {};
 
             // Determine unique organisms
-            let uniqueOrganisms = [...new Set(cy.nodes().map(node => node.data('organism')))];
+            let uniqueOrganisms = [...new Set(cy.nodes().map(node => node.data('species')))];
             // Assign shapes cyclically
             uniqueOrganisms.forEach((organism, index) => {
                 organismShapes[organism] = availableShapes[index % availableShapes.length];
@@ -155,7 +187,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // Dynamically update node styles
             cy.batch(function() {
                 cy.nodes().forEach(node => {
-                    let organism = node.data('organism');
+                    let organism = node.data('species');
                     let newShape = organismShapes[organism] || 'ellipse';
                     node.style('shape', newShape);
                 });
@@ -260,6 +292,69 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
     });
+
+    function clamp(val, min, max) {
+        return Math.max(min, Math.min(max, val));
+    }
+
+    function lerp(a, b, t) {
+        return a + (b - a) * t;
+    }
+
+    function updateEdgesVisibility() {
+        // Read the slider value (0 to 100)
+        const sliderValue = parseInt(document.getElementById('edge-visibility-range').value, 10);
+        
+        // Parameters
+        const exponentHigh = 4;    // For high-degree nodes – higher value = slower growth
+        const thresholdLow = 15;   // Nodes with <= 10 edges are considered low-degree
+        
+        // Determine the current viewport (model coordinates)
+        const extent = cy.extent();
+        
+        // Initialize sorted edges (once), sorted in descending order by weight
+        if (!cy.scratch('sortedEdges')) {
+            const sortedEdges = {};
+            cy.nodes().forEach(node => {
+                const nodeEdges = node.connectedEdges();
+                const sorted = nodeEdges.sort((a, b) => (b.data('weight') || 0) - (a.data('weight') || 0));
+                sortedEdges[node.id()] = sorted.map(edge => edge.id());
+            });
+            cy.scratch('sortedEdges', sortedEdges);
+        }
+        const sortedEdges = cy.scratch('sortedEdges');
+        
+        // Hide all edges initially
+        cy.edges().hide();
+        
+        function nodeInExtent(node) {
+            const pos = node.position();
+            return pos.x >= extent.x1 && pos.x <= extent.x2 &&
+                   pos.y >= extent.y1 && pos.y <= extent.y2;
+        }
+        
+        // For each node in the viewport: Calculate how many edges should be shown.
+        cy.nodes().forEach(node => {
+            if (nodeInExtent(node)) {
+                const edgeIds = sortedEdges[node.id()] || [];
+                const totalEdges = edgeIds.length;
+                let effectiveFraction;
+                
+                if (totalEdges <= thresholdLow) {
+                    // For low-degree nodes: If slider ≥20%, show all edges; otherwise scale linearly.
+                    effectiveFraction = sliderValue >= 20 ? 1 : sliderValue / 20;
+                } else {
+                    // For high-degree nodes: Convex mapping for slower growth.
+                    effectiveFraction = Math.pow(sliderValue / 100, exponentHigh);
+                }
+                
+                const allowedEdges = Math.ceil(effectiveFraction * totalEdges);
+                for (let i = 0; i < allowedEdges && i < totalEdges; i++) {
+                    cy.getElementById(edgeIds[i]).show();
+                }
+            }
+        });
+    }
 
     // Calculate the minimum and maximum TOM value
     var minTOM = Math.min(...cy.edges().map(edge => edge.data('weight')));
@@ -446,36 +541,45 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    function formatList(value) {
+        if (typeof value !== 'string' || value.trim() === '') {
+            return 'N/A'; 
+        }
+        if (!value.includes(',')) {
+            return value; 
+        }
+        let valuesArray = value.split(',');
+        return valuesArray[0] + ', +' + (valuesArray.length - 1);
+    }    
+
     /* Tooltip */
 
     // Tooltip on hover
     cy.on('mouseover', 'node', function(evt) {
         var node = evt.target;
-        var goTerms = node.data('go_terms');
-        var iprIds = node.data('ipr_id');
       
-        // Adjust GO Terms
-        if (goTerms && goTerms.includes(',')) {
-          var goTermsArray = goTerms.split(',');
-          goTerms = goTermsArray[0] + ', +' + (goTermsArray.length - 1);
+        var tooltipText = '';
+        var dataDict = METADATA_MAPPING
+
+        for (var key in dataDict) {
+            if (HIDDEN_KEYS.includes(key)) {
+                continue;
+            }
+        
+            var value = node.data(key);
+        
+            if (value !== undefined && value !== null) {
+                let formattedValue = FORMATTED_KEYS.includes(key) ? formatList(value) : value;
+                
+                tooltipText += `<b>${dataDict[key]}:</b> ${formattedValue}<br>`;
+            }
         }
-          
-        // Adjust InterPro IDs
-        if (iprIds && iprIds.includes(',')) {
-          var iprIdsArray = iprIds.split(',');
-          iprIds = iprIdsArray[0] + ', +' + (iprIdsArray.length - 1);
-        }
-      
-        var tooltipText = '<b>Species:</b> ' + node.data('organism') +
-          '<br><b>Transcript:</b> ' + node.data('gene') +
-          '<br><b>Module:</b> ' + node.data('moduleColor') +
-          '<br><b>Orthogroup:</b> ' + node.data('ortho_ID') +
-          '<br><b>Degree:</b> ' + node.degree() +
-          '<br><b>GO Terms:</b> ' + goTerms +
-          '<br><b>InterPro IDs:</b> ' + iprIds;
+
+        // Add degree separately as it's not in the dataDict
+        tooltipText += '<b>Degree:</b> ' + node.degree() + '<br>';
                         
         if (useClusterTooltip) { 
-            tooltipText += '<br><b>Cluster:</b> ' + node.data('cluster');
+            tooltipText += '<b>Cluster:</b> ' + node.data('cluster');
         }
 
         tooltip.style.display = 'block';
@@ -521,17 +625,6 @@ document.addEventListener('DOMContentLoaded', function() {
     adjustNodeAndEdgeSize();
 
     // Jitter effect for all metadata
-    const metadataKeys = ["ortho_ID", "degree", "gene", "moduleColor", "organism", "go_terms", "ipr_id"];
-    const metadataMapping = {
-        "ortho_ID": "Orthogroup",
-        "degree": "Degree",
-        "gene": "Transcript",
-        "moduleColor": "Module",
-        "organism": "Species",
-        "go_terms": "GO Terms",
-        "ipr_id": "InterPro IDs"
-    };
-
     let currentMetadataIndex = 0;
     let jitterIntervals = {};
 
@@ -679,7 +772,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function updateTooltipText() {
         if (metadataActive) { // Show metadata only if active
-            buttonTooltip.innerHTML = "Current Metadata: <b>" + metadataMapping[metadataKeys[currentMetadataIndex]] + "</b>";
+            buttonTooltip.innerHTML = "Current Metadata: <b>" + METADATA_MAPPING[metadataKeys[currentMetadataIndex]] + "</b>";
         } else {
             buttonTooltip.innerHTML = "Current Metadata: <b>None</b>"; // Show "None" when inactive
         }
@@ -699,7 +792,6 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     /* Adjust Node Size */
-
     nodeSizeRange.value = currentNodeSize;
 
     nodeSizeRange.addEventListener('input', function() {
@@ -792,7 +884,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // Collect highlighted nodes
             var highlightedNodes = cy.nodes('.highlight').map(function(node) {
-                return node.data('gene'); 
+                return node.data('id'); 
             });
 
             // Send the highlighted nodes back to the main page

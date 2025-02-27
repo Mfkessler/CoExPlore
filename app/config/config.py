@@ -1,4 +1,5 @@
 import os
+from wgcna.config import load_metadata_dict
 
 class Config:
     ENV_NAME = os.getenv("ENV_NAME", "default")
@@ -36,3 +37,7 @@ class Config:
             "options": {"queue": CELERY_TASK_DEFAULT_QUEUE},
         },
     }
+    
+    METADATA_JSON_PATH = "/metadata_dict.json"
+    METADATA_DICT = load_metadata_dict(METADATA_JSON_PATH)
+    print(f"METADATA_DICT: {METADATA_DICT}")

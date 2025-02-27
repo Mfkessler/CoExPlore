@@ -9,6 +9,7 @@ import tempfile
 import json
 import logging
 import redis
+import re
 import scanpy as sc
 import pandas as pd
 import numpy as np
@@ -320,7 +321,8 @@ def parse_request_params(request) -> dict:
     - request (Request): The Flask request object.
 
     Returns:
-    - dict: Parsed parameters including start, length, search value, columns, species filter, and order.
+    - dict: Parsed parameters including start, length, search value, columns, species filter,
+            transcript filter (if provided), and order.
     """
 
     params = {}
@@ -330,10 +332,14 @@ def parse_request_params(request) -> dict:
         values = request.values
 
     # Process start and length
-    params['start'] = int(values.get('start', 0))
-    params['length'] = int(values.get('length', 10))
+    if values.get('get_all'):
+        params['start'] = None  # No limit
+        params['length'] = None  # No offset
+    else:
+        params['start'] = int(values.get('start', 0))
+        params['length'] = int(values.get('length', 10))
 
-    # Process search value
+    # Process global search value
     if request.is_json:
         params['search_value'] = values.get('search', {}).get('value', '')
     else:
@@ -374,6 +380,10 @@ def parse_request_params(request) -> dict:
     except json.JSONDecodeError:
         params['species_filter'] = []
 
+    # Process transcript filter
+    params['transcript_filter'] = values.get('transcript_filter', '')
+    params['transcript_filter_column'] = values.get('transcript_filter_column', 'transcript')
+
     # Process order parameters
     params['order'] = []
     if request.is_json:
@@ -408,27 +418,30 @@ def build_sql_query(params: dict, select_columns: str) -> tuple:
     Build SQL query based on parsed parameters.
 
     Parameters:
-    - params (dict): Parsed parameters including start, length, search value, columns, species filter, and order.
+    - params (dict): Parsed parameters including start, length, search value, columns, species filter,
+                     transcript filter, and order.
     - select_columns (str): Columns to select in the SQL query.
 
     Returns:
     - tuple: SQL query string and search parameters.
     """
-
-
-    # Create WHERE clause
+    
     where_conditions = []
     search_params = {}
 
-    # Global search
+    # Global search with OR for multiple tokens
     if params['search_value']:
+        tokens = [token for token in re.split(r'[\s,]+', params['search_value'].strip()) if token]
         global_search_conditions = []
         for idx, col in enumerate(params['columns']):
             if col['searchable']:
                 col_name = col['name']
-                param_name = f"search_value_{idx}"
-                global_search_conditions.append(f"{col_name}::text ILIKE :{param_name}")
-                search_params[param_name] = f"%{params['search_value']}%"
+                token_conditions = []
+                for j, token in enumerate(tokens):
+                    param_name = f"search_value_{idx}_{j}"
+                    token_conditions.append(f"{col_name}::text ILIKE :{param_name}")
+                    search_params[param_name] = f"%{token}%"
+                global_search_conditions.append("(" + " OR ".join(token_conditions) + ")")
         if global_search_conditions:
             where_conditions.append('(' + ' OR '.join(global_search_conditions) + ')')
 
@@ -440,12 +453,35 @@ def build_sql_query(params: dict, select_columns: str) -> tuple:
             where_conditions.append(f"{col_name}::text ILIKE :{param_name}")
             search_params[param_name] = f"%{col['search_value']}%"
 
-    # Add species filter
+    # Add species filter if provided
     if params['species_filter']:
         species_placeholders = ', '.join([f":species_{i}" for i in range(len(params['species_filter']))])
         where_conditions.append(f"species IN ({species_placeholders})")
         for i, species in enumerate(params['species_filter']):
             search_params[f"species_{i}"] = species
+
+    # Extended filter: transcript_filter (general filter_column) with list logic
+    transcript_filter = params.get('transcript_filter', '').strip()
+    if transcript_filter:
+        # Use filter column, default: 'transcript'
+        filter_column = params.get('transcript_filter_column', 'transcript')
+        # Validation: only use allowed columns
+        allowed_columns = [col['name'] for col in params['columns']]
+        if filter_column not in allowed_columns:
+            filter_column = 'transcript'
+
+        tokens = [token for token in re.split(r'[\s,]+', transcript_filter) if token]
+
+        if tokens:
+            # Pass search tokens as an array (in lowercase)
+            search_params['transcript_tokens'] = [token.lower() for token in tokens]
+            # If commas are present, use array overlap (&&) - it is sufficient if at least one token matches.
+            condition = (
+                f"((POSITION(',' IN {filter_column}) > 0 AND "
+                f"string_to_array(LOWER({filter_column}), ',') && :transcript_tokens) OR "
+                f"(POSITION(',' IN {filter_column}) = 0 AND LOWER({filter_column}) = ANY(:transcript_tokens)))"
+            )
+            where_conditions.append(condition)
 
     where_clause = 'WHERE ' + ' AND '.join(where_conditions) if where_conditions else ''
 
@@ -467,7 +503,6 @@ def build_sql_query(params: dict, select_columns: str) -> tuple:
         search_params['length'] = params['length']
         search_params['start'] = params['start']
 
-    # Create final query
     query = f"SELECT {select_columns} FROM {params['table_name']} {where_clause} {order_clause} {limit_offset}"
 
     return query, search_params
@@ -502,6 +537,9 @@ def data():
         table = params['table_name']
         select_columns = ', '.join([col['name'] for col in params['columns']])
         query, query_params = build_sql_query(params, select_columns)
+        logger.info("Received transcript_filter: %s", params.get('transcript_filter'))
+        logger.info("Received transcript_filter_column: %s", params.get('transcript_filter_column'))
+        logger.info("Columns in request: %s", [col['name'] for col in params['columns']])
 
         # Count total records
         with engine.connect() as conn:
@@ -528,6 +566,7 @@ def data():
 
         return jsonify({"error": "Server Error"}), 500
 
+
 @api_bp.route('/api/get_transcripts', methods=['POST'])
 def get_transcripts():
     try:
@@ -552,6 +591,52 @@ def get_transcripts():
     except Exception as e:
         print(f"Error: {e}")
         return jsonify({'error': 'Server Error'}), 500
+
+
+@api_bp.route('/api/get_column_entries', methods=['POST'])
+def get_column_entries():
+    logger.debug("Request JSON:", request.json)
+    try:
+        params = parse_request_params(request)
+        # Get the name of the desired column (e.g., "transcript", "author", etc.)
+        selected_column = request.json.get('selected_column')
+        if not selected_column:
+            return jsonify({'error': 'No column selected'}), 400
+
+        # Unique flag: True if only unique entries are desired
+        unique = request.json.get('unique', False)
+
+        # Build the SQL query only for the selected column
+        select_columns = selected_column
+        
+        # Fetch all rows (all pages)
+        params['start'] = None
+        params['length'] = None
+        query, query_params = build_sql_query(params, select_columns)
+
+        # Debug outputs
+        logger.info("SQL Query: %s", query)
+        logger.info("Search Params: %s", query_params)
+
+        # Execute the SQL query
+        df = execute_sql_query(query, query_params)
+
+        # Remove NaN values and empty strings
+        entries = df[selected_column].dropna().astype(str)
+        entries = entries[entries.str.strip() != '']
+
+        # If unique is desired, remove duplicates
+        if unique:
+            entries = entries.drop_duplicates()
+
+        entries_list = entries.tolist()
+
+        return jsonify({'entries': entries_list})
+    
+    except Exception as e:
+        print(f"Error: {e}")
+        return jsonify({'error': 'Server Error'}), 500
+
 
 @api_bp.route('/api/export_data', methods=['POST'])
 def export_data():
@@ -587,8 +672,10 @@ def export_data():
 def browser():
     context = {
         "BASE_URL": Config.BASE_URL,
-        "BROWSER_DB": Config.BROWSER_DB
+        "BROWSER_DB": Config.BROWSER_DB,
+        "METADATA_DICT": Config.METADATA_DICT
     }
+
     return render_template('browser_template.html', **context)
 
 

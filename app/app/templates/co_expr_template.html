@@ -6,9 +6,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ topic }} Co-Expression Network Analysis</title>
 
-    <!-- Bootstrap CSS, DataTables CSS, and Lightbox -->
-    <link href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap CSS (Bootstrap 5.3) -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- DataTables CSS -->
     <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.11.3/css/jquery.dataTables.css">
+    <!-- Additional DataTables CSS files -->
     <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/responsive/2.2.9/css/responsive.dataTables.min.css">
     <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/buttons/2.0.1/css/buttons.dataTables.min.css">
 
@@ -116,11 +118,11 @@
         }
         /* Prevent text overflow in the first column of the TOM table */
 
-        #tomResults {
+        #nodeResults {
             width: 100% !important;
         }
 
-        #tomResults td {
+        #nodeResults td {
             word-wrap: break-word;
             max-width: 150px;
         }
@@ -129,7 +131,87 @@
             margin-bottom: 10px;
             text-align: right;
         }
-
+        
+        .tom-table-container table tbody td:nth-child(2),
+        .cluster-table-container table tbody td:nth-child(2) {
+            font-style: italic;
+        }
+        .form-check-input {
+            width: 1.5rem;
+            height: 1.5rem;
+            vertical-align: middle;
+            margin-top: 0;
+            border-color: #ced4da;
+        }
+        /* Enhanced styling for form controls */
+        .form-control {
+            border-radius: 0.5rem;
+            border: 1px solid #ced4da;
+            transition: border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+        }
+        .form-control:focus {
+            border-color: #80bdff;
+            box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+        }
+        /* Toggle Section Styling */
+        details>summary {
+            list-style: none;
+            outline: none;
+            cursor: pointer;
+        }
+        details>summary::-webkit-details-marker {
+            display: none;
+        }
+        .toggle-header {
+            font-size: 1.25rem;
+            display: inline-flex;
+            align-items: center;
+            padding: 0;
+            background: none;
+            border: none;
+        }
+        .toggle-header::after {
+            content: "\25BC";
+            margin-left: 5px;
+            transition: transform 0.3s ease;
+        }
+        details[open] .toggle-header::after {
+            transform: rotate(180deg);
+        }
+        .toggle-content {
+            opacity: 0;
+            transform: translateY(-10px);
+            transition: opacity 0.3s ease, transform 0.3s ease;
+        }
+        details[open] .toggle-content {
+            opacity: 1;
+            transform: translateY(0);
+            margin-top: 10px;
+        }
+        input[type="number"] {
+            width: 10ch;
+        }
+        input[type="text"] {
+            width: 20ch;
+        }
+        #exportColumnSelect {
+            width: 20ch;
+        }
+        @media (max-width: 575.98px) {
+            label.col-form-label {
+                text-align: center !important;
+            }
+            .col-sm-6 {
+                text-align: center !important;
+            }
+            .col-sm-6 input.form-control,
+            .col-sm-6 select.form-control,
+            .col-sm-6 textarea.form-control {
+                margin-left: auto !important;
+                margin-right: auto !important;
+                display: block;
+            }
+        }
     </style>
 
     <!-- jQuery, Bootstrap JS, DataTables, and Lightbox JS -->
@@ -141,6 +223,7 @@
     <script type="text/javascript" src="https://cdn.datatables.net/buttons/2.0.1/js/buttons.colVis.min.js"></script>
     <script type="text/javascript" charset="utf8" src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.3/jszip.min.js"></script>
     <script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/buttons/2.0.1/js/buttons.html5.min.js"></script>
+
     <script>
         var isInIframe = (window.self !== window.top);
         if (!isInIframe) {
@@ -183,19 +266,127 @@
             </div>
         </div>
 
-        <!-- TOM Table -->
+        <!-- Node Table -->
         <div class="card mb-3">
             <div class="card-header">
                 <h5 class="mb-0 d-flex justify-content-between align-items-center">
-                    Nodes
-                    <button class="btn btn-link toggle-button" data-toggle="collapse" data-target="#tomTableSection" aria-expanded="true">
+                    Node Table
+                    <button class="btn btn-link toggle-button" data-toggle="collapse" data-target="#nodeTableSection" aria-expanded="true">
                         <span>Show</span>
                     </button>
                 </h5>
             </div>
-            <div id="tomTableSection" class="collapse show">
-                <div class="card-body">
-                    {{ tom_table_html | safe }}
+            <div id="nodeTableSection" class="collapse show">
+                <!-- Add a custom class "tom-table-container" -->
+                <div class="card-body tom-table-container">
+                    <div id="columnSearchDiv">
+                        <details id="columnSearchToggle">
+                            <summary class="toggle-header">Column search</summary>
+                            <div class="toggle-content">
+                                <!-- Row with select and transcriptSearch -->
+                                <div class="row">
+                                    <div class="col-lg-5 mb-3">
+                                        <!-- TODO: SELECT SPECIES DROPDOWN-->
+        
+                                        <!-- Dropdown for column selection -->
+                                        <div class="row mb-2">
+                                            <label for="columnSelect" class="col-sm-6 col-form-label">
+                                                Select Column
+                                            </label>
+                                            <div class="col-sm-6">
+                                                <select id="columnSelect" class="form-control form-control-sm">
+
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <!-- Checkbox for orthogroups filtering -->
+                                        <div class="row mb-2">
+                                            <div class="col-sm-6">
+                                                <label class="form-check-label" for="orthogroupSearch">Use orthogroups</label>
+                                            </div>
+                                            <div class="col-sm-6">
+                                                <input type="checkbox" class="form-check-input" id="orthogroupSearch">
+                                            </div>
+                                        </div>
+                                        <!-- Count info spans (hidden by default) -->
+                                        <div id="filterInfo" style="display: none; text-align: center; margin-top: 10px;">
+                                            <span id="keptTranscripts">Kept transcripts: 0</span><br>
+                                            <span id="lostTranscripts">Lost transcripts: 0</span><br>
+                                            <span id="newTranscripts">New transcripts: 0</span>
+                                        </div>
+                                    </div>
+                                    <div class="col-lg-7 mb-3">
+                                        <textarea id="transcriptSearch" class="form-control" rows="3"
+                                            placeholder="Filter: Tokens separated by comma, space, tab, or newline"></textarea>
+                                    </div>
+                                </div>
+        
+                                <!-- Info row: Tokens recognized (left) and Filtered table entries (right) -->
+                                <div class="row mb-3">
+                                    <div class="col-6">
+                                        <span id="tokensInfo">Tokens recognized: 0 (0 unique)</span>
+                                    </div>
+                                    <div class="col-6 text-end">
+                                        <span id="tableEntriesInfo">Filtered table entries: 0</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </details>
+                    </div>
+                    <br>
+
+                    {{ node_table_html | safe }}
+
+                    <!-- Copy column entries to clipboard section -->
+                    <br>
+                    <div id="copyEntriesDiv">
+                        <details id="copyEntriesToggle">
+                            <summary class="toggle-header">Copy entries</summary>
+                            <div class="toggle-content">
+                                <div class="row justify-content-center">
+                                    <div class="col-md-6 col-lg-8">
+                                        <!-- Dropdown for column selection -->
+                                        <div class="row mb-2">
+                                            <label for="exportColumnSelect" class="col-sm-6 col-form-label text-end">
+                                                Select Column
+                                            </label>
+                                            <div class="col-sm-6">
+                                                <select id="exportColumnSelect" class="form-control form-control-sm">
+                                                    <!-- Loaded dynamically -->
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <!-- Checkbox for unique entries -->
+                                        <div class="row mb-2">
+                                            <div class="col-sm-6 text-end">
+                                                <label class="form-check-label" for="uniqueEntries">Unique Entries Only</label>
+                                            </div>
+                                            <div class="col-sm-6">
+                                                <input type="checkbox" class="form-check-input" id="uniqueEntries">
+                                            </div>
+                                        </div>
+                                        <!-- Input field for separator -->
+                                        <div class="row mb-2">
+                                            <label for="separatorInput" class="col-sm-6 col-form-label text-end">
+                                                Separator
+                                            </label>
+                                            <div class="col-sm-6">
+                                                <input type="text" id="separatorInput" class="form-control form-control-sm"
+                                                    placeholder="Default: NewLine">
+                                            </div>
+                                        </div>
+                                        <!-- Centered copy button -->
+                                        <div class="row">
+                                            <div class="col-12 text-center">
+                                                <button id="copyEntriesBtn" class="btn btn-primary btn-sm">Copy Entries</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </details>
+                    </div>
+                    <br>
                 </div>
             </div>
         </div>
@@ -205,7 +396,7 @@
         <div class="card mb-3">
             <div class="card-header">
                 <h5 class="mb-0 d-flex justify-content-between align-items-center">
-                    Orthogroups
+                    Orthogroup Table
                     <button class="btn btn-link toggle-button" data-toggle="collapse" data-target="#orthoTableSection" aria-expanded="true">
                         <span>Show</span>
                     </button>
@@ -231,14 +422,15 @@
         <div class="card mb-3">
             <div class="card-header">
                 <h5 class="mb-0 d-flex justify-content-between align-items-center">
-                    Cluster
+                    Cluster Table
                     <button class="btn btn-link toggle-button" data-toggle="collapse" data-target="#analysisTableSection" aria-expanded="true">
                         <span>Show</span>
                     </button>
                 </h5>
             </div>
             <div id="analysisTableSection" class="collapse show">
-                <div class="card-body">
+                <!-- Add a custom class "cluster-table-container" -->
+                <div class="card-body cluster-table-container">
                     {{ table_html | safe }}
                 </div>
             </div>
@@ -249,7 +441,7 @@
         <div class="card mb-3">
             <div class="card-header">
                 <h5 class="mb-0 d-flex justify-content-between align-items-center">
-                    Cluster-trait Relationship
+                    Cluster-trait Expression Bar Plots
                     <button class="btn btn-link toggle-button" data-toggle="collapse" data-target="#imageGallerySection" aria-expanded="true">
                         <span>Show</span>
                     </button>
@@ -263,12 +455,48 @@
         </div>
         {% endif %}
 
+        {% if heatmap_paths %}
+        <!-- Heatmap of Clusters -->
+        <div class="card mb-3">
+            <div class="card-header">
+                <h5 class="mb-0 d-flex justify-content-between align-items-center">
+                    Combined Cluster-trait Expression Heatmap
+                    <button class="btn btn-link toggle-button" data-toggle="collapse" data-target="#plotClusterHeatmap" aria-expanded="true">
+                        <span>Show</span>
+                    </button>
+                </h5>
+            </div>
+            <div id="plotClusterHeatmap" class="collapse show">
+                <div class="card-body">
+                    <iframe src="{{ heatmap_paths[0] }}" width="100%" height="800px" class="content-section"></iframe>
+                </div>
+            </div>
+        </div>
+
+        <!-- Heatmap of Species -->
+        <div class="card mb-3">
+            <div class="card-header">
+                <h5 class="mb-0 d-flex justify-content-between align-items-center">
+                    Combined Species-trait Expression Heatmap
+                    <button class="btn btn-link toggle-button" data-toggle="collapse" data-target="#plotSpeciesHeatmap" aria-expanded="true">
+                        <span>Show</span>
+                    </button>
+                </h5>
+            </div>
+            <div id="plotSpeciesHeatmap" class="collapse show">
+                <div class="card-body">
+                    <iframe src="{{ heatmap_paths[1] }}" width="100%" height="800px" class="content-section"></iframe>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
         {% if combined_plot_path %}
         <!-- Eigengene Expression Combined -->
         <div class="card mb-3">
             <div class="card-header">
                 <h5 class="mb-0 d-flex justify-content-between align-items-center">
-                    Combined Eigengene Expression
+                    Combined Custer-trait Expression Bar Plots
                     <button class="btn btn-link toggle-button" data-toggle="collapse" data-target="#plotSectionCombined" aria-expanded="true">
                         <span>Show</span>
                     </button>
@@ -286,6 +514,8 @@
 
     <script>
         $(document).ready(function() {
+            window.currentOrthogroupTokens = '';
+
             // Initialize button text based on the collapse state
             $('.toggle-button').each(function() {
                 var target = $(this).data('target');
@@ -336,40 +566,64 @@
                 $('button[data-target="#' + this.id + '"]').find('span').text('Show');
             });
 
-            // Apply DataTable functionality to all tables with the class "dynamic-table"
-            $('.dynamic-table').each(function() {
-                var table = $(this).DataTable({
-                    responsive: true,
-                    dom: 'Bfrtip',
-                    buttons: [
-                        {
-                            extend: 'colvis',
-                            text: 'Column Visibility'
+            // Common options for all DataTables
+            var commonOptions = {
+                responsive: true,
+                dom: 'Bfrtip',
+                buttons: [
+                    {
+                        extend: 'colvis',
+                        text: 'Column Visibility'
+                    },
+                    {
+                        extend: 'csvHtml5',
+                        text: 'Download Table',
+                        filename: function() {
+                            return prompt('Enter filename') || 'download';
                         },
-                        {
-                            extend: 'csvHtml5',
-                            text: 'Download Table',
-                            filename: function() {
-                                return prompt('Dateinamen eingeben') || 'download';
-                            },
-                            exportOptions: {
-                                columns: ':visible'
-                            }
+                        exportOptions: {
+                            columns: ':visible'
                         }
-                    ]
-                });
+                    }
+                ]
+            };
+
+            // Initialize all tables with the class "dynamic-table" except #nodeResults
+            $('.dynamic-table').not('#nodeResults').each(function() {
+                $(this).DataTable(commonOptions);
             });
 
-            var tomResultsTable = $('#tomResults').DataTable();
+            // Add specific options for the nodeResults table
+            var nodeOptions = $.extend(true, {}, commonOptions, {
+                language: { search: "Global Search:" },
+                initComplete: function() {
+                    $('#nodeResults').on('draw.dt', function() {
+                        var info = nodeResultsTable.page.info();
+                        $('#tableEntriesInfo').text('Filtered table entries: ' + info.recordsDisplay);
+                    });
+                }
+            });
+
+            var nodeResultsTable = $('#nodeResults').DataTable(nodeOptions);
             var infoResultsTable = $('#infoResults').DataTable();
             var orthoResultsTable = $('#orthoResults').DataTable();
+
+            // Determine the index of the "Orthogroup" column
+            var orthogroupColIndex = $('#nodeResults thead th')
+                .toArray()
+                .findIndex(th => $(th).text().trim().toLowerCase() === "orthogroup");
+
+            // Determine the index of the "Node" column
+            var transcriptColIndex = $('#nodeResults thead th')
+                .toArray()
+                .findIndex(th => $(th).text().trim().toLowerCase() === "node");
 
             // Keep track of the last selected node
             var lastSelectedNode = null;
 
-            // Event listener for row click in the tomResults table
-            $('#tomResults tbody').on('click', 'tr', function() {
-                var data = tomResultsTable.row(this).data(); // Get row data
+            // Event listener for row click in the nodeResults table
+            $('#nodeResults tbody').on('click', 'tr', function() {
+                var data = nodeResultsTable.row(this).data(); // Get row data
                 var nodeName = data ? data[0] : null; // Assuming the first column contains the node name
                 var species = data ? data[1] : null; // Assuming the second column contains the species name
                 var nodeID = species + "_" + nodeName; // Combine species and node name for unique ID
@@ -395,26 +649,57 @@
 
             // Event listener to receive messages from the iframe (when nodes are selected in the plot)
             window.addEventListener('message', function(event) {
-                if (event.data && event.data.highlightedNodes) {
-                    var highlightedNodes = event.data.highlightedNodes;
+            if (event.data && event.data.highlightedNodes) {
+                var highlightedNodes = event.data.highlightedNodes;
+                var table = $('#nodeResults').DataTable();
 
-                    if (highlightedNodes.length > 0) {
-                        // Create a regex string for exact matches, using word boundaries \b
-                        var searchRegex = highlightedNodes.map(function(nodeName) {
-                            return '\\b' + nodeName + '\\b'; // \b ensures exact match
-                        }).join('|'); // Join with | to create OR logic for multiple node names
+                // Remove any existing custom filters (if any)
+                $.fn.dataTable.ext.search = $.fn.dataTable.ext.search.filter(function(fn) {
+                    return fn.name !== 'highlightedNodesFilter';
+                });
 
-                        // Apply the regex search to the TOM Table
-                        $('#tomResults').DataTable().search(searchRegex, true, false).draw();
-                    } else {
-                        // If no nodes are highlighted, reset the TOM Table search
-                        $('#tomResults').DataTable().search('').draw();
-                    }
+                if (highlightedNodes.length > 0) {
+                    var searchTokens = highlightedNodes.map(function(id) {
+                        var parts = id.split('_');
+                        return {
+                            species: parts[0].trim(),
+                            node: parts.slice(1).join('_').trim()
+                        };
+                    });
+
+                    // Custom DataTables filter applied only to the Node Table
+                    var highlightedNodesFilter = function(settings, data, dataIndex) {
+                        // Apply filter only to the Node Table
+                        if (settings.nTable.id !== 'nodeResults') {
+                            return true;
+                        }
+                        var rowNode = data[0];
+                        var rowSpecies = data[1];
+
+                        for (var i = 0; i < searchTokens.length; i++) {
+                            var token = searchTokens[i];
+                            if (rowSpecies === token.species) {
+                                var regex = new RegExp('\\b' + token.node + '\\b', 'i');
+                                if (regex.test(rowNode)) {
+                                    return true;
+                                }
+                            }
+                        }
+                        return false;
+                    };
+                    highlightedNodesFilter.name = 'highlightedNodesFilter';
+
+                    // Add the filter and redraw the table
+                    $.fn.dataTable.ext.search.push(highlightedNodesFilter);
+                    table.draw();
+                } else {
+                    table.search('').draw();
                 }
-            }, false);
+            }
+        }, false);
 
-            // Event listener for DataTable search in the TOM Table (explicit search only)
-            $('#tomResults_filter input').on('input', function() {
+            // Event listener for DataTable search in the Node Table (explicit search only)
+            $('#nodeResults_filter input').on('input', function() {
                 var searchValue = this.value.trim();
 
                 // If there's a search value, send it to the iframe
@@ -424,15 +709,15 @@
             });
 
             // Prevent highlighting based on paging or sorting
-            tomResultsTable.on('page.dt order.dt', function() {
-                tomResultsTable.rows().every(function() {
+            nodeResultsTable.on('page.dt order.dt', function() {
+                nodeResultsTable.rows().every(function() {
                     $(this.node()).removeClass('highlight-row');  // Remove highlighting on page change or sort
                 });
             });
 
             // Reset filter when no node is clicked in Cytoscape (plot click outside nodes)
             $('#resetFilterButton').on('click', function() {
-                tomResultsTable.search('').draw(); // Reset the table
+                nodeResultsTable.search('').draw(); // Reset the table
             });
 
             // Event listener for row clicks in the infoResults table
@@ -446,13 +731,13 @@
                 if (cluster) {
                     var searchRegex = '\\b' + cluster + '\\b'; // Regex for exact match of the cluster name
 
-                    // Apply the filter to the TOM Table to display only relevant nodes
+                    // Apply the filter to the Node Table to display only relevant nodes
                     if (cluster === "All Clusters") {
                         // Regex to show all nodes for the selected species, excluding "No clusters"
                         searchRegex = '\\b' + species + '\\b(?!.*No clusters)';
                     }
 
-                    tomResultsTable.search(searchRegex, true, false).draw();
+                    nodeResultsTable.search(searchRegex, true, false).draw();
 
                     // Track the last selected cluster for debugging or further actions
                     lastSelectedCluster = cluster;
@@ -471,8 +756,8 @@
                 if (orthogroup) {
                     var searchRegex = '\\b' + orthogroup + '\\b'; // Regex for exact match of the orthogroup name
 
-                    // Apply the filter to the TOM Table to display only relevant nodes
-                    tomResultsTable.search(searchRegex, true, false).draw();
+                    // Apply the filter to the Node Table to display only relevant nodes
+                    nodeResultsTable.search(searchRegex, true, false).draw();
 
                     // Track the last selected orthogroup for debugging or further actions
                     lastSelectedOrthogroup = orthogroup;
@@ -484,7 +769,7 @@
             // Function to update highlighted nodes based on filtered results
             function updateHighlight() {
                 // Collect the visible nodes after the table has been updated
-                var visibleNodes = tomResultsTable.rows({ filter: 'applied' }).data().toArray();
+                var visibleNodes = nodeResultsTable.rows({ filter: 'applied' }).data().toArray();
 
                 // Generate unique Node IDs using Species and NodeName
                 var nodeIDs = visibleNodes.map(function(row) {
@@ -501,6 +786,216 @@
                     iframe.contentWindow.postMessage({ visibleNodes: nodeIDs }, '*');
                 }
             }
+
+            // Fill the column selection dropdown with the headers from the Node Table
+            var headers = nodeResultsTable.columns().header().toArray();
+            var $select = $('#exportColumnSelect');
+            $select.empty();
+            headers.forEach(function (header, index) {
+                var headerText = $(header).text().trim();
+                $select.append(
+                    $('<option>').attr('value', index).text(headerText)
+                );
+            });
+
+            var $select = $('#columnSelect');
+            $select.empty();
+            
+            headers.forEach(function (header, index) {
+                var headerText = $(header).text().trim();
+                // Skip the header "species" (case-insensitive)
+                if (headerText.toLowerCase() !== 'species') {
+                    $select.append(
+                        $('<option>').attr('value', index).text(headerText)
+                    );
+                }
+            });
+
+            // Custom DataTables filter function
+            $.fn.dataTable.ext.search.push(function(settings, rowData, rowIndex, rowArray) {
+                if ($('#orthogroupSearch').is(':checked')) {
+                    // Get and normalize the stored orthogroup tokens
+                    let ogTokens = (window.currentOrthogroupTokens || '')
+                        .split(/\s+/)
+                        .filter(t => t)
+                        .map(t => t.toLowerCase());
+                    if (ogTokens.length === 0) return true;
+                    // Use the determined column index
+                    let orthoCell = rowData[orthogroupColIndex];
+                    if (!orthoCell) return false;
+                    orthoCell = orthoCell.toString().toLowerCase();
+                    // Exact OR comparison
+                    return ogTokens.some(token => orthoCell === token);
+                } else {
+                    let searchVal = $('#transcriptSearch').val().trim();
+                    if (!searchVal) return true;
+                    // Split and normalize the search tokens (exact comparison, OR logic)
+                    let tokens = searchVal.split(/[\s,]+/).filter(token => token).map(t => t.toLowerCase());
+                    let selectedColumnIndex = parseInt($('#columnSelect').val(), 10);
+                    let cell = rowData[selectedColumnIndex];
+                    if (!cell) return false;
+                    cell = cell.toString().toLowerCase();
+                    return tokens.some(token => cell === token);
+                }
+            });
+
+            // Event-Handler: Update tokens recognized und Tabelle neu zeichnen
+            $('#transcriptSearch').on('input', function() {
+                let tokens = $(this).val().trim().split(/[\s,]+/).filter(token => token);
+                let uniqueTokens = [...new Set(tokens)];
+                $('#tokensInfo').text('Tokens recognized: ' + tokens.length + ' (' + uniqueTokens.length + ' unique)');
+
+                if ($('#orthogroupSearch').is(':checked')) {
+                    updateOrthogroupTokensAndFilterInfo();
+                } else {
+                    $('#filterInfo').hide();
+                    window.currentOrthogroupTokens = '';
+                    nodeResultsTable.draw();
+                }
+            });
+
+            // Event-Handler: Bei Änderung der Orthogroup-Checkbox
+            $('#orthogroupSearch').on('change', function() {
+                if ($(this).is(':checked')) {
+                    updateOrthogroupTokensAndFilterInfo();
+                } else {
+                    $('#filterInfo').hide();
+                    window.currentOrthogroupTokens = '';
+                    nodeResultsTable.draw();
+                }
+            });
+
+            // Event-Handler: Bei Änderung des Spalten-Dropdowns
+            $('#columnSelect').on('change', function() {
+                if ($('#orthogroupSearch').is(':checked')) {
+                    updateOrthogroupTokensAndFilterInfo();
+                }
+                nodeResultsTable.draw();
+            });
+
+            function updateOrthogroupTokensAndFilterInfo() {
+                let searchVal = $('#transcriptSearch').val().trim();
+                let selectedColumnIndex = parseInt($('#columnSelect').val(), 10);
+                let allRows = nodeResultsTable.rows().data().toArray();
+
+                // Filter rows based on the current column search (exact OR comparison)
+                let tokens = searchVal.split(/[\s,]+/).filter(token => token).map(t => t.toLowerCase());
+                let originalRows = allRows.filter(row => {
+                    let cell = row[selectedColumnIndex];
+                    if (!cell) return false;
+                    cell = cell.toString().toLowerCase();
+                    // If no tokens are entered, include all rows
+                    return tokens.length ? tokens.some(token => cell === token) : true;
+                });
+
+                // Extract original transcripts
+                let originalTranscripts = originalRows
+                    .map(row => row[transcriptColIndex])
+                    .filter(x => x && x.trim() !== '')
+                    .map(t => t.toLowerCase());
+                originalTranscripts = [...new Set(originalTranscripts)];
+
+
+                // Extract orthogroups from the original filtered rows
+                let orthogroupArray = originalRows
+                    .map(row => row[orthogroupColIndex])
+                    .filter(x => x && x.trim() !== '' && x.trim().toLowerCase() !== 'nan')
+                    .map(token => token.toLowerCase());
+                orthogroupArray = [...new Set(orthogroupArray)];
+                let orthogroupTokens = orthogroupArray.join(' ');
+
+                if (!orthogroupTokens || orthogroupTokens.trim() === '') {
+                    $('#keptTranscripts').text('Kept transcripts: 0');
+                    $('#lostTranscripts').text('Lost transcripts: ' + originalTranscripts.length);
+                    $('#newTranscripts').text('New transcripts: 0');
+                    $('#filterInfo').show();
+                    window.currentOrthogroupTokens = '';
+                    nodeResultsTable.draw();
+                    return;
+                } else {
+                    // Use exact OR comparison when applying the new filter
+                    let ogTokens = orthogroupTokens.split(/\s+/).filter(t => t).map(t => t.toLowerCase());
+                    let transformedRows = allRows.filter(row => {
+                        let cell = row[orthogroupColIndex];
+                        if (!cell) return false;
+                        cell = cell.toString().toLowerCase();
+                        return ogTokens.some(token => cell === token);
+                    });
+                    let transformedTranscripts = transformedRows
+                        .map(row => row[transcriptColIndex])
+                        .filter(x => x && x.trim() !== '')
+                        .map(t => t.toLowerCase());
+                    transformedTranscripts = [...new Set(transformedTranscripts)];
+
+                    let kept = originalTranscripts.filter(t => transformedTranscripts.includes(t));
+                    let lost = originalTranscripts.filter(t => !transformedTranscripts.includes(t));
+                    let newly = transformedTranscripts.filter(t => !originalTranscripts.includes(t));
+
+                    $('#keptTranscripts').text('Kept transcripts: ' + kept.length);
+                    $('#lostTranscripts').text('Lost transcripts: ' + lost.length);
+                    $('#newTranscripts').text('New transcripts: ' + newly.length);
+                    $('#filterInfo').show();
+                    window.currentOrthogroupTokens = orthogroupTokens;
+                    nodeResultsTable.draw();
+                }
+            }
+
+            // Copy column entries to clipboard handling
+            $('#copyEntriesBtn').on('click', async function () {
+                // Store the original button text and reference
+                var $btn = $(this);
+                var originalText = $btn.text();
+
+                // Get the selected column index/key and unique flag from the UI
+                var selectedColumn = $('#exportColumnSelect').val();
+                var uniqueFlag = $('#uniqueEntries').is(':checked');
+
+                // Retrieve all rows data from the DataTable (only the filtered/visible rows)
+                var data = nodeResultsTable.rows({ search: 'applied' }).data().toArray();
+                var entries = [];
+
+                // Extract the desired column entry from each row
+                data.forEach(function (row) {
+                    // If row is an array, use index; if it's an object, use the property name.
+                    // Adjust the following line based on your table data structure.
+                    entries.push(row[selectedColumn]);
+                });
+
+                // If unique flag is set, remove duplicate entries
+                if (uniqueFlag) {
+                    entries = [...new Set(entries)];
+                }
+
+                // Determine the separator: default to newline if no separator is provided
+                var sep = $('#separatorInput').val();
+                if (!sep || sep.trim() === "") {
+                    sep = "\n";
+                }
+                var textToCopy = entries.join(sep);
+
+                try {
+                    // Use the clipboard API if available, else use a fallback method
+                    if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+                        await navigator.clipboard.writeText(textToCopy);
+                    } else {
+                        var $temp = $("<textarea>");
+                        $("body").append($temp);
+                        $temp.val(textToCopy).select();
+                        document.execCommand("copy");
+                        $temp.remove();
+                    }
+                    // Disable the button and update text with the number of copied entries
+                    var count = entries.length;
+                    $btn.prop('disabled', true).text(count + ' Entries Copied');
+                    // Re-enable the button and restore original text after 1 second
+                    setTimeout(function () {
+                        $btn.prop('disabled', false).text(originalText);
+                    }, 1000);
+                } catch (error) {
+                    console.error(error);
+                    alert('Error: ' + error.message);
+                }
+            });
 
             if (isInIframe) {
                 sendHeight();

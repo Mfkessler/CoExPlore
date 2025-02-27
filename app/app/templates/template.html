@@ -221,16 +221,29 @@
               <!-- Browser Description -->
               <div id="userGuideCardBrowser" class="analysis-description" style="display: none;">
                 <p>
-                  Explore data for selected plant species by searching for transcripts, orthogroups, GO terms (GO IDs),
-                  or modules.
-                  Separate multiple entries with commas. Examples of GO terms are
-                  <a href="#" onclick="sendGoTermToIframe('GO:0009908'); event.preventDefault();">flower development
-                    (GO:0009908)</a>,
-                  <a href="#" onclick="sendGoTermToIframe('GO:0015979'); event.preventDefault();">photosynthesis
-                    (GO:0015979)</a>, or
-                  <a href="#" onclick="sendGoTermToIframe('GO:0006950'); event.preventDefault();">response to stress
-                    (GO:0006950)</a>.
-                  The search results are used for subsequent analyses.
+                  Explore data for selected plant species by searching for transcripts or provided metadata (e.g. Modules or GO Terms)
+                  using the global search box.
+                  For example, try searching for
+                  <a href="#" onclick="sendGoTermToIframe('GO:0009908'); event.preventDefault();">flower development (GO:0009908)</a>,
+                  <a href="#" onclick="sendGoTermToIframe('GO:0015979'); event.preventDefault();">photosynthesis (GO:0015979)</a>, or
+                  <a href="#" onclick="sendGoTermToIframe('GO:0006950'); event.preventDefault();">response to stress (GO:0006950)</a>.
+                  The global search is case-insensitive and supports partial matches.
+                </p>
+                <p>
+                  If the global search does not meet your needs, you can refine your query using the column search. Select a specific
+                  column from the drop-down menu to limit your search to that field.
+                  Enter multiple search terms separated by commas, spaces, tabs or line breaks. Column search is case-sensitive and
+                  does not support partial matches.
+                </p>
+                <p>
+                  In addition, checking the <i>Use orthogroups</i> box will redirect your search to orthogroup IDs (if this metadata is provided). This
+                  takes the orthogroups from the filtered table entries as new tokens and calculates metrics that show how many
+                  transcripts are retained, lost or added.
+                </p>
+                <p>
+                  You can also customise the table view by adjusting column visibility, downloading the filtered table, or
+                  copying selected column entries to the clipboard. When copying entries, you can choose to export only unique values
+                  and specify a custom separator (default is a new line).
                 </p>
               </div>
               <!-- Browser Results Container -->
@@ -416,6 +429,17 @@
                               </div>
                             </div>
 
+                            <!-- Form Group: Max Neighbors -->
+                            <div class="row mb-3" id="maxNeighborsGroupBrowser" style="display: none;">
+                              <label for="maxNeighborsBrowser" class="col-sm-4 col-form-label text-end">
+                                Max Neighbors
+                              </label>
+                              <div class="col-sm-8">
+                                <input type="number" class="form-control" id="maxNeighborsBrowser" placeholder="Enter max neighbors" value="0"
+                                  step="1" min="0" max="5" required>
+                              </div>
+                            </div>
+
                             <!-- Form Group: Highlight Nodes -->
                             <div class="row mb-3" id="highlightListGroupBrowser" style="display: none;">
                               <label for="highlightListBrowser" class="col-sm-4 col-form-label text-end">
@@ -449,19 +473,6 @@
                                 <div class="form-check">
                                   <input type="checkbox" class="form-check-input large-checkbox" id="useColorsBrowser">
                                   <label class="form-check-label" for="useColorsBrowser"></label>
-                                </div>
-                              </div>
-                            </div>
-
-                            <!-- Form Group: Plot Only (Checkbox) -->
-                            <div class="row mb-3" id="plotOnlyGroupBrowser" style="display: none;">
-                              <label for="plotOnlyBrowser" class="col-sm-4 col-form-label text-end">
-                                Plot only
-                              </label>
-                              <div class="col-sm-8 d-flex align-items-center">
-                                <div class="form-check">
-                                  <input type="checkbox" class="form-check-input large-checkbox" id="plotOnlyBrowser">
-                                  <label class="form-check-label" for="plotOnlyBrowser"></label>
                                 </div>
                               </div>
                             </div>

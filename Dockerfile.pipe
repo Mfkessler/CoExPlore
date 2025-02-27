@@ -1,0 +1,20 @@
+# Dockerfile.pipe for CoExPlore pipeline
+# Persistent package
+
+FROM coexplore-base:latest
+
+# Set the working directory
+WORKDIR /CoExPlore
+
+# Copy the package temporarily for installation
+COPY package /tmp/wgcna-package/
+
+# Install the persistent package (without dependencies)
+RUN pip install --no-deps /tmp/wgcna-package
+
+# Install Snakemake and specific Pulp version
+RUN pip install snakemake pulp==2.7.0
+
+# Clean up temporary files and pip cache
+RUN rm -rf /tmp/wgcna-package ~/.cache/pip /tmp/* /var/tmp/* && \
+    apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
