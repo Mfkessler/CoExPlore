@@ -159,8 +159,8 @@ def analyze_co_expression_network(adata: Union[AnnData, List[AnnData]], config: 
     
     tom_metrics = calculate_all_tom_metrics(
         tom, adata, cluster_map, tool, progress_callback).reset_index()
-    tom_table_html = tom_metrics.to_html(
-        classes='dynamic-table display dataTable no-border', index=False, border=0, header=True, table_id="tomResults")
+    node_table_html = tom_metrics.to_html(
+        classes='dynamic-table display dataTable no-border', index=False, border=0, header=True, table_id="nodeResults")
 
     if progress_callback:
         progress_callback(f"Calculating eigengenes")
@@ -201,7 +201,7 @@ def analyze_co_expression_network(adata: Union[AnnData, List[AnnData]], config: 
             adata=adata,
             config=config,
             table_html=table_html,
-            tom_table_html=tom_table_html,
+            node_table_html=node_table_html,
             ortho_table_html=ortho_table_html if tool == "cytoscape" else None,
             images=images,
             combined_plot_path=combined_plot_path,
@@ -559,7 +559,7 @@ def map_tissue_info(cluster_eigengenes: pd.DataFrame, ad: AnnData) -> pd.DataFra
     return cluster_eigengenes
 
 
-def generate_co_expression_html(adata: Union[AnnData, List[AnnData]], config: PlotConfig, table_html: str, tom_table_html: str,
+def generate_co_expression_html(adata: Union[AnnData, List[AnnData]], config: PlotConfig, table_html: str, node_table_html: str,
                                 ortho_table_html: str, images: List[str], combined_plot_path: str, heatmap_paths: List[str],
                                 topic: str, ortho_plot_path: str, network_plot_path: str,
                                 threshold: int, template_path: str, custom_filename: str = None) -> str:
@@ -594,7 +594,7 @@ def generate_co_expression_html(adata: Union[AnnData, List[AnnData]], config: Pl
     rendered_html = template.render(
         topic=topic,
         table_html=table_html,
-        tom_table_html=tom_table_html,
+        node_table_html=node_table_html,
         ortho_table_html=ortho_table_html,
         images=images,
         combined_plot_path=combined_plot_path,

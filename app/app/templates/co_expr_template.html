@@ -116,11 +116,11 @@
         }
         /* Prevent text overflow in the first column of the TOM table */
 
-        #tomResults {
+        #nodeResults {
             width: 100% !important;
         }
 
-        #tomResults td {
+        #nodeResults td {
             word-wrap: break-word;
             max-width: 150px;
         }
@@ -188,7 +188,7 @@
             </div>
         </div>
 
-        <!-- TOM Table -->
+        <!-- Node Table -->
         <div class="card mb-3">
             <div class="card-header">
                 <h5 class="mb-0 d-flex justify-content-between align-items-center">
@@ -201,7 +201,7 @@
             <div id="tomTableSection" class="collapse show">
                 <!-- Add a custom class "tom-table-container" -->
                 <div class="card-body tom-table-container">
-                    {{ tom_table_html | safe }}
+                    {{ node_table_html | safe }}
                 </div>
             </div>
         </div>
@@ -403,16 +403,16 @@
                 });
             });
 
-            var tomResultsTable = $('#tomResults').DataTable();
+            var nodeResultsTable = $('#nodeResults').DataTable();
             var infoResultsTable = $('#infoResults').DataTable();
             var orthoResultsTable = $('#orthoResults').DataTable();
 
             // Keep track of the last selected node
             var lastSelectedNode = null;
 
-            // Event listener for row click in the tomResults table
-            $('#tomResults tbody').on('click', 'tr', function() {
-                var data = tomResultsTable.row(this).data(); // Get row data
+            // Event listener for row click in the nodeResults table
+            $('#nodeResults tbody').on('click', 'tr', function() {
+                var data = nodeResultsTable.row(this).data(); // Get row data
                 var nodeName = data ? data[0] : null; // Assuming the first column contains the node name
                 var species = data ? data[1] : null; // Assuming the second column contains the species name
                 var nodeID = species + "_" + nodeName; // Combine species and node name for unique ID
@@ -440,7 +440,7 @@
             window.addEventListener('message', function(event) {
             if (event.data && event.data.highlightedNodes) {
                 var highlightedNodes = event.data.highlightedNodes;
-                var table = $('#tomResults').DataTable();
+                var table = $('#nodeResults').DataTable();
 
                 // Remove any existing custom filters (if any)
                 $.fn.dataTable.ext.search = $.fn.dataTable.ext.search.filter(function(fn) {
@@ -456,10 +456,10 @@
                         };
                     });
 
-                    // Custom DataTables filter applied only to the TOM Table
+                    // Custom DataTables filter applied only to the Node Table
                     var highlightedNodesFilter = function(settings, data, dataIndex) {
-                        // Apply filter only to the TOM Table
-                        if (settings.nTable.id !== 'tomResults') {
+                        // Apply filter only to the Node Table
+                        if (settings.nTable.id !== 'nodeResults') {
                             return true;
                         }
                         var rowNode = data[0];
@@ -487,8 +487,8 @@
             }
         }, false);
 
-            // Event listener for DataTable search in the TOM Table (explicit search only)
-            $('#tomResults_filter input').on('input', function() {
+            // Event listener for DataTable search in the Node Table (explicit search only)
+            $('#nodeResults_filter input').on('input', function() {
                 var searchValue = this.value.trim();
 
                 // If there's a search value, send it to the iframe
@@ -498,15 +498,15 @@
             });
 
             // Prevent highlighting based on paging or sorting
-            tomResultsTable.on('page.dt order.dt', function() {
-                tomResultsTable.rows().every(function() {
+            nodeResultsTable.on('page.dt order.dt', function() {
+                nodeResultsTable.rows().every(function() {
                     $(this.node()).removeClass('highlight-row');  // Remove highlighting on page change or sort
                 });
             });
 
             // Reset filter when no node is clicked in Cytoscape (plot click outside nodes)
             $('#resetFilterButton').on('click', function() {
-                tomResultsTable.search('').draw(); // Reset the table
+                nodeResultsTable.search('').draw(); // Reset the table
             });
 
             // Event listener for row clicks in the infoResults table
@@ -520,13 +520,13 @@
                 if (cluster) {
                     var searchRegex = '\\b' + cluster + '\\b'; // Regex for exact match of the cluster name
 
-                    // Apply the filter to the TOM Table to display only relevant nodes
+                    // Apply the filter to the Node Table to display only relevant nodes
                     if (cluster === "All Clusters") {
                         // Regex to show all nodes for the selected species, excluding "No clusters"
                         searchRegex = '\\b' + species + '\\b(?!.*No clusters)';
                     }
 
-                    tomResultsTable.search(searchRegex, true, false).draw();
+                    nodeResultsTable.search(searchRegex, true, false).draw();
 
                     // Track the last selected cluster for debugging or further actions
                     lastSelectedCluster = cluster;
@@ -545,8 +545,8 @@
                 if (orthogroup) {
                     var searchRegex = '\\b' + orthogroup + '\\b'; // Regex for exact match of the orthogroup name
 
-                    // Apply the filter to the TOM Table to display only relevant nodes
-                    tomResultsTable.search(searchRegex, true, false).draw();
+                    // Apply the filter to the Node Table to display only relevant nodes
+                    nodeResultsTable.search(searchRegex, true, false).draw();
 
                     // Track the last selected orthogroup for debugging or further actions
                     lastSelectedOrthogroup = orthogroup;
@@ -558,7 +558,7 @@
             // Function to update highlighted nodes based on filtered results
             function updateHighlight() {
                 // Collect the visible nodes after the table has been updated
-                var visibleNodes = tomResultsTable.rows({ filter: 'applied' }).data().toArray();
+                var visibleNodes = nodeResultsTable.rows({ filter: 'applied' }).data().toArray();
 
                 // Generate unique Node IDs using Species and NodeName
                 var nodeIDs = visibleNodes.map(function(row) {
