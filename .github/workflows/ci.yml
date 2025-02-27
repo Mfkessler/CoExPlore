@@ -16,6 +16,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
+      - name: Move metadata file
+        run: cp metadata_dict.json /metadata_dict.json
+
       - name: Set up Python 3.13.2
         uses: actions/setup-python@v4
         with:
