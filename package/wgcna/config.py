@@ -30,6 +30,11 @@ def is_dockerized() -> bool:
     return False
 
 
+def is_github_runner() -> bool:
+    """Check if the script is running inside a GitHub Actions runner."""
+    return os.getenv("GITHUB_ACTIONS") == "true"
+
+
 def load_metadata_dict(metadata_json_path: str) -> dict:
     """
     Loads the metadata dictionary from a JSON file.
@@ -55,8 +60,9 @@ def load_metadata_dict(metadata_json_path: str) -> dict:
 
 
 # Load metadata based on environment
-if is_dockerized():
-    METADATA_DICT = load_metadata_dict("/metadata_dict.json")
+if is_github_runner():
+    metadata_path = os.path.join(os.getenv("GITHUB_WORKSPACE", ""), "metadata_dict.json")
+elif is_dockerized():
+    metadata_path = "/metadata_dict.json"
 else:
-    METADATA_DICT = load_metadata_dict(
-        "/vol/blast/wgcna/Project-Setup/wgcna-app/envs/metadata_dict.json")
+    metadata_path = "/vol/blast/wgcna/Project-Setup/wgcna-app/envs/metadata_dict.json"
