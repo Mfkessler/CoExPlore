@@ -66,3 +66,5 @@ elif is_dockerized():
     metadata_path = "/metadata_dict.json"
 else:
     metadata_path = "/vol/blast/wgcna/Project-Setup/wgcna-app/envs/metadata_dict.json"
+
+METADATA_DICT = load_metadata_dict(metadata_path)
