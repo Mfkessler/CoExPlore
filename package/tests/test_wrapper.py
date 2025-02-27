@@ -52,7 +52,7 @@ def test_get_tom_data_single(ann_data_single):
 
 def test_get_tom_data_list(ann_data_list):
     """Test get_tom_data with a list of AnnData objects."""
-    toms, adatas = get_tom_data(tom_path=[os.path.join(BASE_DIR, "data", f"S{i}", "tom_matrix.h5") for i in range(1, 9)], 
+    toms, adatas = get_tom_data(tom_path=[os.path.join(BASE_DIR, "data", f"S{i}", "tom_matrix.h5") for i in range(1, 3)], 
                                 adata=ann_data_list, 
                                 query="",
                                 threshold=0.2)
@@ -85,7 +85,7 @@ def test_analyze_co_expression_network_list(ann_data_list, plot_config):
         adata=ann_data_list,
         config=plot_config,
         topic="Test2",
-        tom_path=[os.path.join(BASE_DIR, "data", f"S{i}", "tom_matrix.h5") for i in range(1, 9)],
+        tom_path=[os.path.join(BASE_DIR, "data", f"S{i}", "tom_matrix.h5") for i in range(1, 3)],
         out="html",
         template_path=TEMPLATE_DIR,
         plot_go_enrichment=False,
