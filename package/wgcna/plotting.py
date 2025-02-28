@@ -1,4 +1,5 @@
 import os
+import json
 import networkx as nx
 import numpy as np
 import pandas as pd
@@ -8,7 +9,8 @@ import matplotlib.pyplot as plt
 import plotly.graph_objects as go
 import scanpy as sc
 import scipy.stats as stats
-import json
+import matplotlib.cm as cm
+import matplotlib.colors as mcolors
 from typing import List, Dict, Tuple
 from anndata import AnnData
 from .utils import reduce_tom_matrix, load_subset_from_hdf5, identify_network_clusters, generate_stage_color_dict, get_data_trait_df
@@ -37,7 +39,7 @@ from bokeh.layouts import column
 from bokeh.transform import dodge, factor_cmap
 from bokeh.palettes import Category20, viridis
 from .config import METADATA_DICT
-
+from collections import defaultdict
 
 plt.rcParams['savefig.bbox'] = 'tight'
 pd.set_option('future.no_silent_downcasting', True)
@@ -3567,101 +3569,234 @@ Cytoscape.js Network Plotting
 
 NodeData = Dict[str, Union[str, int]]
 Node = Dict[str, NodeData]
-
 EdgeData = Dict[str, Union[str, float]]
 Edge = Dict[str, EdgeData]
 
+# Helper functions for aggregating networks
 
-def plot_cyto_network(config: PlotConfig, custom_filename: str = "cyto_network", network_data: Dict[str, List[Union[Node, Edge]]] = None,
-                      searchpath: str = "../flask/app_dev/templates/", use_colors: bool = True, use_shapes: bool = False,
-                      cluster_info: Dict[str, str] = None, node_size: int = 10, highlight: List[str] = None,
-                      edge_width: int = 1, highlight_color: str = "magenta",
-                      use_edge_transparency: bool = False, use_edge_coloring: bool = True, filter_edges: bool = True) -> str:
+def aggregate_network(network_data: dict):
+    """
+    Aggregates nodes based on their 'cluster' attribute.
+    For each cluster, creates an aggregated node with:
+      - label: the cluster name and the number of nodes in that cluster
+      - color: determined by the average intra-cluster edge weight mapped to the Viridis colormap.
+    Returns:
+      aggregated_network (dict): A network with aggregated nodes and no edges.
+      clusters (dict): Mapping of each cluster label to the list of original nodes in that cluster.
+    """
+    # Group nodes by their cluster label
+    clusters = defaultdict(list)
+    for node in network_data['nodes']:
+        cluster_label = node['data'].get('cluster', 'No clusters')
+        clusters[cluster_label].append(node)
+    
+    # Calculate average edge weight for each cluster (only intra-cluster edges)
+    cluster_edge_weights = defaultdict(list)
+    for edge in network_data['edges']:
+        source_id = edge['data'].get('source')
+        target_id = edge['data'].get('target')
+        source_cluster = None
+        target_cluster = None
+        # Find cluster of source and target nodes
+        for node in network_data['nodes']:
+            if node['data'].get('id') == source_id:
+                source_cluster = node['data'].get('cluster', 'No clusters')
+            if node['data'].get('id') == target_id:
+                target_cluster = node['data'].get('cluster', 'No clusters')
+            if source_cluster and target_cluster:
+                break
+        if source_cluster == target_cluster and source_cluster is not None:
+            weight = edge['data'].get('weight', 1)
+            cluster_edge_weights[source_cluster].append(weight)
+    
+    # Set up Viridis colormap
+    viridis = cm.get_cmap('viridis')
+    # Compute average weight for each cluster
+    avg_weights = {}
+    for cl, weights in cluster_edge_weights.items():
+        if weights:
+            avg_weights[cl] = sum(weights) / len(weights)
+        else:
+            avg_weights[cl] = 0
+    # Normalize the weights for color mapping
+    if avg_weights:
+        min_weight = min(avg_weights.values())
+        max_weight = max(avg_weights.values())
+    else:
+        min_weight, max_weight = 0, 1
+
+    def weight_to_color(avg):
+        if max_weight == min_weight:
+            norm = 0.5
+        else:
+            norm = (avg - min_weight) / (max_weight - min_weight)
+        rgba = viridis(norm)
+        return mcolors.rgb2hex(rgba)
+    
+    # Create aggregated nodes (one per cluster)
+    aggregated_nodes = []
+    cluster_to_agg_id = {}
+    for cluster_label, nodes in clusters.items():
+        node_count = len(nodes)
+        avg_weight = avg_weights.get(cluster_label, 0)
+        agg_color = weight_to_color(avg_weight)
+        agg_node = {
+            "data": {
+                "id": f"cluster_{cluster_label}",
+                "label": f"{cluster_label} ({node_count} nodes)",
+                "aggregated": True,      # Flag to indicate this is an aggregated node
+                "node_count": node_count,
+                "avg_weight": avg_weight,
+                "color": agg_color       # Color based on average intra-cluster edge weight
+            }
+        }
+        aggregated_nodes.append(agg_node)
+        cluster_to_agg_id[cluster_label] = f"cluster_{cluster_label}"
+    
+    # In the aggregated view we do not show edges since clusters do not interconnect.
+    aggregated_network = {
+        "nodes": aggregated_nodes,
+        "edges": []
+    }
+    
+    return aggregated_network, clusters
+
+def get_cluster_detail(network_data: dict, cluster_label: str):
+    """
+    Extracts the detailed network for a given cluster label.
+    Returns a network containing all nodes that belong to the cluster and all intra-cluster edges.
+    """
+    detail_nodes = [node for node in network_data['nodes'] if node['data'].get('cluster', 'No clusters') == cluster_label]
+    node_ids = {node['data']['id'] for node in detail_nodes}
+    detail_edges = [edge for edge in network_data['edges']
+                    if edge['data'].get('source') in node_ids and edge['data'].get('target') in node_ids]
+    return {"nodes": detail_nodes, "edges": detail_edges}
+
+# The main plotting function
+def plot_cyto_network(config, custom_filename: str = "cyto_network", 
+                      network_data: Dict[str, List[Union[Node, Edge]]] = None,
+                      searchpath: str = "../flask/app_dev/templates/", 
+                      use_colors: bool = True, use_shapes: bool = False,
+                      cluster_info: Dict[str, str] = None, node_size: int = 10, 
+                      highlight: List[str] = None, edge_width: int = 1, 
+                      highlight_color: str = "magenta",
+                      use_edge_transparency: bool = False, 
+                      use_edge_coloring: bool = True, filter_edges: bool = True) -> str:
     """
     Plot a network using Cytoscape.js and save it as an HTML file.
-
+    
+    Extended functionality:
+      - If 'cluster_info' is provided, each node gets its 'cluster' attribute.
+      - The network is aggregated: an aggregated network JSON is created (one node per cluster,
+        with label = cluster name and node count, and color from Viridis based on average intra-cluster edge weight).
+      - Additionally, for each cluster the detailed network is saved as a separate JSON.
+      - The HTML file will render the aggregated network by default.
+    
     Parameters:
-    - config (PlotConfig): Configuration object for plot control.
-    - custom_filename (str): Custom filename for the plot.
-    - network_data (Dict[str, List[Union[Node, Edge]]]): The network data to be plotted.
-    - searchpath (str): The search path for the Jinja2 template.
-    - use_colors (bool): Whether to use module colors in the network plot.
-    - use_shapes (bool): Whether to use different shapes for different node types.
-    - cluster_info (Dict[str, str]): Dictionary containing cluster information.
-    - node_size (int): The size of the nodes in the network plot.
-    - edge_width (int): The width of the edges in the network plot.
-    - highlight (List[str]): List of nodes (e.g. transcripts) to highlight in the network.
-    - highlight_color (str): Color to use for highlighting the nodes.
-    - use_edge_transparency (bool): Whether to apply transparency to edges based on weights.
-    - use_edge_coloring (bool): Whether to color edges based on weights.
-    - filter_edges (bool): Whether to filter edges.
-
+      config: PlotConfig object with output_path, etc.
+      custom_filename: Base filename to use for saving HTML and JSON files.
+      network_data: Full network data (nodes and edges) in Cytoscape.js format.
+      searchpath: Path to the Jinja2 templates.
+      use_colors, use_shapes, node_size, highlight, edge_width, highlight_color,
+      use_edge_transparency, use_edge_coloring, filter_edges: Plotting parameters.
+      cluster_info: Dictionary mapping node IDs to cluster names.
+    
     Returns:
-    - The absolute path to the saved HTML file.
+      The absolute path to the saved HTML file.
     """
-
-    # If highlight is a string, convert it to a list
+    
+    # Convert highlight to list if needed
     if isinstance(highlight, str):
         highlight = [highlight]
-
-    # Adding cluster information to each node
+    
+    # If cluster_info is provided, add cluster info to each node's data
     if cluster_info:
         for node in network_data['nodes']:
             node_id = node['data']['id']
-            node['data']['cluster'] = cluster_info[node_id]
-
+            node['data']['cluster'] = cluster_info.get(node_id, "No clusters")
+    
+    # Optionally assign shapes based on module_colors (unchanged)
     if use_shapes:
         shape_dict = generate_cyto_shape_dict(
             [node['data']['module_colors'] for node in network_data['nodes']], None)
         for node in network_data['nodes']:
             module_color = node['data']['module_colors']
             node['data']['shape'] = shape_dict.get(module_color, 'ellipse')
-
+    
+    # Highlight nodes if specified
     if highlight:
         for node in network_data['nodes']:
-            if node['data']['gene'] in highlight:
-                node['data']['highlighted'] = True
-            else:
-                node['data']['highlighted'] = False
-
-    # Load the Jinja2 environment
+            node['data']['highlighted'] = (node['data']['gene'] in highlight)
+    
+    # Load Jinja2 environment
     env = Environment(loader=FileSystemLoader(searchpath=searchpath))
-
-    # Render the CSS template
+    
+    # Render CSS template
     css_template = env.get_template("network.css")
     css_content = css_template.render()
+    
+    # --- Aggregation and Saving JSONs ---
+    # If cluster_info is provided, compute aggregated network and save JSON files.
+    if cluster_info:
+        aggregated_net, clusters = aggregate_network(network_data)
+        # Save aggregated network JSON
+        aggregated_json_filename = f"{custom_filename}_aggregated.json"
+        aggregated_json_path = os.path.join(config.output_path, aggregated_json_filename)
+        with open(aggregated_json_path, 'w') as f:
+            json.dump(aggregated_net, f, indent=2)
+        
+        # For each cluster, save the detailed network JSON
+        for cluster_label in clusters.keys():
+            detail_net = get_cluster_detail(network_data, cluster_label)
+            # Replace spaces or special characters in cluster label if needed
+            safe_cluster_label = cluster_label.replace(" ", "_")
+            detail_json_filename = f"{custom_filename}_detail_{safe_cluster_label}.json"
+            detail_json_path = os.path.join(config.output_path, detail_json_filename)
+            with open(detail_json_path, 'w') as f:
+                json.dump(detail_net, f, indent=2)
+        
+        # For plotting, we use the aggregated network
+        network_data_to_plot = aggregated_net
+    else:
+        network_data_to_plot = network_data
 
-    # Render the JS template
+    # Render the JS template and pass outputPath and custom_filename
     js_template = env.get_template("network.js")
-    js_content = js_template.render(network_data=network_data,
-                                    metadata_dict=METADATA_DICT,
-                                    filter_edges=filter_edges,
-                                    use_background_color=use_colors,
-                                    use_shapes=use_shapes,
-                                    use_cluster_tooltip=cluster_info is not None,
-                                    node_size=node_size,
-                                    edge_width=edge_width,
-                                    highlight_color=highlight_color,
-                                    use_edge_transparency=use_edge_transparency,
-                                    use_edge_coloring=use_edge_coloring)
-
-    # Render the HTML template and embed CSS and JS contents
+    js_content = js_template.render(
+        network_data=network_data_to_plot,
+        metadata_dict=METADATA_DICT,
+        filter_edges=filter_edges,
+        use_background_color=use_colors,
+        use_shapes=use_shapes,
+        use_cluster_tooltip=(cluster_info is not None),
+        node_size=node_size,
+        edge_width=edge_width,
+        highlight_color=highlight_color,
+        use_edge_transparency=use_edge_transparency,
+        use_edge_coloring=use_edge_coloring,
+        outputPath=config.output_path,      # new: output path for JSON files
+        custom_filename=custom_filename       # new: base filename for JSONs
+    )
+    
+    # Render the final HTML template with embedded CSS and JS
     html_template = env.get_template("network.html")
-    rendered_html = html_template.render(css_content=css_content,
-                                         js_content=js_content)
-
-    html_file_path = f"{config.output_path}/{custom_filename}.html"
+    rendered_html = html_template.render(css_content=css_content, js_content=js_content,
+                                           outputPath=config.output_path)
+    
+    # Save the HTML file
+    html_file_path = os.path.join(config.output_path, f"{custom_filename}.html")
     if config.show:
         display(IFrame(src=html_file_path, width='100%', height='600px'))
-
+    
     if config.save_plots:
-        with open((html_file_path), 'w') as f:
+        with open(html_file_path, 'w') as f:
             f.write(rendered_html)
-
+    
+    # Optionally save the raw network data (detail network)
     if config.save_raw:
-        raw_data_filename = custom_filename if custom_filename else "cyto_network"
-        raw_data_filepath = f"{config.output_path}/{raw_data_filename}.json"
+        raw_data_filename = f"{custom_filename}_detail.json"
+        raw_data_filepath = os.path.join(config.output_path, raw_data_filename)
         with open(raw_data_filepath, 'w') as f:
-            json.dump(network_data, f)
-
+            json.dump(network_data, f, indent=2)
+    
     return os.path.abspath(html_file_path)
