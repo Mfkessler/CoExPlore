@@ -10,6 +10,9 @@ document.addEventListener('DOMContentLoaded', function() {
     var useEdgeTransparency = {{ use_edge_transparency|tojson }};  // Transparency flag
     var useEdgeColoring = {{ use_edge_coloring|tojson }};  // Edge coloring flag
 
+    // Get the output path and custom filename from the template
+    var customFilename = "{{ custom_filename }}";  // e.g., 'cyto_network'
+
     // Metadata
     const METADATA_MAPPING = {{ metadata_dict|tojson }};
     METADATA_MAPPING['gene'] = 'Transcript';
@@ -24,24 +27,43 @@ document.addEventListener('DOMContentLoaded', function() {
                 selector: 'node',
                 style: {
                     'background-color': function(node) {
-                        if (node.data('highlighted')) {
-                            return highlightColor;  // Highlighted node
+                        if (node.data('aggregated')) {
+                            return node.data('color');  // Aggregated node: use its own color
+                        } else if (node.data('highlighted')) {
+                            return highlightColor;
                         }
                         return useBackgroundColor ? node.data('module_colors') : 'black';
                     },
-                    'shape': 'ellipse',
-                    'text-valign': 'center',
-                    'color': 'white',
+                    'width': function(node) {
+                        return node.data('aggregated') ? nodeSize * 2 : nodeSize;
+                    },
+                    'height': function(node) {
+                        return node.data('aggregated') ? nodeSize * 2 : nodeSize;
+                    },
+                    'text-valign': function(node) {
+                        return node.data('aggregated') ? 'top' : 'center';
+                    },
+                    'text-halign': 'center',
+                    'text-margin-y': function(node) {
+                        return node.data('aggregated') ? -5 : 0;
+                    },
+                    'color': function(node) {
+                        return node.data('aggregated') ? 'black' : 'white';
+                    },
+                    'font-size': function(node) {
+                        return node.data('aggregated') ? 4 : 2;
+                    },
+                    'label': function(node) {
+                        return node.data('aggregated') ? node.data('label') : '';
+                    },
                     'border-color': 'black',
-                    'border-width': 1,
-                    'font-size': 10,
-                    'label': '',  // No direct label on nodes
+                    'border-width': 1
                 }
             },
             {
                 selector: 'node[is_neighbor]',
                 style: {
-                    'opacity': 0.5
+                    'opacity': 0.75
                 }
             },
             {
@@ -161,64 +183,7 @@ document.addEventListener('DOMContentLoaded', function() {
         cy.on('pan', debouncedUpdateEdgesVisibility);
 
         /* Shape assignment based on organism */
-        if (useShapes) {
-            const availableShapes = [
-                'ellipse',
-                'triangle',
-                'rectangle',
-                'diamond',
-                'pentagon',
-                'tag',
-                'vee',
-                'rhomboid',
-                'hexagon',
-                'barrel',
-            ];
-              
-            let organismShapes = {};
-
-            // Determine unique organisms
-            let uniqueOrganisms = [...new Set(cy.nodes().map(node => node.data('species')))];
-            // Assign shapes cyclically
-            uniqueOrganisms.forEach((organism, index) => {
-                organismShapes[organism] = availableShapes[index % availableShapes.length];
-            });
-
-            // Dynamically update node styles
-            cy.batch(function() {
-                cy.nodes().forEach(node => {
-                    let organism = node.data('species');
-                    let newShape = organismShapes[organism] || 'ellipse';
-                    node.style('shape', newShape);
-                });
-            });
-
-            // Dynamically build species legend with SVG symbols, a space, and italic species names
-            let speciesLegendList = document.getElementById('species-legend-list');
-            speciesLegendList.innerHTML = ''; // Clear the list
-            Object.keys(organismShapes).forEach(species => {
-                let shape = organismShapes[species];
-
-                let li = document.createElement('li');
-                li.style.marginBottom = '5px';
-
-                // Create SVG icon for the respective shape
-                let svgElement = createShapeSVG(shape);
-                svgElement.classList.add('legend-shape');
-                li.appendChild(svgElement);
-
-                // Add species name
-                let speciesSpan = document.createElement('span');
-                speciesSpan.classList.add('legend-species');
-                speciesSpan.textContent = species;
-                li.appendChild(speciesSpan);
-
-                speciesLegendList.appendChild(li);
-            });
-        } else {
-            // Hide the species legend if shapes are not used
-            document.getElementById('species-legend').style.display = 'none';
-        }
+        assignOrganismShapes();
 
         /* Edge Filtering */
         if (filterEdges) {
@@ -292,6 +257,67 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
     });
+
+    function assignOrganismShapes() {
+        if (useShapes) {
+            const availableShapes = [
+                'ellipse',
+                'triangle',
+                'rectangle',
+                'diamond',
+                'pentagon',
+                'tag',
+                'vee',
+                'rhomboid',
+                'hexagon',
+                'barrel',
+            ];
+
+            let organismShapes = {};
+
+            // Determine unique organisms
+            let uniqueOrganisms = [...new Set(cy.nodes().map(node => node.data('species')))];
+            // Assign shapes cyclically
+            uniqueOrganisms.forEach((organism, index) => {
+                organismShapes[organism] = availableShapes[index % availableShapes.length];
+            });
+
+            // Dynamically update node styles
+            cy.batch(function () {
+                cy.nodes().forEach(node => {
+                    let organism = node.data('species');
+                    let newShape = organismShapes[organism] || 'ellipse';
+                    node.style('shape', newShape);
+                });
+            });
+
+            // Dynamically build species legend with SVG symbols, a space, and italic species names
+            let speciesLegendList = document.getElementById('species-legend-list');
+            speciesLegendList.innerHTML = ''; // Clear the list
+            Object.keys(organismShapes).forEach(species => {
+                let shape = organismShapes[species];
+
+                let li = document.createElement('li');
+                li.style.marginBottom = '5px';
+
+                // Create SVG icon for the respective shape
+                let svgElement = createShapeSVG(shape);
+                svgElement.classList.add('legend-shape');
+                li.appendChild(svgElement);
+
+                // Add species name
+                let speciesSpan = document.createElement('span');
+                speciesSpan.classList.add('legend-species');
+                speciesSpan.textContent = species;
+                li.appendChild(speciesSpan);
+
+                speciesLegendList.appendChild(li);
+            });
+        } else {
+            // Hide the species legend if shapes are not used
+            document.getElementById('species-legend').style.display = 'none';
+        }
+    }
 
     function clamp(val, min, max) {
         return Math.max(min, Math.min(max, val));
@@ -387,31 +413,40 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Reset button
     document.getElementById('zoom-reset').addEventListener('click', function() {
+        var aggregatedFile = customFilename + "_aggregated.json";
+        fetch(aggregatedFile)
+            .then(function(response) { return response.json(); })
+            .then(function(aggregatedData) {
+                cy.json({ elements: aggregatedData });
+                // Run a layout to reposition nodes properly
+                cy.layout({ name: 'cose', fit: true, padding: 10, animate: true }).run();
+            })
+            .catch(function(error) {
+                console.error("Error loading aggregated network:", error);
+            });
+        
+        // Reset zoom and pan if not in fullscreen
         if (document.fullscreenElement) {
-            // If fullscreen is active: Use the entire space
             cy.resize();
             cy.fit();
         } else {
-            // If NOT in fullscreen mode: Reset to default values
             cy.fit();
             cy.zoom(initialZoom);
             cy.pan(initialPan);
             cy.center();
         }
-
-        // Reset node and edge sizes to the original values
+        
+        // Reset node and edge sizes
         cy.nodes().forEach(node => {
             node.style('width', nodeSize);
             node.style('height', nodeSize);
         });
-
         cy.edges().forEach(edge => {
             edge.style('width', edgeWidth);
         });
-
-        // Ensure size adjustment after reset
+        
         adjustNodeAndEdgeSize();
-    });
+    });    
 
     /* Toggle scroll zoom */
 
@@ -463,26 +498,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     /* Legend */
 
-    var legend = document.getElementById('legend');
-    var legendGradient = document.getElementById('legend-gradient');
-
-    if (useEdgeColoring || useEdgeTransparency) {
-        // Set the actual min and max TOM values in the legend
-        document.getElementById('minTOM').textContent = minTOM.toFixed(2);
-        document.getElementById('maxTOM').textContent = maxTOM.toFixed(2);
-
-        // Update gradient for coloring or transparency
-        if (useEdgeColoring) {
-            // Set Viridis gradient if edge coloring is enabled
-            legendGradient.style.background = 'linear-gradient(to right, #440154, #3b528b, #21918c, #5dc962, #fde725)';
-        } else if (useEdgeTransparency) {
-            // Set transparency gradient (gray-to-opacity) if only transparency is enabled
-            legendGradient.style.background = 'linear-gradient(to right, rgba(169, 169, 169, 0.1), rgba(169, 169, 169, 1))';
-        }
-    } else {
-        // Hide the legend if neither edge coloring nor transparency is enabled
-        legend.style.display = 'none';
-    }
+    updateLegendDisplay();
 
     // Toggle Legend
     document.getElementById('toggle-legend').addEventListener('click', function() {
@@ -503,42 +519,69 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     /* Edge Coloring and Transparency */
-    if (useEdgeTransparency || useEdgeColoring) {
-        /* Color Scale */
-        var colorScale = null;
-        if (useEdgeColoring) {
-            // Define the continuous Viridis scale based on the actual TOM values
-            colorScale = d3.scaleSequential()
-                        .domain([minTOM, maxTOM])
-                        .interpolator(d3.interpolateViridis);
+    updateEdgeStyles();
+
+    function updateLegendDisplay() {
+        var legend = document.getElementById('legend');
+        var legendGradient = document.getElementById('legend-gradient');
+
+        if (useEdgeColoring || useEdgeTransparency) {
+            // Set the actual min and max TOM values in the legend
+            document.getElementById('minTOM').textContent = minTOM.toFixed(2);
+            document.getElementById('maxTOM').textContent = maxTOM.toFixed(2);
+
+            // Update gradient for coloring or transparency
+            if (useEdgeColoring) {
+                // Set Viridis gradient if edge coloring is enabled
+                legendGradient.style.background = 'linear-gradient(to right, #440154, #3b528b, #21918c, #5dc962, #fde725)';
+            } else if (useEdgeTransparency) {
+                // Set transparency gradient (gray-to-opacity) if only transparency is enabled
+                legendGradient.style.background = 'linear-gradient(to right, rgba(169, 169, 169, 0.1), rgba(169, 169, 169, 1))';
+            }
+        } else {
+            // Hide the legend if neither edge coloring nor transparency is enabled
+            legend.style.display = 'none';
         }
+    }
 
-        /* Transparency Scale */
-        var opacityScale = null;
-        if (useEdgeTransparency) {
-            // Define a transparency scale, 0.1 for the lowest weight and 1 for the highest
-            opacityScale = d3.scaleLinear()
-                            .domain([minTOM, maxTOM])
-                            .range([0.1, 1]);
-        }
+    function updateEdgeStyles() {
+        if (useEdgeTransparency || useEdgeColoring) {
+            /* Color Scale */
+            var colorScale = null;
+            if (useEdgeColoring) {
+                // Define the continuous Viridis scale based on the actual TOM values
+                colorScale = d3.scaleSequential()
+                    .domain([minTOM, maxTOM])
+                    .interpolator(d3.interpolateViridis);
+            }
 
-        // Use cy.batch() for optimized batch updates of either color or transparency
-        cy.batch(function() {
-            cy.edges().forEach(function(edge) {
-                var weight = edge.data('weight');
-                var styleUpdate = {};
+            /* Transparency Scale */
+            var opacityScale = null;
+            if (useEdgeTransparency) {
+                // Define a transparency scale, 0.1 for the lowest weight and 1 for the highest
+                opacityScale = d3.scaleLinear()
+                    .domain([minTOM, maxTOM])
+                    .range([0.1, 1]);
+            }
 
-                if (useEdgeColoring) {
-                    styleUpdate['line-color'] = colorScale(weight);  // Determine the color based on TOM value
-                }
+            // Use cy.batch() for optimized batch updates of either color or transparency
+            cy.batch(function () {
+                cy.edges().forEach(function (edge) {
+                    var weight = edge.data('weight');
+                    var styleUpdate = {};
 
-                if (useEdgeTransparency) {
-                    styleUpdate['opacity'] = opacityScale(weight);  // Determine opacity based on TOM value
-                }
+                    if (useEdgeColoring) {
+                        styleUpdate['line-color'] = colorScale(weight); // Determine the color based on TOM value
+                    }
 
-                edge.style(styleUpdate);  // Apply styles based on the current settings
+                    if (useEdgeTransparency) {
+                        styleUpdate['opacity'] = opacityScale(weight); // Determine opacity based on TOM value
+                    }
+
+                    edge.style(styleUpdate);
+                });
             });
-        });
+        }
     }
 
     function formatList(value) {
@@ -554,43 +597,40 @@ document.addEventListener('DOMContentLoaded', function() {
 
     /* Tooltip */
 
-    // Tooltip on hover
+    /* Tooltip on hover */
     cy.on('mouseover', 'node', function(evt) {
         var node = evt.target;
-      
+        var tooltip = document.getElementById('tooltip');
         var tooltipText = '';
-        var dataDict = METADATA_MAPPING
 
-        for (var key in dataDict) {
-            if (HIDDEN_KEYS.includes(key)) {
-                continue;
+        if (node.data('aggregated')) {
+            // For aggregated nodes, show only cluster-specific metadata
+            tooltipText += '<b>Cluster:</b> ' + node.data('label') + '<br>';
+            tooltipText += '<b>Average Edge Weight:</b> ' + node.data('avg_weight').toFixed(2) + '<br>';
+            tooltipText += '<b>Node Count:</b> ' + node.data('node_count') + '<br>';
+        } else {
+            // For detailed nodes, iterate through METADATA_MAPPING
+            var dataDict = METADATA_MAPPING;
+            for (var key in dataDict) {
+                if (HIDDEN_KEYS.includes(key)) continue;
+                var value = node.data(key);
+                if (value !== undefined && value !== null) {
+                    let formattedValue = FORMATTED_KEYS.includes(key) ? formatList(value) : value;
+                    tooltipText += `<b>${dataDict[key]}:</b> ${formattedValue}<br>`;
+                }
             }
-        
-            var value = node.data(key);
-        
-            if (value !== undefined && value !== null) {
-                let formattedValue = FORMATTED_KEYS.includes(key) ? formatList(value) : value;
-                
-                tooltipText += `<b>${dataDict[key]}:</b> ${formattedValue}<br>`;
+            tooltipText += '<b>Degree:</b> ' + node.degree() + '<br>';
+            if (useClusterTooltip) { 
+                tooltipText += '<b>Cluster:</b> ' + node.data('cluster');
             }
-        }
-
-        // Add degree separately as it's not in the dataDict
-        tooltipText += '<b>Degree:</b> ' + node.degree() + '<br>';
-                        
-        if (useClusterTooltip) { 
-            tooltipText += '<b>Cluster:</b> ' + node.data('cluster');
         }
 
         tooltip.style.display = 'block';
         tooltip.innerHTML = tooltipText;
-
-        // Get mouse position and update tooltip position
         var mouseX = evt.originalEvent.clientX;
         var mouseY = evt.originalEvent.clientY;
-
-        tooltip.style.left = (mouseX + 15) + 'px';  // Offset to the right of the mouse pointer
-        tooltip.style.top = (mouseY + 0) + 'px';   // Offset below the mouse pointer
+        tooltip.style.left = (mouseX + 15) + 'px';
+        tooltip.style.top = (mouseY) + 'px';
     });
 
     cy.on('mouseout', 'node', function(evt) {
@@ -613,6 +653,8 @@ document.addEventListener('DOMContentLoaded', function() {
         var scaledEdgeWidth = currentEdgeWidth / zoomLevel;
     
         cy.nodes().forEach(function(node) {
+            if (node.data('aggregated')) return;  // Skip aggregated nodes
+
             node.style('width', scaledNodeSize);
             node.style('height', scaledNodeSize);
         });
@@ -894,6 +936,37 @@ document.addEventListener('DOMContentLoaded', function() {
         if (metadataActive) { // Only jitter if metadata highlighting is active
             highlightNodesByMetadata(metadataKeys[currentMetadataIndex], node);
         }
+
+        // If the node is aggregated, load its detail network
+        if (node.data('aggregated')) {
+            // Extract cluster name from label (assumes "ClusterName (n nodes)")
+            var label = node.data('label');
+            var clusterName = label.split(" (")[0]; 
+            var safeClusterName = clusterName.replace(/\s/g, "_");
+            // Build file name WITHOUT outputPath prefix (files are in the same folder)
+            var detailNetworkFile = customFilename + "_detail_" + safeClusterName + ".json";
+            
+            fetch(detailNetworkFile)
+                .then(function(response) { return response.json(); })
+                .then(function(detailData) {
+                    // Replace current network with detailed network and run layout
+                    cy.json({ elements: detailData });
+                    cy.layout({
+                        name: 'cose',
+                        fit: true,  // Ensures the entire graph is visible
+                        padding: 10,  // Adds padding around the layout
+                        nodeRepulsion: 400000,  // Increase this value to spread nodes further apart
+                        idealEdgeLength: 100,  // Sets an ideal edge length
+                        nodeDimensionsIncludeLabels: false,  // Doesn't include labels when calculating size
+                        animate: false,  // Animates the layout
+                        animationDuration: 50  // Sets animation duration
+                    }).run();
+                    resetParameters();
+                })
+                .catch(function(error) {
+                    console.error("Error loading detail network:", error);
+                });
+        }
     });
 
     // When clicking anywhere in the Cytoscape plot (but not on nodes), reset the table
@@ -1073,7 +1146,48 @@ document.addEventListener('DOMContentLoaded', function() {
         link.download = 'cytoscape_export.png';
         link.href = exportCanvas.toDataURL('image/png');
         link.click();
-    }             
+    }
+    
+    function resetParameters() {
+        // Clear the sortedEdges cache so that edge filtering is recalculated
+        cy.scratch('sortedEdges', null);
+        
+        // Reset global size variables to the initial values provided by Python
+        currentNodeSize = nodeSize;
+        currentEdgeWidth = edgeWidth;
+        
+        // Reset node sizes for all nodes:
+        cy.nodes().forEach(function(node) {
+            if (node.data('aggregated')) {
+                // For aggregated nodes, set them to 2x (oder 4x, je nach Wunsch) der normalen Größe
+                node.style('width', nodeSize * 2);
+                node.style('height', nodeSize * 2);
+            } else {
+                // For detail nodes, use the default nodeSize
+                node.style('width', nodeSize);
+                node.style('height', nodeSize);
+            }
+        });
+        
+        // Reset edge sizes
+        cy.edges().forEach(function(edge) {
+            edge.style('width', edgeWidth);
+        });
+        
+        // Update Species Legend
+        assignOrganismShapes();
+
+        // Re-run the edge visibility update (this will rebuild the sortedEdges cache)
+        updateEdgesVisibility();
+        
+        // Calculate the minimum and maximum TOM value
+        minTOM = Math.min(...cy.edges().map(edge => edge.data('weight')));
+        maxTOM = Math.max(...cy.edges().map(edge => edge.data('weight')));
+
+        updateEdgeStyles();
+        updateLegendDisplay();
+    }
+    
 
     // Hide the loading spinner when the layout is complete
     cy.on('render', function(){
