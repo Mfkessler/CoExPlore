@@ -66,7 +66,7 @@ document.addEventListener('DOMContentLoaded', function() {
             {
                 selector: 'node[is_neighbor]',
                 style: {
-                    'opacity': 0.75
+                    'opacity': 0.25
                 }
             },
             {
@@ -426,7 +426,7 @@ document.addEventListener('DOMContentLoaded', function() {
             .then(function(aggregatedData) {
                 cy.json({ elements: aggregatedData });
                 // Run a layout to reposition nodes properly
-                cy.layout({ name: 'cose', fit: true, padding: 10, animate: true }).run();
+                cy.layout({ name: 'cose', fit: true, padding: 10, animate: false }).run();
                 aggregated = true; // Aggregated network is shown
                 // Hide Legend
                 document.getElementById('legend').style.display = 'none';
