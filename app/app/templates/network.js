@@ -19,6 +19,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const FORMATTED_KEYS = ['go_terms', 'ipr_id'];
     const HIDDEN_KEYS = ['description_long', 'modules_labels', 'module_count', 'unique_modules', 'unique_go_terms', 'transcript'];
 
+    // Aggregated network
+    let aggregated = true;
+    
     var cy = cytoscape({
         container: document.getElementById('cy'),
         elements: {{ network_data|tojson }},  // Data from Python
@@ -176,14 +179,14 @@ document.addEventListener('DOMContentLoaded', function() {
         const initialZoom = cy.zoom();
         cy.scratch('initialZoom', initialZoom);
         updateEdgesVisibility();
+
+        // Hide Legend
+        document.getElementById('legend').style.display = 'none';
         
         const debouncedUpdateEdgesVisibility = debounce(updateEdgesVisibility, 100);
         document.getElementById('edge-visibility-range').addEventListener('input', debouncedUpdateEdgesVisibility);
         cy.on('zoom', debouncedUpdateEdgesVisibility);
         cy.on('pan', debouncedUpdateEdgesVisibility);
-
-        /* Shape assignment based on organism */
-        assignOrganismShapes();
 
         /* Edge Filtering */
         if (filterEdges) {
@@ -259,7 +262,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     function assignOrganismShapes() {
-        if (useShapes) {
+        if (useShapes && !aggregated) {
             const availableShapes = [
                 'ellipse',
                 'triangle',
@@ -313,6 +316,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 speciesLegendList.appendChild(li);
             });
+            // Show Legend
+            document.getElementById('legend').style.display = 'block';
+            // Show the species legend
+            document.getElementById('species-legend').style.display = 'block';
         } else {
             // Hide the species legend if shapes are not used
             document.getElementById('species-legend').style.display = 'none';
@@ -420,6 +427,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 cy.json({ elements: aggregatedData });
                 // Run a layout to reposition nodes properly
                 cy.layout({ name: 'cose', fit: true, padding: 10, animate: true }).run();
+                aggregated = true; // Aggregated network is shown
+                // Hide Legend
+                document.getElementById('legend').style.display = 'none';
             })
             .catch(function(error) {
                 console.error("Error loading aggregated network:", error);
@@ -502,9 +512,14 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Toggle Legend
     document.getElementById('toggle-legend').addEventListener('click', function() {
-        var legend = document.getElementById('legend');
-        legend.classList.toggle('hidden');
-        this.classList.toggle('active');
+        if(aggregated) {
+            return;
+        } else {
+            // Show the legend if the detailed network is shown
+            var legend = document.getElementById('legend');
+            legend.classList.toggle('hidden');
+            this.classList.toggle('active');
+        }
       });
 
     /* Highlight Button */
@@ -961,6 +976,9 @@ document.addEventListener('DOMContentLoaded', function() {
                         animate: false,  // Animates the layout
                         animationDuration: 50  // Sets animation duration
                     }).run();
+                    aggregated = false;  // Detailed network is now shown
+                    // Show Legend
+                    document.getElementById('legend').style.display = 'block';
                     resetParameters();
                 })
                 .catch(function(error) {
