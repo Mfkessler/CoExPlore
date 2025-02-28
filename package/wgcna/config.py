@@ -61,10 +61,17 @@ def load_metadata_dict(metadata_json_path: str) -> dict:
 
 # Load metadata based on environment
 if is_github_runner():
+    print("Running in GitHub Actions.")
     metadata_path = os.path.join(os.getenv("GITHUB_WORKSPACE", ""), "metadata_dict.json")
 elif is_dockerized():
+    print("Running in Docker.")
     metadata_path = "/metadata_dict.json"
+    if not os.path.exists(metadata_path):
+        metadata_path = "/vol/blast/wgcna/Project-Setup/wgcna-app/envs/metadata_dict.json"
+        if not os.path.exists(metadata_path):
+            print(f"Warning: {metadata_path} not found. Using an empty dictionary.")
 else:
+    print("Running locally.")
     metadata_path = "/vol/blast/wgcna/Project-Setup/wgcna-app/envs/metadata_dict.json"
 
 METADATA_DICT = load_metadata_dict(metadata_path)

@@ -1,13 +1,13 @@
 import os
 import random
 import h5py
+import re
+import matplotlib.cm as cm
 import pandas as pd
 import numpy as np
 import scanpy as sc
 import scipy.sparse as sp
 import networkx as nx
-import igraph as ig
-import re
 from .ortho import add_ortho_count, update_ortho_ID
 from matplotlib import cm, colors
 from goatools.obo_parser import GODag
@@ -1984,7 +1984,7 @@ def export_co_expression_network_to_cytoscape(
     for idx, (current_tom, current_adata) in enumerate(tom_adata_pairs):
         gene_metadata = current_adata.var
 
-        # Filter genes based on selected module colors if provided
+        # Filter genes based on selected module colors if provided (not used, ignore for now)
         if selected_module_colors:
             mod_genes = gene_metadata[gene_metadata["module_colors"].isin(
                 selected_module_colors)].index
@@ -2033,14 +2033,17 @@ def export_co_expression_network_to_cytoscape(
             node_data['data']['name'] = current_adata.uns['name']
             nodes.append(node_data)
 
-        # Build edges based on TOM threshold (without extra metadata)
+        # Build edges based on TOM threshold
         for i in range(len(mod_genes)):
             for j in range(i + 1, len(mod_genes)):
                 gene_i = mod_genes[i]
                 gene_j = mod_genes[j]
                 if current_tom.loc[gene_i, gene_j] > threshold:
+                    # Create a unique edge ID (for instance, by concatenating source and target)
+                    edge_id = f"{species_value}_{gene_i}_{gene_j}"
                     edge_data = {
                         'data': {
+                            'id': edge_id,
                             source_key: f"{species_value}_{gene_i}",
                             target_key: f"{species_value}_{gene_j}",
                             weight_key: current_tom.loc[gene_i, gene_j]
