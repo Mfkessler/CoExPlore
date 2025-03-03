@@ -86,8 +86,8 @@ def plot_co_expression_network_task(self, data):
             adata = adata_cache.get_adata(plant)
 
         total_transcripts = sum(len(v) for v in transcripts.values())
-        if total_transcripts > 5000:
-            return {"status": "FAILURE", "result": {"status": "error", "message": "Too many transcripts selected, please select fewer than 5000"}}
+        if total_transcripts > 20000:
+            return {"status": "FAILURE", "result": {"status": "error", "message": "Too many transcripts selected, please select fewer than 20000"}}
 
         html_path = rwrap.analyze_co_expression_network(adata, plot_config, transcripts=transcripts, threshold=threshold,
                                                         obo_path=f"{Config.DATA_DIR}/go-basic.obo", topic=topic, plot_go_enrichment=False,
