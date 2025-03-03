@@ -101,6 +101,16 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
+    function computeAggregatedFactor(count, minCount, maxCount) {
+        const minScale = 1.33;
+        const maxScale = 2.5;
+        if (maxCount === minCount) {
+            return (minScale + maxScale) / 2;
+        }
+        return minScale + ((count - minCount) / (maxCount - minCount)) * (maxScale - minScale);
+    }
+    
+
     /* SVG Shape Creation */
     function createShapeSVG(shape, color = 'black', size = 15) {
         const svgNS = "http://www.w3.org/2000/svg";
@@ -168,6 +178,120 @@ document.addEventListener('DOMContentLoaded', function() {
         return svg;
     }    
 
+    function assignDynamicNetworkIconToAggregatedNodes() {
+        let aggregatedNodes = cy.nodes().filter(node => node.data('aggregated'));
+        if (aggregatedNodes.empty()) return;
+    
+        // Determine the global minimum and maximum node_count (default value: 1)
+        let counts = aggregatedNodes.map(node => node.data('node_count') || 1);
+        let minCount = Math.min(...counts);
+        let maxCount = Math.max(...counts);
+    
+        // For each aggregated node: Determine a scaled node count (between 2 and 10)
+        aggregatedNodes.forEach(function(node) {
+            let rawCount = node.data('node_count') || 1;
+            let scaledCount;
+            if (maxCount === minCount) {
+                scaledCount = 6; // If all are the same, set a median value
+            } else {
+                scaledCount = Math.round(2 + ((rawCount - minCount) / (maxCount - minCount)) * (10 - 2));
+            }
+            // Base size: nodeSize * 3 (can be adjusted as needed)
+            let baseSize = nodeSize * 3;
+            let newSize = baseSize; // Optionally, you can add additional scaling based on rawCount
+    
+            // Create the dynamic network icon with the scaled node count
+            let svgElement = createDynamicNetworkIconSVG(node.data('color') || 'gray', newSize, scaledCount);
+            
+            // Serialize the SVG and create a Data URL from it
+            let serializer = new XMLSerializer();
+            let svgString = serializer.serializeToString(svgElement);
+            let encodedData = encodeURIComponent(svgString);
+            let dataUrl = 'data:image/svg+xml;charset=utf-8,' + encodedData;
+            
+            // Assign the new style to the node:
+            node.style({
+                'width': newSize,
+                'height': newSize,
+                'background-image': 'url(' + dataUrl + ')',
+                'background-fit': 'cover',
+                'background-opacity': 0,
+                'border-width': 1,
+                'border-color': 'black',
+                'shape': 'rectangle',
+                'label': '' // Remove the text if any
+            });
+        });
+    }
+
+    // Creates a dynamic network icon as SVG without a central circle.
+    // Parameters:
+    //   color: Fill color of the small nodes (taken from node data).
+    //   size: Total size of the icon (in pixels).
+    //   count: Number of small nodes (scaled value between 2 and 10).
+    function createDynamicNetworkIconSVG(color, size, count) {
+        const svgNS = "http://www.w3.org/2000/svg";
+        // Create the SVG element.
+        let svg = document.createElementNS(svgNS, "svg");
+        svg.setAttribute("width", size);
+        svg.setAttribute("height", size);
+        svg.setAttribute("viewBox", "0 0 100 100");
+
+        // Center and parameters for positioning
+        const centerX = 50, centerY = 50;
+        const placementRadius = 35; // Distance from the center
+        const nodeRadius = 8;       // Radius of the small nodes
+
+        // Calculate the positions of the small nodes (evenly distributed)
+        let positions = [];
+        for (let i = 0; i < count; i++) {
+            let angle = (2 * Math.PI * i) / count;
+            let cx = centerX + placementRadius * Math.cos(angle);
+            let cy = centerY + placementRadius * Math.sin(angle);
+            positions.push({ cx, cy });
+        }
+
+        // Draw lines from each small node to the center (for a network-like appearance)
+        positions.forEach(pos => {
+            let line = document.createElementNS(svgNS, "line");
+            line.setAttribute("x1", pos.cx);
+            line.setAttribute("y1", pos.cy);
+            line.setAttribute("x2", centerX);
+            line.setAttribute("y2", centerY);
+            line.setAttribute("stroke", color);
+            line.setAttribute("stroke-width", "2");
+            svg.appendChild(line);
+        });
+
+        // Draw lines connecting adjacent nodes (close the circle)
+        for (let i = 0; i < count; i++) {
+            let start = positions[i];
+            let end = positions[(i + 1) % count];
+            let line = document.createElementNS(svgNS, "line");
+            line.setAttribute("x1", start.cx);
+            line.setAttribute("y1", start.cy);
+            line.setAttribute("x2", end.cx);
+            line.setAttribute("y2", end.cy);
+            line.setAttribute("stroke", color);
+            line.setAttribute("stroke-width", "2");
+            svg.appendChild(line);
+        }
+
+        // Create the small nodes (circles) – with fill color and black border.
+        positions.forEach(pos => {
+            let circle = document.createElementNS(svgNS, "circle");
+            circle.setAttribute("cx", pos.cx);
+            circle.setAttribute("cy", pos.cy);
+            circle.setAttribute("r", nodeRadius);
+            circle.setAttribute("fill", "black");
+            circle.setAttribute("stroke", color);
+            circle.setAttribute("stroke-width", "1");
+            svg.appendChild(circle);
+        });
+
+        return svg;
+    }
+    
     function debounce(func, wait) {
         let timeout;
         return function(...args) {
@@ -179,6 +303,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const metadataKeys = Object.keys(METADATA_MAPPING).filter(key => !HIDDEN_KEYS.includes(key));
 
     cy.ready(function() {
+        // Assign network shape to aggregated nodes
+        assignDynamicNetworkIconToAggregatedNodes();
+
         /* Init edge visibility */
         const initialZoom = cy.zoom();
         cy.scratch('initialZoom', initialZoom);
@@ -424,50 +551,33 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Reset button
     document.getElementById('zoom-reset').addEventListener('click', function() {
-        var aggregatedFile = customFilename + "_aggregated.json";
-        spinner.style.display = 'flex'; 
+        if(!aggregated) {
+            var aggregatedFile = customFilename + "_aggregated.json";
+            spinner.style.display = 'flex'; 
 
-        fetch(aggregatedFile)
-            .then(function(response) { return response.json(); })
-            .then(function(aggregatedData) {
-                cy.json({ elements: aggregatedData });
-                // Run a layout to reposition nodes properly
-                cy.layout({ name: 'cose', 
-                            fit: true, 
-                            padding: 10, 
-                            animate: false,
-                            stop: () => {
-                                spinner.style.display = 'none';
-                            } }).run();
-                aggregated = true; // Aggregated network is shown
-                // Hide Legend
-                document.getElementById('legend').style.display = 'none';
-            })
-            .catch(function(error) {
-                console.error("Error loading aggregated network:", error);
-            });
-        
-        // Reset zoom and pan if not in fullscreen
-        if (document.fullscreenElement) {
-            cy.resize();
-            cy.fit();
-        } else {
-            cy.fit();
-            cy.zoom(initialZoom);
-            cy.pan(initialPan);
-            cy.center();
+            // Load the aggregated network
+            fetch(aggregatedFile)
+                .then(function(response) { return response.json(); })
+                .then(function(aggregatedData) {
+                    cy.json({ elements: aggregatedData });
+                    // Run a layout to reposition nodes properly
+                    cy.layout({ name: 'cose', 
+                                fit: true, 
+                                padding: 10, 
+                                animate: false,
+                                stop: () => {
+                                    spinner.style.display = 'none';
+                                } }).run();
+                    aggregated = true; // Aggregated network is shown
+                    // Hide Legend
+                    document.getElementById('legend').style.display = 'none';
+                })
+                .catch(function(error) {
+                    console.error("Error loading aggregated network:", error);
+                });
         }
-        
-        // Reset node and edge sizes
-        cy.nodes().forEach(node => {
-            node.style('width', nodeSize);
-            node.style('height', nodeSize);
-        });
-        cy.edges().forEach(edge => {
-            edge.style('width', edgeWidth);
-        });
-        
-        adjustNodeAndEdgeSize();
+
+        resetParameters();
     });    
 
     /* Toggle scroll zoom */
@@ -1192,9 +1302,9 @@ document.addEventListener('DOMContentLoaded', function() {
         // Reset node sizes for all nodes:
         cy.nodes().forEach(function(node) {
             if (node.data('aggregated')) {
-                // For aggregated nodes, set them to 2x (oder 4x, je nach Wunsch) der normalen Größe
-                node.style('width', nodeSize * 2);
-                node.style('height', nodeSize * 2);
+                // For aggregated nodes
+                node.style('width', nodeSize * 3);
+                node.style('height', nodeSize * 3);
             } else {
                 // For detail nodes, use the default nodeSize
                 node.style('width', nodeSize);
@@ -1219,5 +1329,22 @@ document.addEventListener('DOMContentLoaded', function() {
 
         updateEdgeStyles();
         updateLegendDisplay();
+
+        adjustNodeAndEdgeSize();
+        assignDynamicNetworkIconToAggregatedNodes();
+
+        // Reset zoom and pan if not in fullscreen
+        if (document.fullscreenElement) {
+            cy.resize();
+            cy.fit();
+        } else {
+            cy.resize();
+            cy.fit();
+            cy.zoom(initialZoom);
+            cy.pan(initialPan);
+            cy.center();
+        }
     }
+
+    resetParameters();
 });
