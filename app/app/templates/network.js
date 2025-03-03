@@ -5,6 +5,7 @@ document.addEventListener('DOMContentLoaded', function() {
     var useShapes = {{ use_shapes|tojson }};
     var useClusterTooltip = {{ use_cluster_tooltip|tojson }};
     var nodeSize = {{node_size}};  // Initial node size
+    var aggNodeSize = nodeSize * 4;  // Aggregated node size
     var edgeWidth = {{edge_width}};  // Initial edge width
     var highlightColor = '{{ highlight_color }}';  // Highlight color from Python
     var useEdgeTransparency = {{ use_edge_transparency|tojson }};  // Transparency flag
@@ -40,10 +41,10 @@ document.addEventListener('DOMContentLoaded', function() {
                         return useBackgroundColor ? node.data('module_colors') : 'black';
                     },
                     'width': function(node) {
-                        return node.data('aggregated') ? nodeSize * 3 : nodeSize;
+                        return node.data('aggregated') ? aggNodeSize : nodeSize;
                     },
                     'height': function(node) {
-                        return node.data('aggregated') ? nodeSize * 3 : nodeSize;
+                        return node.data('aggregated') ? aggNodeSize : nodeSize;
                     },
                     'text-valign': function(node) {
                         return node.data('aggregated') ? 'top' : 'center';
@@ -56,7 +57,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         return node.data('aggregated') ? 'black' : 'white';
                     },
                     'font-size': function(node) {
-                        return node.data('aggregated') ? 4 : 2;
+                        return node.data('aggregated') ? 6 : 2;
                     },
                     'label': function(node) {
                         return node.data('aggregated') ? node.data('label') : '';
@@ -186,8 +187,8 @@ document.addEventListener('DOMContentLoaded', function() {
             } else {
                 scaledCount = Math.round(2 + ((rawCount - minCount) / (maxCount - minCount)) * (10 - 2));
             }
-            // Base size: nodeSize * 3 (can be adjusted as needed)
-            let baseSize = nodeSize * 3;
+            // Base size: aggNodeSize (can be adjusted as needed)
+            let baseSize = aggNodeSize;
             let newSize = baseSize; // Optionally, you can add additional scaling based on rawCount
     
             // Create the dynamic network icon with the scaled node count
@@ -205,11 +206,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 'height': newSize,
                 'background-image': 'url(' + dataUrl + ')',
                 'background-fit': 'cover',
-                'background-opacity': 1,
-                'background-color': 'white',
+                'background-opacity': 0.8,
+                'background-color': 'lightgray',
                 'border-width': 1,
-                'border-color': 'white',
-                'shape': 'circle',
+                'border-color': 'darkgrey',
+                'border-opacity': 0.8,
+                'shape': 'ellipse',
                 'label': '' // Remove the text if any
             });
         });
@@ -276,7 +278,7 @@ document.addEventListener('DOMContentLoaded', function() {
             circle.setAttribute("cx", pos.cx);
             circle.setAttribute("cy", pos.cy);
             circle.setAttribute("r", nodeRadius);
-            circle.setAttribute("fill", "black");
+            circle.setAttribute("fill", "white");
             circle.setAttribute("stroke", color);
             circle.setAttribute("stroke-width", "1");
             svg.appendChild(circle);
@@ -558,16 +560,14 @@ document.addEventListener('DOMContentLoaded', function() {
                         nodeRepulsion: 400000,
                         idealEdgeLength: 100,
                         animate: false,
-                        stop: () => {
-                            spinner.style.display = 'none';
-                            // Apply dynamic aggregated node icons
-                            assignDynamicNetworkIconToAggregatedNodes();
-                            // Optionally adjust zoom and pan
-                            cy.resize();
-                            cy.fit();
-                        }
                     }).run();
                     aggregated = true;
+                    spinner.style.display = 'none';
+                    // Apply dynamic aggregated node icons
+                    assignDynamicNetworkIconToAggregatedNodes();
+                    // Optionally adjust zoom and pan
+                    cy.resize();
+                    cy.fit();
                     // Hide legend
                     document.getElementById('legend').style.display = 'none';
                 })
@@ -1317,8 +1317,8 @@ document.addEventListener('DOMContentLoaded', function() {
         cy.nodes().forEach(function(node) {
             if (node.data('aggregated')) {
                 // For aggregated nodes
-                node.style('width', nodeSize * 3);
-                node.style('height', nodeSize * 3);
+                node.style('width', aggNodeSize);
+                node.style('height', aggNodeSize);
             } else {
                 // For detail nodes, use the default nodeSize
                 node.style('width', nodeSize);
