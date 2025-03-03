@@ -40,10 +40,10 @@ document.addEventListener('DOMContentLoaded', function() {
                         return useBackgroundColor ? node.data('module_colors') : 'black';
                     },
                     'width': function(node) {
-                        return node.data('aggregated') ? nodeSize * 2 : nodeSize;
+                        return node.data('aggregated') ? nodeSize * 3 : nodeSize;
                     },
                     'height': function(node) {
-                        return node.data('aggregated') ? nodeSize * 2 : nodeSize;
+                        return node.data('aggregated') ? nodeSize * 3 : nodeSize;
                     },
                     'text-valign': function(node) {
                         return node.data('aggregated') ? 'top' : 'center';
@@ -551,33 +551,42 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Reset button
     document.getElementById('zoom-reset').addEventListener('click', function() {
-        if(!aggregated) {
+        if (!aggregated) {
             var aggregatedFile = customFilename + "_aggregated.json";
-            spinner.style.display = 'flex'; 
-
-            // Load the aggregated network
+            spinner.style.display = 'flex';
             fetch(aggregatedFile)
-                .then(function(response) { return response.json(); })
-                .then(function(aggregatedData) {
+                .then(response => response.json())
+                .then(aggregatedData => {
+                    // Reload the network
                     cy.json({ elements: aggregatedData });
-                    // Run a layout to reposition nodes properly
-                    cy.layout({ name: 'cose', 
-                                fit: true, 
-                                padding: 10, 
-                                animate: false,
-                                stop: () => {
-                                    spinner.style.display = 'none';
-                                } }).run();
-                    aggregated = true; // Aggregated network is shown
-                    // Hide Legend
+                    // Start layout
+                    cy.layout({
+                        name: 'cose',
+                        fit: true,
+                        padding: 10,
+                        nodeRepulsion: 400000,
+                        idealEdgeLength: 100,
+                        animate: false,
+                        stop: () => {
+                            spinner.style.display = 'none';
+                            // Apply dynamic aggregated node icons
+                            assignDynamicNetworkIconToAggregatedNodes();
+                            // Optionally adjust zoom and pan
+                            cy.resize();
+                            cy.fit();
+                        }
+                    }).run();
+                    aggregated = true;
+                    // Hide legend
                     document.getElementById('legend').style.display = 'none';
                 })
-                .catch(function(error) {
+                .catch(error => {
                     console.error("Error loading aggregated network:", error);
+                    spinner.style.display = 'none';
                 });
+        } else {
+            resetParameters();
         }
-
-        resetParameters();
     });    
 
     /* Toggle scroll zoom */
@@ -886,6 +895,8 @@ document.addEventListener('DOMContentLoaded', function() {
     // Event listener for the fullscreen button
     fullscreenButton.addEventListener("click", function() {
         toggleFullscreen();
+        cy.resize();
+        cy.fit();
     });
 
     function restoreNodeAndEdgeSize(initialNodeSize, initialEdgeWidth) {
@@ -1334,16 +1345,8 @@ document.addEventListener('DOMContentLoaded', function() {
         assignDynamicNetworkIconToAggregatedNodes();
 
         // Reset zoom and pan if not in fullscreen
-        if (document.fullscreenElement) {
-            cy.resize();
-            cy.fit();
-        } else {
-            cy.resize();
-            cy.fit();
-            cy.zoom(initialZoom);
-            cy.pan(initialPan);
-            cy.center();
-        }
+        cy.resize();
+        cy.fit();
     }
 
     resetParameters();
