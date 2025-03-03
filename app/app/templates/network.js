@@ -21,7 +21,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Aggregated network
     let aggregated = true;
-    
+
+    let spinner = document.getElementById('loading-spinner');
+
     var cy = cytoscape({
         container: document.getElementById('cy'),
         elements: {{ network_data|tojson }},  // Data from Python
@@ -93,7 +95,9 @@ document.addEventListener('DOMContentLoaded', function() {
             idealEdgeLength: 100,  // Sets an ideal edge length
             nodeDimensionsIncludeLabels: false,  // Doesn't include labels when calculating size
             animate: false,  // Animates the layout
-            animationDuration: 50  // Sets animation duration
+            stop: () => {
+                spinner.style.display = 'none';
+            }
         }
     });
 
@@ -421,12 +425,20 @@ document.addEventListener('DOMContentLoaded', function() {
     // Reset button
     document.getElementById('zoom-reset').addEventListener('click', function() {
         var aggregatedFile = customFilename + "_aggregated.json";
+        spinner.style.display = 'flex'; 
+
         fetch(aggregatedFile)
             .then(function(response) { return response.json(); })
             .then(function(aggregatedData) {
                 cy.json({ elements: aggregatedData });
                 // Run a layout to reposition nodes properly
-                cy.layout({ name: 'cose', fit: true, padding: 10, animate: false }).run();
+                cy.layout({ name: 'cose', 
+                            fit: true, 
+                            padding: 10, 
+                            animate: false,
+                            stop: () => {
+                                spinner.style.display = 'none';
+                            } }).run();
                 aggregated = true; // Aggregated network is shown
                 // Hide Legend
                 document.getElementById('legend').style.display = 'none';
@@ -960,7 +972,8 @@ document.addEventListener('DOMContentLoaded', function() {
             var safeClusterName = clusterName.replace(/\s/g, "_");
             // Build file name WITHOUT outputPath prefix (files are in the same folder)
             var detailNetworkFile = customFilename + "_detail_" + safeClusterName + ".json";
-            
+
+            spinner.style.display = 'flex'; 
             fetch(detailNetworkFile)
                 .then(function(response) { return response.json(); })
                 .then(function(detailData) {
@@ -974,7 +987,9 @@ document.addEventListener('DOMContentLoaded', function() {
                         idealEdgeLength: 100,  // Sets an ideal edge length
                         nodeDimensionsIncludeLabels: false,  // Doesn't include labels when calculating size
                         animate: false,  // Animates the layout
-                        animationDuration: 50  // Sets animation duration
+                        stop: () => {
+                            spinner.style.display = 'none';
+                        }
                     }).run();
                     aggregated = false;  // Detailed network is now shown
                     // Show Legend
@@ -1205,11 +1220,4 @@ document.addEventListener('DOMContentLoaded', function() {
         updateEdgeStyles();
         updateLegendDisplay();
     }
-    
-
-    // Hide the loading spinner when the layout is complete
-    cy.on('render', function(){
-        document.getElementById('loading-spinner').style.display = 'none';
-    });
-
 });
