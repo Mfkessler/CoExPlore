@@ -1,18 +1,18 @@
 document.addEventListener('DOMContentLoaded', function() {
     // Initialize Cytoscape
-    var filterEdges = {{ filter_edges|tojson }};  // Flag from Python
-    var useBackgroundColor = {{ use_background_color|tojson }};  // Flag from Python
-    var useShapes = {{ use_shapes|tojson }};
-    var useClusterTooltip = {{ use_cluster_tooltip|tojson }};
-    var nodeSize = {{node_size}};  // Initial node size
-    var aggNodeSize = nodeSize * 4;  // Aggregated node size
-    var edgeWidth = {{edge_width}};  // Initial edge width
-    var highlightColor = '{{ highlight_color }}';  // Highlight color from Python
-    var useEdgeTransparency = {{ use_edge_transparency|tojson }};  // Transparency flag
-    var useEdgeColoring = {{ use_edge_coloring|tojson }};  // Edge coloring flag
+    let filterEdges = {{ filter_edges|tojson }};  // Flag from Python
+    let useBackgroundColor = {{ use_background_color|tojson }};  // Flag from Python
+    let useShapes = {{ use_shapes|tojson }};
+    let useClusterTooltip = {{ use_cluster_tooltip|tojson }};
+    let nodeSize = {{node_size}};  // Initial node size
+    let aggNodeSize = nodeSize * 4;  // Aggregated node size
+    let edgeWidth = {{edge_width}};  // Initial edge width
+    let highlightColor = '{{ highlight_color }}';  // Highlight color from Python
+    let useEdgeTransparency = {{ use_edge_transparency|tojson }};  // Transparency flag
+    let useEdgeColoring = {{ use_edge_coloring|tojson }};  // Edge coloring flag
 
     // Get the output path and custom filename from the template
-    var customFilename = "{{ custom_filename }}";  // e.g., 'cyto_network'
+    let customFilename = "{{ custom_filename }}";  // e.g., 'cyto_network'
 
     // Metadata
     const METADATA_MAPPING = {{ metadata_dict|tojson }};
@@ -25,7 +25,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     let spinner = document.getElementById('loading-spinner');
 
-    var cy = cytoscape({
+    let cy = cytoscape({
         container: document.getElementById('cy'),
         elements: {{ network_data|tojson }},  // Data from Python
         style: [
@@ -101,7 +101,6 @@ document.addEventListener('DOMContentLoaded', function() {
         return minScale + ((count - minCount) / (maxCount - minCount)) * (maxScale - minScale);
     }
     
-
     /* SVG Shape Creation */
     function createShapeSVG(shape, color = 'black', size = 15) {
         const svgNS = "http://www.w3.org/2000/svg";
@@ -215,8 +214,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 'label': '' // Remove the text if any
             });
         });
-
-        updateEdgeStyles();
     }
 
     // Creates a dynamic network icon as SVG without a central circle.
@@ -301,10 +298,6 @@ document.addEventListener('DOMContentLoaded', function() {
         /* Init edge visibility */
         const initialZoom = cy.zoom();
         cy.scratch('initialZoom', initialZoom);
-
-        // Hide Legend
-        document.getElementById('legend').style.display = 'none';
-        
         const debouncedUpdateEdgesVisibility = debounce(updateEdgesVisibility, 100);
         document.getElementById('edge-visibility-range').addEventListener('input', debouncedUpdateEdgesVisibility);
         cy.on('zoom', debouncedUpdateEdgesVisibility);
@@ -312,21 +305,21 @@ document.addEventListener('DOMContentLoaded', function() {
 
         /* Edge Filtering */
         if (filterEdges) {
-            var thresholdDegree = 10; // Threshold for node degree
-            var topEdges = 10;        // Number of edges to show for high-degree nodes
+            let thresholdDegree = 10; // Threshold for node degree
+            let topEdges = 10;        // Number of edges to show for high-degree nodes
 
             // Calculate the degree for all nodes
-            var degreeCount = {};
+            let degreeCount = {};
             cy.nodes().forEach(function(node) {
                 degreeCount[node.id()] = node.degree();
             });
 
             // Create a map for edges between high-degree nodes
-            var highDegreeEdges = {};
+            let highDegreeEdges = {};
 
             cy.edges().forEach(function(edge) {
-                var source = edge.source().id();
-                var target = edge.target().id();
+                let source = edge.source().id();
+                let target = edge.target().id();
 
                 // Check if both nodes exceed the degree threshold
                 if (degreeCount[source] >= thresholdDegree && degreeCount[target] >= thresholdDegree) {
@@ -343,12 +336,12 @@ document.addEventListener('DOMContentLoaded', function() {
             });
 
             // Reduce the number of edges for high-degree nodes
-            var hiddenEdges = new Set();
+            let hiddenEdges = new Set();
             Object.keys(highDegreeEdges).forEach(function(nodeId) {
-                var edges = highDegreeEdges[nodeId];
+                let edges = highDegreeEdges[nodeId];
 
                 // Sort edges by weight
-                var sortedEdges = edges.sort(function(a, b) {
+                let sortedEdges = edges.sort(function(a, b) {
                     return b.data('weight') - a.data('weight');
                 });
 
@@ -358,9 +351,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
 
                 // Show only the top edges for this node (starting from index 1 as the strongest edge is already shown)
-                for (var i = 1; i < sortedEdges.length && i < topEdges; i++) {
-                    var edge = sortedEdges[i];
-                    var edgeId = edge.id();
+                for (let i = 1; i < sortedEdges.length && i < topEdges; i++) {
+                    let edge = sortedEdges[i];
+                    let edgeId = edge.id();
 
                     // Check if the edge has already been shown
                     if (!hiddenEdges.has(edgeId)) {
@@ -370,9 +363,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
 
                 // Hide all remaining edges
-                for (var i = topEdges; i < sortedEdges.length; i++) {
-                    var edge = sortedEdges[i];
-                    var edgeId = edge.id();
+                for (let i = topEdges; i < sortedEdges.length; i++) {
+                    let edge = sortedEdges[i];
+                    let edgeId = edge.id();
 
                     if (!hiddenEdges.has(edgeId)) {
                         edge.hide();
@@ -438,22 +431,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 speciesLegendList.appendChild(li);
             });
-            // Show Legend
-            document.getElementById('legend').style.display = 'block';
-            // Show the species legend
-            document.getElementById('species-legend').style.display = 'block';
-        } else {
-            // Hide the species legend if shapes are not used
-            document.getElementById('species-legend').style.display = 'none';
+
         }
-    }
-
-    function clamp(val, min, max) {
-        return Math.max(min, Math.min(max, val));
-    }
-
-    function lerp(a, b, t) {
-        return a + (b - a) * t;
     }
 
     function updateEdgesVisibility() {
@@ -514,19 +493,19 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Calculate the minimum and maximum TOM value
-    var minTOM = Math.min(...cy.edges().map(edge => edge.data('weight')));
-    var maxTOM = Math.max(...cy.edges().map(edge => edge.data('weight')));
+    let minTOM = Math.min(...cy.edges().map(edge => edge.data('weight')));
+    let maxTOM = Math.max(...cy.edges().map(edge => edge.data('weight')));
 
     /* Zoom Controls */
 
     // Store the initial zoom level and position
-    var initialZoom = cy.zoom();
-    var initialPan = cy.pan();
-    var initialCenter = cy.center;
+    let initialZoom = cy.zoom();
+    let initialPan = cy.pan();
+    let initialCenter = cy.center;
 
     // Zoom In button
     document.getElementById('zoom-in').addEventListener('click', function() {
-        var currentZoom = cy.zoom();
+        let currentZoom = cy.zoom();
         cy.zoom({
             level: currentZoom * 1.2,  // Zoom in by 20%
             renderedPosition: { x: cy.width() / 2, y: cy.height() / 2 }
@@ -535,17 +514,17 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Zoom Out button
     document.getElementById('zoom-out').addEventListener('click', function() {
-        var currentZoom = cy.zoom();
+        let currentZoom = cy.zoom();
         cy.zoom({
             level: currentZoom * 0.8,  // Zoom out by 20%
             renderedPosition: { x: cy.width() / 2, y: cy.height() / 2 }
         });
     });
 
-    // Reset button
+    // Reset button (Network View)
     document.getElementById('zoom-reset').addEventListener('click', function() {
         if (!aggregated) {
-            var aggregatedFile = customFilename + "_aggregated.json";
+            let aggregatedFile = customFilename + "_aggregated.json";
             spinner.style.display = 'flex';
             fetch(aggregatedFile)
                 .then(response => response.json())
@@ -556,20 +535,13 @@ document.addEventListener('DOMContentLoaded', function() {
                     cy.layout({
                         name: 'cose',
                         fit: true,
-                        padding: 10,
+                        padding: 10, 
                         nodeRepulsion: 400000,
                         idealEdgeLength: 100,
                         animate: false,
                     }).run();
                     aggregated = true;
-                    spinner.style.display = 'none';
-                    // Apply dynamic aggregated node icons
-                    assignDynamicNetworkIconToAggregatedNodes();
-                    // Optionally adjust zoom and pan
-                    cy.resize();
-                    cy.fit();
-                    // Hide legend
-                    document.getElementById('legend').style.display = 'none';
+                    resetParameters();
                 })
                 .catch(error => {
                     console.error("Error loading aggregated network:", error);
@@ -584,7 +556,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Variable to track the state of scroll zoom
     let scrollZoomActive = false; // Initial state off
-    var rectangleZoomMode = false; // Rectangle zoom is off by default
+    let rectangleZoomMode = false; // Rectangle zoom is off by default
     cy.userZoomingEnabled(false); // Ensure consistency
 
     document.getElementById('toggleZoom').addEventListener('click', function() {
@@ -609,16 +581,16 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Event listener for the export button
     document.getElementById('export-json').addEventListener('click', function() {
-        var cyJson = cy.json();  // Get the current Cytoscape network as JSON
+        let cyJson = cy.json();  // Get the current Cytoscape network as JSON
         
         // Convert the JSON to a string
-        var jsonString = JSON.stringify(cyJson, null, 2);
+        let jsonString = JSON.stringify(cyJson, null, 2);
 
         // Create a blob from the JSON string
-        var blob = new Blob([jsonString], { type: 'application/json' });
+        let blob = new Blob([jsonString], { type: 'application/json' });
 
         // Create a link element to trigger the download
-        var link = document.createElement('a');
+        let link = document.createElement('a');
         link.href = URL.createObjectURL(blob);
         link.download = 'cyto_network.json';  // Name of the exported file
 
@@ -632,15 +604,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Toggle Legend
     document.getElementById('toggle-legend').addEventListener('click', function() {
-        if(aggregated) {
-            return;
-        } else {
-            // Show the legend if the detailed network is shown
-            var legend = document.getElementById('legend');
-            legend.classList.toggle('hidden');
-            this.classList.toggle('active');
-        }
-      });
+        let legend = document.getElementById('legend');
+        legend.classList.toggle('hidden');
+        this.classList.toggle('active');
+    });
 
     /* Highlight Button */
 
@@ -654,21 +621,26 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     function updateLegendDisplay() {
-        var legend = document.getElementById('legend');
-        var legendGradient = document.getElementById('legend-gradient');
+        let legend = document.getElementById('legend');
+        let legendGradient = document.getElementById('legend-gradient');
 
         if (useEdgeColoring || useEdgeTransparency) {
             // Set the actual min and max TOM values in the legend
-            document.getElementById('minTOM').textContent = minTOM.toFixed(2);
-            document.getElementById('maxTOM').textContent = maxTOM.toFixed(2);
+            if (aggregated) {
+                document.getElementById('minTOM').textContent = minTOM.toFixed(0);
+                document.getElementById('maxTOM').textContent = maxTOM.toFixed(0);
+            } else {
+                document.getElementById('minTOM').textContent = minTOM.toFixed(2);
+                document.getElementById('maxTOM').textContent = maxTOM.toFixed(2);
+            }
 
             // Update gradient for coloring or transparency
             if (useEdgeColoring) {
                 // Set Viridis gradient if edge coloring is enabled
                 legendGradient.style.background = 'linear-gradient(to right, #440154, #3b528b, #21918c, #5dc962, #fde725)';
             } else if (useEdgeTransparency) {
-                // Set transparency gradient (gray-to-opacity) if only transparency is enabled
-                legendGradient.style.background = 'linear-gradient(to right, rgba(169, 169, 169, 0.1), rgba(169, 169, 169, 1))';
+                // Set transparency gradient (black-to-opacity) if only transparency is enabled
+                legendGradient.style.background = 'linear-gradient(to right, rgba(0, 0, 0, 0.05),rgb(0, 0, 0))';
             }
         } else {
             // Hide the legend if neither edge coloring nor transparency is enabled
@@ -679,28 +651,27 @@ document.addEventListener('DOMContentLoaded', function() {
     function updateEdgeStyles() {
         cy.batch(function () {
             if (aggregated) {
-                // For aggregated view: use fixed edge width and map edge opacity based on overlap weight
                 // Filter aggregated edges (assumed to have the "overlap" attribute defined)
                 let aggregatedEdges = cy.edges().filter(edge => edge.data('overlap') !== undefined);
                 // Compute global min and max weight among these edges
                 let weights = aggregatedEdges.map(edge => edge.data('weight'));
                 let minWeight = Math.min(...weights);
                 let maxWeight = Math.max(...weights);
-                // Define a fixed edge width for all aggregated edges
                 const fixedEdgeWidth = 1; // Adjust as needed
-    
+                const minOpacity = 0.05;
+                const exponent = 2; // Exponent > 1 verstärkt den Unterschied
+            
                 aggregatedEdges.forEach(edge => {
                     let weight = edge.data('weight');
-                    // Calculate opacity mapping:
-                    // If all edges have the same weight, set opacity to 1.
-                    // Otherwise, map minWeight to 0.25 and maxWeight to 1 linearly.
-                    let opacity = (minWeight === maxWeight) 
-                        ? 1 
-                        : 0.25 + ((weight - minWeight) / (maxWeight - minWeight)) * (1 - 0.25);
+                    // Normierung der Werte
+                    let norm = (maxWeight === minWeight) ? 1 : (weight - minWeight) / (maxWeight - minWeight);
+                    // Nicht-lineare Transformation: niedrige Werte werden noch weiter gesenkt
+                    norm = Math.pow(norm, exponent);
+                    let opacity = minOpacity + norm * (1 - minOpacity);
                     edge.style({
                         'width': fixedEdgeWidth,
                         'line-color': 'black',
-                        'opacity': opacity
+                        'line-opacity': opacity
                     });
                 });
             } else {
@@ -747,9 +718,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
     /* Tooltip on hover */
     cy.on('mouseover', 'node', function(evt) {
-        var node = evt.target;
-        var tooltip = document.getElementById('tooltip');
-        var tooltipText = '';
+        let node = evt.target;
+        let tooltip = document.getElementById('tooltip');
+        let tooltipText = '';
 
         if (node.data('aggregated')) {
             // For aggregated nodes, show only cluster-specific metadata
@@ -758,10 +729,10 @@ document.addEventListener('DOMContentLoaded', function() {
             tooltipText += '<b>Node Count:</b> ' + node.data('node_count') + '<br>';
         } else {
             // For detailed nodes, iterate through METADATA_MAPPING
-            var dataDict = METADATA_MAPPING;
-            for (var key in dataDict) {
+            let dataDict = METADATA_MAPPING;
+            for (let key in dataDict) {
                 if (HIDDEN_KEYS.includes(key)) continue;
-                var value = node.data(key);
+                let value = node.data(key);
                 if (value !== undefined && value !== null) {
                     let formattedValue = FORMATTED_KEYS.includes(key) ? formatList(value) : value;
                     tooltipText += `<b>${dataDict[key]}:</b> ${formattedValue}<br>`;
@@ -775,8 +746,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
         tooltip.style.display = 'block';
         tooltip.innerHTML = tooltipText;
-        var mouseX = evt.originalEvent.clientX;
-        var mouseY = evt.originalEvent.clientY;
+        let mouseX = evt.originalEvent.clientX;
+        let mouseY = evt.originalEvent.clientY;
         tooltip.style.left = (mouseX + 15) + 'px';
         tooltip.style.top = (mouseY) + 'px';
     });
@@ -794,11 +765,11 @@ document.addEventListener('DOMContentLoaded', function() {
     let currentEdgeWidth = edgeWidth;
 
     function adjustNodeAndEdgeSize() {
-        var zoomLevel = cy.zoom();
+        let zoomLevel = cy.zoom();
     
         // Calculate scaled sizes
-        var scaledNodeSize = currentNodeSize / zoomLevel;
-        var scaledEdgeWidth = currentEdgeWidth / zoomLevel;
+        let scaledNodeSize = currentNodeSize / zoomLevel;
+        let scaledEdgeWidth = currentEdgeWidth / zoomLevel;
     
         // For non-aggregated nodes: Adjust size
         cy.nodes().forEach(function(node) {
@@ -899,7 +870,6 @@ document.addEventListener('DOMContentLoaded', function() {
     fullscreenButton.addEventListener("click", function() {
         toggleFullscreen();
         cy.resize();
-        cy.fit();
     });
 
     function restoreNodeAndEdgeSize(initialNodeSize, initialEdgeWidth) {
@@ -921,7 +891,6 @@ document.addEventListener('DOMContentLoaded', function() {
     // Event listener for fullscreen change -> Resize and fit the graph, adjust button status
     document.addEventListener("fullscreenchange", function() {
         cy.resize(); // Ensure the canvas is resized
-        cy.fit(); // Fit the graph to the container
         adjustNodeAndEdgeSize(); // Apply the new size
 
         // If fullscreen is exited, reset the button
@@ -988,12 +957,12 @@ document.addEventListener('DOMContentLoaded', function() {
     nodeSizeRange.value = currentNodeSize;
 
     nodeSizeRange.addEventListener('input', function() {
-        var oldNodeSize = currentNodeSize; // Store the old node size
+        let oldNodeSize = currentNodeSize; // Store the old node size
     
         currentNodeSize = parseInt(this.value);  // Get node size from slider
     
         // Calculate the scaling factor based on the old and new node sizes
-        var scaleFactor = currentNodeSize / oldNodeSize;
+        let scaleFactor = currentNodeSize / oldNodeSize;
     
         // Scale the edge width by the same factor as the node size
         currentEdgeWidth *= scaleFactor; 
@@ -1007,14 +976,14 @@ document.addEventListener('DOMContentLoaded', function() {
     window.addEventListener('message', function(event) {
         cy.batch(function() {
             if (event.data && event.data.tableSelectedNode !== undefined) {
-                var selectedNode = event.data.tableSelectedNode;
+                let selectedNode = event.data.tableSelectedNode;
 
                 // Only reset table-highlight on affected nodes
                 cy.nodes('.table-highlight').removeClass('table-highlight');
 
                 if (selectedNode) {
                     // Highlight the node selected from the table in a different color
-                    var node = cy.$("node[id='" + selectedNode + "']");
+                    let node = cy.$("node[id='" + selectedNode + "']");
                     if (!node.hasClass('table-highlight')) {
                         node.addClass('table-highlight');
                     }
@@ -1022,14 +991,14 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             if (event.data && event.data.visibleNodes) {
-                var visibleNodes = event.data.visibleNodes;
+                let visibleNodes = event.data.visibleNodes;
 
                 // Remove highlight only from previously highlighted nodes
                 cy.nodes('.highlight').removeClass('highlight');
 
                 // Highlight only the nodes that are visible based on the search in the DataTable
                 visibleNodes.forEach(function(nodeID) {
-                    var node = cy.$("node[id='" + nodeID + "']");
+                    let node = cy.$("node[id='" + nodeID + "']");
                     if (!node.hasClass('highlight')) {
                         node.addClass('highlight');
                     }
@@ -1059,8 +1028,8 @@ document.addEventListener('DOMContentLoaded', function() {
     let lastClickedNode = null; // Track the last clicked node
 
     cy.on('tap', 'node', function(evt) {
-        var node = evt.target;
-        var nodeId = node.id();
+        let node = evt.target;
+        let nodeId = node.id();
         lastClickedNode = nodeId;
 
         if (highlightingActive) {
@@ -1076,7 +1045,7 @@ document.addEventListener('DOMContentLoaded', function() {
             });
 
             // Collect highlighted nodes
-            var highlightedNodes = cy.nodes('.highlight').map(function(node) {
+            let highlightedNodes = cy.nodes('.highlight').map(function(node) {
                 return node.data('id'); 
             });
 
@@ -1091,11 +1060,11 @@ document.addEventListener('DOMContentLoaded', function() {
         // If the node is aggregated, load its detail network
         if (node.data('aggregated')) {
             // Extract cluster name from label (assumes "ClusterName (n nodes)")
-            var label = node.data('label');
-            var clusterName = label.split(" (")[0]; 
-            var safeClusterName = clusterName.replace(/\s/g, "_");
+            let label = node.data('label');
+            let clusterName = label.split(" (")[0]; 
+            let safeClusterName = clusterName.replace(/\s/g, "_");
             // Build file name WITHOUT outputPath prefix (files are in the same folder)
-            var detailNetworkFile = customFilename + "_detail_" + safeClusterName + ".json";
+            let detailNetworkFile = customFilename + "_detail_" + safeClusterName + ".json";
 
             spinner.style.display = 'flex'; 
             fetch(detailNetworkFile)
@@ -1106,18 +1075,13 @@ document.addEventListener('DOMContentLoaded', function() {
                     cy.layout({
                         name: 'cose',
                         fit: true,  // Ensures the entire graph is visible
-                        padding: 10,  // Adds padding around the layout
+                        padding: 100,  // Adds padding around the layout
                         nodeRepulsion: 400000,  // Increase this value to spread nodes further apart
                         idealEdgeLength: 100,  // Sets an ideal edge length
                         nodeDimensionsIncludeLabels: false,  // Doesn't include labels when calculating size
                         animate: false,  // Animates the layout
-                        stop: () => {
-                            spinner.style.display = 'none';
-                        }
                     }).run();
                     aggregated = false;  // Detailed network is now shown
-                    // Show Legend
-                    document.getElementById('legend').style.display = 'block';
                     resetParameters();
                 })
                 .catch(function(error) {
@@ -1145,10 +1109,10 @@ document.addEventListener('DOMContentLoaded', function() {
     /* Rectangle Zoom */
 
     // Variables for rectangle zoom
-    var isMouseDown = false;
-    var startX, startY;
-    var rectangleOverlayElement;
-    var containerOffset;
+    let isMouseDown = false;
+    let startX, startY;
+    let rectangleOverlayElement;
+    let containerOffset;
 
     // Disable default interactions during rectangle zoom
     if (rectangleZoomMode) {
@@ -1158,7 +1122,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Determine container offset for coordinate calculation
-    var rect = cy.container().getBoundingClientRect();
+    let rect = cy.container().getBoundingClientRect();
     containerOffset = {
         left: rect.left + window.scrollX,
         top: rect.top + window.scrollY
@@ -1181,7 +1145,7 @@ document.addEventListener('DOMContentLoaded', function() {
             cy.userZoomingEnabled(false);
             cy.container().style.cursor = 'crosshair';
     
-            var rect = cy.container().getBoundingClientRect();
+            let rect = cy.container().getBoundingClientRect();
             containerOffset = {
                 left: rect.left + window.scrollX,
                 top: rect.top + window.scrollY
@@ -1222,13 +1186,13 @@ document.addEventListener('DOMContentLoaded', function() {
     cy.on('mousemove', function(event) {
         if (!rectangleZoomMode || !isMouseDown) return;
 
-        var currentX = event.originalEvent.pageX - containerOffset.left;
-        var currentY = event.originalEvent.pageY - containerOffset.top;
+        let currentX = event.originalEvent.pageX - containerOffset.left;
+        let currentY = event.originalEvent.pageY - containerOffset.top;
 
-        var x = Math.min(startX, currentX);
-        var y = Math.min(startY, currentY);
-        var width = Math.abs(startX - currentX);
-        var height = Math.abs(startY - currentY);
+        let x = Math.min(startX, currentX);
+        let y = Math.min(startY, currentY);
+        let width = Math.abs(startX - currentX);
+        let height = Math.abs(startY - currentY);
 
         rectangleOverlayElement.style.left = x + 'px';
         rectangleOverlayElement.style.top = y + 'px';
@@ -1242,8 +1206,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
         isMouseDown = false;
 
-        var endX = event.originalEvent.pageX - containerOffset.left;
-        var endY = event.originalEvent.pageY - containerOffset.top;
+        let endX = event.originalEvent.pageX - containerOffset.left;
+        let endY = event.originalEvent.pageY - containerOffset.top;
 
         // Remove the rectangle overlay
         if (rectangleOverlayElement && rectangleOverlayElement.parentNode) {
@@ -1256,22 +1220,22 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         // Calculate the bounding box in model coordinates
-        var x1 = (Math.min(startX, endX) - cy.pan().x) / cy.zoom();
-        var y1 = (Math.min(startY, endY) - cy.pan().y) / cy.zoom();
-        var x2 = (Math.max(startX, endX) - cy.pan().x) / cy.zoom();
-        var y2 = (Math.max(startY, endY) - cy.pan().y) / cy.zoom();
+        let x1 = (Math.min(startX, endX) - cy.pan().x) / cy.zoom();
+        let y1 = (Math.min(startY, endY) - cy.pan().y) / cy.zoom();
+        let x2 = (Math.max(startX, endX) - cy.pan().x) / cy.zoom();
+        let y2 = (Math.max(startY, endY) - cy.pan().y) / cy.zoom();
 
-        var boundingBox = { x1: x1, y1: y1, x2: x2, y2: y2 };
+        let boundingBox = { x1: x1, y1: y1, x2: x2, y2: y2 };
 
         // Zoom into the bounding box
         cy.fit(boundingBox);
     });
 
     document.getElementById('export-png').addEventListener('click', function() {
-        var exportScale = 2; // Higher resolution (2x)
-        var cyImageData = cy.png({ full: false, scale: exportScale }); // Only visible area!
+        let exportScale = 2; // Higher resolution (2x)
+        let cyImageData = cy.png({ full: false, scale: exportScale }); // Only visible area!
     
-        var cyImage = new Image();
+        let cyImage = new Image();
         cyImage.src = cyImageData;
     
         cyImage.onload = function() {
@@ -1281,12 +1245,12 @@ document.addEventListener('DOMContentLoaded', function() {
     
     /* Export Image */
     function createExportImage(cyImage) {
-        var exportCanvas = document.createElement('canvas');
-        var ctx = exportCanvas.getContext('2d');
+        let exportCanvas = document.createElement('canvas');
+        let ctx = exportCanvas.getContext('2d');
     
         // Define canvas size based on Cytoscape container
-        var width = cy.container().clientWidth * 2;
-        var height = cy.container().clientHeight * 2;
+        let width = cy.container().clientWidth * 2;
+        let height = cy.container().clientHeight * 2;
     
         exportCanvas.width = width;
         exportCanvas.height = height;
@@ -1299,7 +1263,7 @@ document.addEventListener('DOMContentLoaded', function() {
         ctx.drawImage(cyImage, 0, 0, width, height);
     
         // Save as PNG
-        var link = document.createElement('a');
+        let link = document.createElement('a');
         link.download = 'cytoscape_export.png';
         link.href = exportCanvas.toDataURL('image/png');
         link.click();
@@ -1324,35 +1288,51 @@ document.addEventListener('DOMContentLoaded', function() {
                 node.style('width', nodeSize);
                 node.style('height', nodeSize);
             }
-        });
-              
-        // Update Species Legend
-        assignOrganismShapes();
-
-        // Re-run the edge visibility update (this will rebuild the sortedEdges cache)
-        updateEdgesVisibility();
+        });          
         
         // Calculate the minimum and maximum TOM value
         minTOM = Math.min(...cy.edges().map(edge => edge.data('weight')));
         maxTOM = Math.max(...cy.edges().map(edge => edge.data('weight')));
+
+        if (!aggregated) {
+            updateEdgesVisibility();
+            useEdgeTransparency = false
+            useEdgeColoring = true;
+        } else {
+            minTOM = Math.floor(minTOM);
+            maxTOM = Math.floor(maxTOM);
+            useEdgeColoring = false;
+            useEdgeTransparency = true;
+            assignDynamicNetworkIconToAggregatedNodes();
+        }
+
+        if (!useShapes || aggregated) {
+            // Hide the species legend if shapes are not used
+            document.getElementById('species-legend').style.display = 'none';
+        } else if (useShapes && !aggregated) {
+            // Show the species legend if shapes are used
+            assignOrganismShapes();
+            document.getElementById('species-legend').style.display = 'block';
+        }
 
         updateEdgeStyles();
         updateLegendDisplay();
 
         adjustNodeAndEdgeSize();
 
-        // Reset zoom and pan if not in fullscreen
-        cy.resize();
-        cy.fit();
+        if (aggregated) {
+            document.querySelector('#edge-legend p b').textContent = "Overlapping Orthogroups";
+        } else {
+            document.querySelector('#edge-legend p b').textContent = "TOM Value";
+        }
+
+        setTimeout(function() {
+            spinner.style.display = 'none';
+        }
+        , 1000);
     }
 
     resetParameters();
-    assignDynamicNetworkIconToAggregatedNodes();
 
-    // Wait 1 second than hide the spinner
-    setTimeout(function() {
-        spinner.style.display = 'none';
-    }
-    , 1000);
-
+    console.log("Cytoscape network visualization initialized successfully.");
 });
