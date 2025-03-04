@@ -659,14 +659,19 @@ document.addEventListener('DOMContentLoaded', function() {
                 let maxWeight = Math.max(...weights);
                 const fixedEdgeWidth = 1; // Adjust as needed
                 const minOpacity = 0.05;
-                const exponent = 2; // Exponent > 1 verstärkt den Unterschied
+            
+                // Shift values to avoid log(0) by ensuring minWeight > 0
+                let shift = (minWeight <= 0) ? Math.abs(minWeight) + 1 : 0;
             
                 aggregatedEdges.forEach(edge => {
-                    let weight = edge.data('weight');
-                    // Normierung der Werte
-                    let norm = (maxWeight === minWeight) ? 1 : (weight - minWeight) / (maxWeight - minWeight);
-                    // Nicht-lineare Transformation: niedrige Werte werden noch weiter gesenkt
-                    norm = Math.pow(norm, exponent);
+                    let weight = edge.data('weight') + shift; // Apply shift
+                    let logWeight = Math.log(weight);
+            
+                    // Normalize log-transformed values
+                    let logMin = Math.log(minWeight + shift);
+                    let logMax = Math.log(maxWeight + shift);
+                    let norm = (logMax === logMin) ? 1 : (logWeight - logMin) / (logMax - logMin);
+            
                     let opacity = minOpacity + norm * (1 - minOpacity);
                     edge.style({
                         'width': fixedEdgeWidth,
