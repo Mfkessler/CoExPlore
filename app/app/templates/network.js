@@ -3,6 +3,7 @@ document.addEventListener('DOMContentLoaded', function() {
     let filterEdges = {{ filter_edges|tojson }};  // Flag from Python
     let useBackgroundColor = {{ use_background_color|tojson }};  // Flag from Python
     let useShapes = {{ use_shapes|tojson }};
+    let detailOnly = {{ detail_only|tojson }};
     let useClusterTooltip = {{ use_cluster_tooltip|tojson }};
     let nodeSize = {{node_size}};  // Initial node size
     let aggNodeSize = nodeSize * 4;  // Aggregated node size
@@ -295,7 +296,10 @@ document.addEventListener('DOMContentLoaded', function() {
     const metadataKeys = Object.keys(METADATA_MAPPING).filter(key => !HIDDEN_KEYS.includes(key));
 
     cy.ready(function() {
-        /* Init edge visibility */
+        if (detailOnly) {
+            aggregated = false;
+        }
+
         const initialZoom = cy.zoom();
         cy.scratch('initialZoom', initialZoom);
         const debouncedUpdateEdgesVisibility = debounce(updateEdgesVisibility, 100);
@@ -523,7 +527,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Reset button (Network View)
     document.getElementById('zoom-reset').addEventListener('click', function() {
-        if (!aggregated) {
+        if (!aggregated && !detailOnly) {
             let aggregatedFile = customFilename + "_aggregated.json";
             spinner.style.display = 'flex';
             fetch(aggregatedFile)
