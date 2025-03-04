@@ -35,7 +35,7 @@ def analyze_co_expression_network(adata: Union[AnnData, List[AnnData]], config: 
                                   use_colors: bool = False, use_shapes: bool = False,
                                   node_size: int = 10, use_symmetry: bool = False, progress_callback: Callable[[str], None] = None,
                                   trait: str = "tissue", filter_edges: bool = True, include_neighbors: bool = False,
-                                  max_neighbors: int = 10) -> dict:
+                                  max_neighbors: int = 10, detail_only: bool = False) -> dict:
     """
     Analyze co-expression network for a given topic:
     - Plot the co-expression network and identify clusters.
@@ -75,6 +75,7 @@ def analyze_co_expression_network(adata: Union[AnnData, List[AnnData]], config: 
     - include_neighbours (bool): If True, for each transcript in rows, 
                                 check for neighbours with value >= threshold and include them.
     - max_neighbors (int): Maximum number of neighbours to include.
+    - detail_only (bool): If True, don't aggregate Nodes.
 
     Returns:
     - dict: Eigengenes for clusters if out is not "html".
@@ -140,7 +141,7 @@ def analyze_co_expression_network(adata: Union[AnnData, List[AnnData]], config: 
             progress_callback(f"Plotting {tool} network")
         plot_cyto_network(config, custom_filename=custom_filename, network_data=cyto_data, use_colors=use_colors, use_shapes=use_shapes,
                           cluster_info=cluster_map, searchpath=template_path, node_size=node_size, highlight=highlight,
-                          highlight_color=highlight_color, filter_edges=filter_edges)
+                          highlight_color=highlight_color, filter_edges=filter_edges, detail_only=detail_only)
     else:
         if progress_callback:
             progress_callback(f"Plotting {tool} network")

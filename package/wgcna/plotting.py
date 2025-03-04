@@ -3580,16 +3580,24 @@ def aggregate_network(network_data: dict):
     For each cluster, creates an aggregated node with:
       - label: the cluster name and the number of nodes in that cluster
       - color: determined by the average intra-cluster edge weight mapped to the Viridis colormap.
+    Additionally, if nodes have the key "ortho_id", creates edges between aggregated nodes 
+    that represent the number of overlapping orthogroups.
+    
     Returns:
-      aggregated_network (dict): A network with aggregated nodes and no edges.
+      aggregated_network (dict): A network with aggregated nodes and (optionally) edges.
       clusters (dict): Mapping of each cluster label to the list of original nodes in that cluster.
     """
+
     # Group nodes by their cluster label
     clusters = defaultdict(list)
+    ortho_exists = False
     for node in network_data['nodes']:
         cluster_label = node['data'].get('cluster', 'No clusters')
         clusters[cluster_label].append(node)
-    
+        # Check if any node has the key "ortho_id"
+        if 'ortho_id' in node['data']:
+            ortho_exists = True
+
     # Calculate average edge weight for each cluster (only intra-cluster edges)
     cluster_edge_weights = defaultdict(list)
     for edge in network_data['edges']:
@@ -3652,14 +3660,45 @@ def aggregate_network(network_data: dict):
         }
         aggregated_nodes.append(agg_node)
         cluster_to_agg_id[cluster_label] = f"cluster_{cluster_label}"
-    
-    # In the aggregated view we do not show edges since clusters do not interconnect.
+    # Create aggregated edges if ortho_id is present
+    aggregated_edges = []
+    if ortho_exists:
+        # For each cluster, collect orthogroups from nodes (as a set)
+        cluster_ortho = {}
+        for cluster_label, nodes in clusters.items():
+            ortho_set = set()
+            for node in nodes:
+                # If the node contains multiple orthogroups, you can split here
+                if 'ortho_id' in node['data']:
+                    ortho_set.add(node['data']['ortho_id'])
+            cluster_ortho[cluster_label] = ortho_set
+
+        # Compare all pairs of clusters
+        cluster_labels = list(clusters.keys())
+        for i in range(len(cluster_labels)):
+            for j in range(i + 1, len(cluster_labels)):
+                cl1 = cluster_labels[i]
+                cl2 = cluster_labels[j]
+                overlap = cluster_ortho[cl1].intersection(cluster_ortho[cl2])
+                if overlap:
+                    edge = {
+                        "data": {
+                            "id": f"edge_{cluster_to_agg_id[cl1]}_{cluster_to_agg_id[cl2]}",
+                            "source": cluster_to_agg_id[cl1],
+                            "target": cluster_to_agg_id[cl2],
+                            "weight": len(overlap),
+                            "overlap": list(overlap)
+                        }
+                    }
+                    aggregated_edges.append(edge)
+    # In the aggregated view, edges are either an empty list or aggregated edges.
     aggregated_network = {
         "nodes": aggregated_nodes,
-        "edges": []
+        "edges": aggregated_edges
     }
     
     return aggregated_network, clusters
+
 
 def get_cluster_detail(network_data: dict, cluster_label: str):
     """
@@ -3672,7 +3711,7 @@ def get_cluster_detail(network_data: dict, cluster_label: str):
                     if edge['data'].get('source') in node_ids and edge['data'].get('target') in node_ids]
     return {"nodes": detail_nodes, "edges": detail_edges}
 
-# The main plotting function
+
 def plot_cyto_network(config, custom_filename: str = "cyto_network", 
                       network_data: Dict[str, List[Union[Node, Edge]]] = None,
                       searchpath: str = "../flask/app_dev/templates/", 
@@ -3681,16 +3720,18 @@ def plot_cyto_network(config, custom_filename: str = "cyto_network",
                       highlight: List[str] = None, edge_width: int = 1, 
                       highlight_color: str = "magenta",
                       use_edge_transparency: bool = False, 
-                      use_edge_coloring: bool = True, filter_edges: bool = True) -> str:
+                      use_edge_coloring: bool = True, filter_edges: bool = True,
+                      detail_only: bool = False) -> str:
     """
     Plot a network using Cytoscape.js and save it as an HTML file.
     
     Extended functionality:
       - If 'cluster_info' is provided, each node gets its 'cluster' attribute.
-      - The network is aggregated: an aggregated network JSON is created (one node per cluster,
-        with label = cluster name and node count, and color from Viridis based on average intra-cluster edge weight).
-      - Additionally, for each cluster the detailed network is saved as a separate JSON.
-      - The HTML file will render the aggregated network by default.
+      - By default, the network is aggregated: an aggregated network JSON is created 
+        (one node per cluster, with label = cluster name and node count, and color from Viridis 
+        based on average intra-cluster edge weight) and for each cluster a detail network is saved.
+      - If detail_only is True, NO aggregation is done and ONLY the detail network(s) are saved.
+      - The HTML file will render the aggregated network by default unless detail_only is True.
     
     Parameters:
       config: PlotConfig object with output_path, etc.
@@ -3700,6 +3741,7 @@ def plot_cyto_network(config, custom_filename: str = "cyto_network",
       use_colors, use_shapes, node_size, highlight, edge_width, highlight_color,
       use_edge_transparency, use_edge_coloring, filter_edges: Plotting parameters.
       cluster_info: Dictionary mapping node IDs to cluster names.
+      detail_only: If True, skip network aggregation and save only the detailed network(s).
     
     Returns:
       The absolute path to the saved HTML file.
@@ -3715,7 +3757,7 @@ def plot_cyto_network(config, custom_filename: str = "cyto_network",
             node_id = node['data']['id']
             node['data']['cluster'] = cluster_info.get(node_id, "No clusters")
     
-    # Optionally assign shapes based on module_colors (unchanged)
+    # Optionally assign shapes based on module_colors
     if use_shapes:
         shape_dict = generate_cyto_shape_dict(
             [node['data']['module_colors'] for node in network_data['nodes']], None)
@@ -3736,27 +3778,38 @@ def plot_cyto_network(config, custom_filename: str = "cyto_network",
     css_content = css_template.render()
     
     # --- Aggregation and Saving JSONs ---
-    # If cluster_info is provided, compute aggregated network and save JSON files.
     if cluster_info:
-        aggregated_net, clusters = aggregate_network(network_data)
-        # Save aggregated network JSON
-        aggregated_json_filename = f"{custom_filename}_aggregated.json"
-        aggregated_json_path = os.path.join(config.output_path, aggregated_json_filename)
-        with open(aggregated_json_path, 'w') as f:
-            json.dump(aggregated_net, f, indent=2)
-        
-        # For each cluster, save the detailed network JSON
-        for cluster_label in clusters.keys():
-            detail_net = get_cluster_detail(network_data, cluster_label)
-            # Replace spaces or special characters in cluster label if needed
-            safe_cluster_label = cluster_label.replace(" ", "_")
-            detail_json_filename = f"{custom_filename}_detail_{safe_cluster_label}.json"
-            detail_json_path = os.path.join(config.output_path, detail_json_filename)
-            with open(detail_json_path, 'w') as f:
-                json.dump(detail_net, f, indent=2)
-        
-        # For plotting, we use the aggregated network
-        network_data_to_plot = aggregated_net
+        if not detail_only:
+            # Standard: Create aggregated network data and save both JSONs
+            aggregated_net, clusters = aggregate_network(network_data)
+            # Save aggregated network JSON
+            aggregated_json_filename = f"{custom_filename}_aggregated.json"
+            aggregated_json_path = os.path.join(config.output_path, aggregated_json_filename)
+            with open(aggregated_json_path, 'w') as f:
+                json.dump(aggregated_net, f, indent=2)
+            
+            # For each cluster, save the detailed network JSON
+            for cluster_label in clusters.keys():
+                detail_net = get_cluster_detail(network_data, cluster_label)
+                safe_cluster_label = cluster_label.replace(" ", "_")
+                detail_json_filename = f"{custom_filename}_detail_{safe_cluster_label}.json"
+                detail_json_path = os.path.join(config.output_path, detail_json_filename)
+                with open(detail_json_path, 'w') as f:
+                    json.dump(detail_net, f, indent=2)
+            
+            # For plotting, use the aggregated network
+            network_data_to_plot = aggregated_net
+        else:
+            # detail_only True: No aggregation, ONLY save detailed networks
+            for cluster_label in set(cluster_info.values()):
+                detail_net = get_cluster_detail(network_data, cluster_label)
+                safe_cluster_label = cluster_label.replace(" ", "_")
+                detail_json_filename = f"{custom_filename}_detail_{safe_cluster_label}.json"
+                detail_json_path = os.path.join(config.output_path, detail_json_filename)
+                with open(detail_json_path, 'w') as f:
+                    json.dump(detail_net, f, indent=2)
+            # For plotting, use the original (detailed) network
+            network_data_to_plot = network_data
     else:
         network_data_to_plot = network_data
 
@@ -3774,8 +3827,9 @@ def plot_cyto_network(config, custom_filename: str = "cyto_network",
         highlight_color=highlight_color,
         use_edge_transparency=use_edge_transparency,
         use_edge_coloring=use_edge_coloring,
-        outputPath=config.output_path,      # new: output path for JSON files
-        custom_filename=custom_filename       # new: base filename for JSONs
+        outputPath=config.output_path,
+        custom_filename=custom_filename,
+        detail_only=detail_only
     )
     
     # Render the final HTML template with embedded CSS and JS
