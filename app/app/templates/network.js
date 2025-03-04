@@ -23,6 +23,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Aggregated network
     let aggregated = true;
+    let selectedAggNodes = new Set();
 
     let spinner = document.getElementById('loading-spinner');
 
@@ -551,11 +552,11 @@ document.addEventListener('DOMContentLoaded', function() {
                     console.error("Error loading aggregated network:", error);
                     spinner.style.display = 'none';
                 });
-        } else if (detailOnly) {
-            cy.zoom(initialZoom);
-            cy.pan(initialPan);
-            cy.center();
-        }
+        } 
+
+        cy.zoom(initialZoom);
+        cy.pan(initialPan);
+        cy.center();
 
         resetParameters();
     });    
@@ -882,7 +883,6 @@ document.addEventListener('DOMContentLoaded', function() {
     // Event listener for the fullscreen button
     fullscreenButton.addEventListener("click", function() {
         toggleFullscreen();
-        cy.resize();
     });
 
     function restoreNodeAndEdgeSize(initialNodeSize, initialEdgeWidth) {
@@ -1045,77 +1045,124 @@ document.addEventListener('DOMContentLoaded', function() {
         let nodeId = node.id();
         lastClickedNode = nodeId;
 
-        if (highlightingActive) {
-            cy.batch(function() {
-                if (node.hasClass('highlight')) {
-                    // Highlight the neighborhood of the clicked node
-                    node.neighborhood().addClass('highlight');
-                } else {
-                    // Remove highlight from all nodes and highlight the clicked node
-                    cy.nodes('.highlight').removeClass('highlight');
-                    node.addClass('highlight');
-                }
-            });
-
-            // Collect highlighted nodes
-            let highlightedNodes = cy.nodes('.highlight').map(function(node) {
-                return node.data('id'); 
-            });
-
-            // Send the highlighted nodes back to the main page
-            window.parent.postMessage({ highlightedNodes: highlightedNodes }, '*');
-        }
-
-        if (metadataActive) { // Only jitter if metadata highlighting is active
-            highlightNodesByMetadata(metadataKeys[currentMetadataIndex], node);
-        }
-
-        // If the node is aggregated, load its detail network
-        if (node.data('aggregated')) {
-            // Extract cluster name from label (assumes "ClusterName (n nodes)")
-            let label = node.data('label');
-            let clusterName = label.split(" (")[0]; 
-            let safeClusterName = clusterName.replace(/\s/g, "_");
-            // Build file name WITHOUT outputPath prefix (files are in the same folder)
-            let detailNetworkFile = customFilename + "_detail_" + safeClusterName + ".json";
-
-            spinner.style.display = 'flex'; 
-            fetch(detailNetworkFile)
-                .then(function(response) { return response.json(); })
-                .then(function(detailData) {
-                    // Replace current network with detailed network and run layout
-                    cy.json({ elements: detailData });
-                    cy.layout({
-                        name: 'cose',
-                        fit: true,  // Ensures the entire graph is visible
-                        padding: 100,  // Adds padding around the layout
-                        nodeRepulsion: 400000,  // Increase this value to spread nodes further apart
-                        idealEdgeLength: 100,  // Sets an ideal edge length
-                        nodeDimensionsIncludeLabels: false,  // Doesn't include labels when calculating size
-                        animate: false,  // Animates the layout
-                    }).run();
-                    aggregated = false;  // Detailed network is now shown
-                    resetParameters();
-                })
-                .catch(function(error) {
-                    console.error("Error loading detail network:", error);
+        if (!aggregated) {
+            if (highlightingActive) {
+                cy.batch(function() {
+                    if (node.hasClass('highlight')) {
+                        // Highlight the neighborhood of the clicked node
+                        node.neighborhood().addClass('highlight');
+                    } else {
+                        // Remove highlight from all nodes and highlight the clicked node
+                        cy.nodes('.highlight').removeClass('highlight');
+                        node.addClass('highlight');
+                    }
                 });
+
+                // Collect highlighted nodes
+                let highlightedNodes = cy.nodes('.highlight').map(function(node) {
+                    return node.data('id'); 
+                });
+
+                // Send the highlighted nodes back to the main page
+                window.parent.postMessage({ highlightedNodes: highlightedNodes }, '*');
+            }
+
+            if (metadataActive) { // Only jitter if metadata highlighting is active
+                highlightNodesByMetadata(metadataKeys[currentMetadataIndex], node);
+            }
+        } else {
+            if (selectedAggNodes.has(nodeId)) {
+                selectedAggNodes.delete(nodeId);
+                node.removeClass('selected-agg');
+
+                // Stop jitter effect for this node
+                clearInterval(jitterIntervals[nodeId]);
+            } else {
+                selectedAggNodes.add(nodeId);
+                node.addClass('selected-agg');
+            }
+
+            // Jitter all selected nodes
+            jitterNodes(cy.nodes('.selected-agg'));
         }
+    });
+
+    document.getElementById('load-detail-view').addEventListener('click', function() {
+        if (selectedAggNodes.size === 0) {
+            alert('Please select at least one aggregated node.');
+            return;
+        }
+        
+        spinner.style.display = 'flex';
+        // Array with fetch promises for each detail network file
+        let fetchPromises = [];
+        selectedAggNodes.forEach(nodeId => {
+            let node = cy.getElementById(nodeId);
+            let label = node.data('label');
+            let clusterName = label.split(" (")[0];
+            let safeClusterName = clusterName.replace(/\s/g, "_");
+            let detailNetworkFile = customFilename + "_detail_" + safeClusterName + ".json";
+            fetchPromises.push(
+            fetch(detailNetworkFile).then(response => response.json())
+            );
+        });
+        
+        // Wait until all networks are loaded and merge the elements
+        Promise.all(fetchPromises)
+            .then(networks => {
+            let mergedElements = { nodes: [], edges: [] };
+            networks.forEach(net => {
+                mergedElements.nodes = mergedElements.nodes.concat(net.nodes || []);
+                mergedElements.edges = mergedElements.edges.concat(net.edges || []);
+            });
+            
+            // Update Cytoscape with merged network and run layout
+            cy.json({ elements: mergedElements });
+            cy.layout({
+                name: 'cose',
+                fit: true,
+                padding: 100,
+                nodeRepulsion: 400000,
+                idealEdgeLength: 100,
+                nodeDimensionsIncludeLabels: false,
+                animate: false
+            }).run();
+            
+            // After loading: Reset selection and parameters
+                selectedAggNodes.clear();
+                cy.nodes().removeClass('selected-agg');
+                aggregated = false;
+                resetParameters();
+            })
+            .catch(error => {
+                console.error("Error loading combined detail networks:", error);
+            })
+            .finally(() => {
+                spinner.style.display = 'none';
+            });
     });
 
     // When clicking anywhere in the Cytoscape plot (but not on nodes), reset the table
     cy.on('tap', function(event) {
         if (event.target === cy) { // If we clicked on an empty space (not a node)
+            if (aggregated) {
+                cy.batch(function() {
+                    // Reset the highlights
+                    cy.nodes('.selected-agg').removeClass('selected-agg');
+                    selectedAggNodes.clear();
+                    lastClickedNode = null; // Clear the last clicked node tracking
+                });
+            } else {
+                window.parent.postMessage({ highlightedNodes: [] }, '*');
+            }
+
             cy.batch(function() {
                 // Reset the highlights
                 cy.nodes('.highlight').removeClass('highlight');
                 lastClickedNode = null; // Clear the last clicked node tracking
             });
 
-            stopJitter(); // Stop the jitter effect
-
-            // Send an empty array to the main page to reset the DataTable
-            window.parent.postMessage({ highlightedNodes: [] }, '*');
+            stopJitter(); // Stop any ongoing jitter effect
         }
     });
 
@@ -1317,6 +1364,11 @@ document.addEventListener('DOMContentLoaded', function() {
             useEdgeColoring = false;
             useEdgeTransparency = true;
             assignDynamicNetworkIconToAggregatedNodes();
+            cy.batch(function() {
+                // Reset the highlights
+                cy.nodes('.selected-agg').removeClass('selected-agg');
+                lastClickedNode = null; // Clear the last clicked node tracking
+            });
         }
 
         if (!useShapes || aggregated) {
@@ -1335,8 +1387,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
         if (aggregated) {
             document.querySelector('#edge-legend p b').textContent = "Overlapping Orthogroups";
+            document.getElementById('load-detail-view').style.display = 'block';
         } else {
             document.querySelector('#edge-legend p b').textContent = "TOM Value";
+            document.getElementById('load-detail-view').style.display = 'none';
         }
 
         setTimeout(function() {

@@ -255,3 +255,24 @@ html, body {
     color: rgb(0, 0, 0);
     margin: 0 5px;
 }
+
+#load-detail-view {
+    position: absolute;
+    top: 50%;
+    right: 20px; 
+    transform: translateY(-50%);
+    background-color: #FF5722; 
+    border: none;
+    border-radius: 50%;
+    width: 60px;
+    height: 60px;
+    font-size: 28px;
+    color: white;
+    cursor: pointer;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+    z-index: 1001; 
+}
+#load-detail-view:hover {
+    background-color: goldenrod;
+}
+
