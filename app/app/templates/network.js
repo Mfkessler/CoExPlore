@@ -551,7 +551,11 @@ document.addEventListener('DOMContentLoaded', function() {
                     console.error("Error loading aggregated network:", error);
                     spinner.style.display = 'none';
                 });
-        } 
+        } else if (detailOnly) {
+            cy.zoom(initialZoom);
+            cy.pan(initialPan);
+            cy.center();
+        }
 
         resetParameters();
     });    
