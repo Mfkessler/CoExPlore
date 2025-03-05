@@ -69,6 +69,12 @@ def plot_co_expression_network_task(self, data):
     template_path = os.path.join(current_app.root_path, 'templates')
     topic = ""
     max_neighbors = data.get('maxNeighbors', 0)
+    force_detailed_view = data.get('forceDetailedView', False)
+
+    if force_detailed_view:
+        detail_only_nodes = None
+    else:
+        detail_only_nodes = 500
 
     if max_neighbors > 0:
         logger.info(f"Max neighbors: {max_neighbors}")
@@ -94,7 +100,7 @@ def plot_co_expression_network_task(self, data):
                                                         template_path=template_path, highlight=highlight_list, custom_filename=custom_filename,
                                                         use_colors=use_colors, use_shapes=use_shapes, progress_callback=progress_callback,
                                                         tom_prefix=f"{Config.DATA_DIR}/tom", filter_edges=False, max_neighbors=max_neighbors,
-                                                        include_neighbors=include_neighbors)
+                                                        include_neighbors=include_neighbors, detail_only_nodes=detail_only_nodes)
         
         if isinstance(html_path, dict):
             return {"status": "FAILURE", "result": {"status": "error", "message": f"{html_path.get('message')}"}}

@@ -151,7 +151,7 @@ def analyze_co_expression_network(adata: Union[AnnData, List[AnnData]], config: 
                     f"Nodes: {len(cyto_data['nodes'])} - Using aggregated plotting")
                 detail_only = False
         else:
-            detail_only = False
+            detail_only = True
 
         if progress_callback:
             progress_callback(f"Plotting {tool} network")
