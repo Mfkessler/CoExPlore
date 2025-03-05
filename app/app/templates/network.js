@@ -24,8 +24,12 @@ document.addEventListener('DOMContentLoaded', function() {
     // Aggregated network
     let aggregated = true;
     let selectedAggNodes = new Set();
+    const aggregatedFile = customFilename + "_aggregated.json";
 
     let spinner = document.getElementById('loading-spinner');
+
+    // Initialize the network cache
+    const networkDataCache = {};
 
     let cy = cytoscape({
         container: document.getElementById('cy'),
@@ -529,18 +533,14 @@ document.addEventListener('DOMContentLoaded', function() {
     // Reset button (Network View)
     document.getElementById('zoom-reset').addEventListener('click', function() {
         if (!aggregated && !detailOnly) {
-            let aggregatedFile = customFilename + "_aggregated.json";
             spinner.style.display = 'flex';
-            fetch(aggregatedFile)
-                .then(response => response.json())
+            loadNetworkData(aggregatedFile)
                 .then(aggregatedData => {
-                    // Reload the network
                     cy.json({ elements: aggregatedData });
-                    // Start layout
                     cy.layout({
                         name: 'cose',
                         fit: true,
-                        padding: 10, 
+                        padding: 10,
                         nodeRepulsion: 400000,
                         idealEdgeLength: 100,
                         animate: false,
@@ -552,14 +552,14 @@ document.addEventListener('DOMContentLoaded', function() {
                     console.error("Error loading aggregated network:", error);
                     spinner.style.display = 'none';
                 });
-        } 
-
+        }
+    
         cy.zoom(initialZoom);
         cy.pan(initialPan);
         cy.center();
-
+    
         resetParameters();
-    });    
+    });      
 
     /* Toggle scroll zoom */
 
@@ -1080,59 +1080,60 @@ document.addEventListener('DOMContentLoaded', function() {
 
     document.getElementById('load-detail-view').addEventListener('click', function() {
         if (selectedAggNodes.size === 0) {
-            alert('Please select at least one aggregated node.');
-            return;
+          alert('Please select at least one aggregated node.');
+          return;
         }
-        
+
         spinner.style.display = 'flex';
-        // Array with fetch promises for each detail network file
-        let fetchPromises = [];
+        
+        // Array with promises for each detail network
+        let detailPromises = [];
         selectedAggNodes.forEach(nodeId => {
-            let node = cy.getElementById(nodeId);
-            let label = node.data('label');
-            let clusterName = label.split(" (")[0];
-            let safeClusterName = clusterName.replace(/\s/g, "_");
-            let detailNetworkFile = customFilename + "_detail_" + safeClusterName + ".json";
-            fetchPromises.push(
-            fetch(detailNetworkFile).then(response => response.json())
-            );
+          let node = cy.getElementById(nodeId);
+          let label = node.data('label');
+          let clusterName = label.split(" (")[0];
+          let safeClusterName = clusterName.replace(/\s/g, "_");
+          let detailNetworkFile = customFilename + "_detail_" + safeClusterName + ".json";
+          
+          // All detail networks are loaded via the common cache
+          detailPromises.push(loadNetworkData(detailNetworkFile));
         });
         
-        // Wait until all networks are loaded and merge the elements
-        Promise.all(fetchPromises)
-            .then(networks => {
+        // Wait until all networks are loaded and merged
+        Promise.all(detailPromises)
+          .then(networks => {
             let mergedElements = { nodes: [], edges: [] };
             networks.forEach(net => {
-                mergedElements.nodes = mergedElements.nodes.concat(net.nodes || []);
-                mergedElements.edges = mergedElements.edges.concat(net.edges || []);
+              mergedElements.nodes = mergedElements.nodes.concat(net.nodes || []);
+              mergedElements.edges = mergedElements.edges.concat(net.edges || []);
             });
             
-            // Update Cytoscape with merged network and run layout
+            // Update Cytoscape with the merged elements
             cy.json({ elements: mergedElements });
             cy.layout({
-                name: 'cose',
-                fit: true,
-                padding: 100,
-                nodeRepulsion: 400000,
-                idealEdgeLength: 100,
-                nodeDimensionsIncludeLabels: false,
-                animate: false
+              name: 'cose',
+              fit: true,
+              padding: 100,
+              nodeRepulsion: 400000,
+              idealEdgeLength: 100,
+              nodeDimensionsIncludeLabels: false,
+              animate: false
             }).run();
             
-            // After loading: Reset selection and parameters
-                selectedAggNodes.clear();
-                cy.nodes().removeClass('selected-agg');
-                aggregated = false;
-                resetParameters();
-            })
-            .catch(error => {
-                console.error("Error loading combined detail networks:", error);
-            })
-            .finally(() => {
-                spinner.style.display = 'none';
-            });
+            // After loading: Reset selection and adjust parameters
+            selectedAggNodes.clear();
+            cy.nodes().removeClass('selected-agg');
+            aggregated = false;
+            resetParameters();
+          })
+          .catch(error => {
+            console.error("Error loading combined detail networks:", error);
+          })
+          .finally(() => {
+            spinner.style.display = 'none';
+          });
     });
-
+    
     // When clicking anywhere in the Cytoscape plot (but not on nodes), reset the table
     cy.on('tap', function(event) {
         if (event.target === cy) { // If we clicked on an empty space (not a node)
@@ -1320,6 +1321,21 @@ document.addEventListener('DOMContentLoaded', function() {
         link.click();
     }
     
+    async function loadNetworkData(file) {
+        if (networkDataCache[file]) {
+          console.log("Using cached network data for:", file);
+          return Promise.resolve(networkDataCache[file]);
+        } else {
+          console.log("Loading network data for:", file);
+          return fetch(file)
+            .then(response => response.json())
+            .then(data => {
+              networkDataCache[file] = data;
+              return data;
+            });
+        }
+    }
+
     function resetParameters() {
         // Clear the sortedEdges cache so that edge filtering is recalculated
         cy.scratch('sortedEdges', null);
@@ -1384,10 +1400,7 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('load-detail-view').style.display = 'none';
         }
 
-        setTimeout(function() {
-            spinner.style.display = 'none';
-        }
-        , 1000);
+        spinner.style.display = 'none';
     }
 
     resetParameters();
