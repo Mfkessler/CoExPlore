@@ -35,7 +35,7 @@ def analyze_co_expression_network(adata: Union[AnnData, List[AnnData]], config: 
                                   use_colors: bool = False, use_shapes: bool = False,
                                   node_size: int = 10, use_symmetry: bool = False, progress_callback: Callable[[str], None] = None,
                                   trait: str = "tissue", filter_edges: bool = True, include_neighbors: bool = False,
-                                  max_neighbors: int = 10, detail_only_nodes: int = 1000) -> dict:
+                                  max_neighbors: int = 10, detail_only_nodes: int = 500) -> dict:
     """
     Analyze co-expression network for a given topic:
     - Plot the co-expression network and identify clusters.
