@@ -885,6 +885,11 @@ document.addEventListener('DOMContentLoaded', function() {
         toggleFullscreen();
     });
 
+    document.addEventListener("fullscreenchange", function() {
+        cy.resize();
+        cy.fit();
+    });
+      
     function restoreNodeAndEdgeSize(initialNodeSize, initialEdgeWidth) {
         // Restore node and edge sizes
         cy.nodes().forEach(function(node) {
@@ -900,20 +905,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
-    
-    // Event listener for fullscreen change -> Resize and fit the graph, adjust button status
-    document.addEventListener("fullscreenchange", function() {
-        cy.resize(); // Ensure the canvas is resized
-        adjustNodeAndEdgeSize(); // Apply the new size
-
-        // If fullscreen is exited, reset the button
-        if (!document.fullscreenElement) {
-            cy.zoom(initialZoom);  // Restore the initial zoom level
-            cy.pan(initialPan);    // Reset to the initial pan position
-            cy.center();           // Ensure the graph is centered correctly
-            fullscreenButton.classList.remove("active");
-        } 
-    });
 
     const toggleMetadataButton = document.getElementById("toggle-metadata");
     const buttonTooltip = document.getElementById("button-tooltip");
