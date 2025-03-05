@@ -35,7 +35,7 @@ def analyze_co_expression_network(adata: Union[AnnData, List[AnnData]], config: 
                                   use_colors: bool = False, use_shapes: bool = False,
                                   node_size: int = 10, use_symmetry: bool = False, progress_callback: Callable[[str], None] = None,
                                   trait: str = "tissue", filter_edges: bool = True, include_neighbors: bool = False,
-                                  max_neighbors: int = 10, detail_only: bool = False) -> dict:
+                                  max_neighbors: int = 10, detail_only_nodes: int = 1000) -> dict:
     """
     Analyze co-expression network for a given topic:
     - Plot the co-expression network and identify clusters.
@@ -73,9 +73,10 @@ def analyze_co_expression_network(adata: Union[AnnData, List[AnnData]], config: 
     - trait (str): Column name in adata.obs containing the trait information.
     - filter_edges (bool): Filter edges to increase performance.
     - include_neighbours (bool): If True, for each transcript in rows, 
-                                check for neighbours with value >= threshold and include them.
+                                 check for neighbours with value >= threshold and include them.
     - max_neighbors (int): Maximum number of neighbours to include.
-    - detail_only (bool): If True, don't aggregate Nodes.
+    - detail_only_nodes (int): Maximum number of nodes to use for detailed plotting. 
+                               If the number of nodes is higher, aggregated plotting is used.
 
     Returns:
     - dict: Eigengenes for clusters if out is not "html".
@@ -89,25 +90,27 @@ def analyze_co_expression_network(adata: Union[AnnData, List[AnnData]], config: 
         if custom_filename is None:
             custom_filename = f"{topic}"
     elif tool == "plotly" and isinstance(adata, list):
-        raise ValueError("Plotly is not supported for multiple AnnData objects")
+        raise ValueError(
+            "Plotly is not supported for multiple AnnData objects")
     else:
         if custom_filename is None:
             custom_filename = f"{adata.uns['name']}_{topic}"
 
     print(f"Analyzing co-expression network for {topic} using {tool}")
     if progress_callback:
-        progress_callback(f"Analyzing co-expression network for {topic} using {tool}")
+        progress_callback(
+            f"Analyzing co-expression network for {topic} using {tool}")
 
     # Load TOM data (with neighbor information)
     if isinstance(adata, list):
         tom, adata, neighbor_info = get_tom_data(tom_path, adata, transcripts=transcripts, query=query, threshold=threshold, tom_prefix=tom_prefix,
-                                  use_symmetry=use_symmetry, progress_callback=progress_callback, include_neighbours=include_neighbors,
-                                  max_neighbors=max_neighbors)
+                                                 use_symmetry=use_symmetry, progress_callback=progress_callback, include_neighbours=include_neighbors,
+                                                 max_neighbors=max_neighbors)
     else:
         tom, neighbor_info = get_tom_data(tom_path, adata, transcripts=transcripts, query=query, threshold=threshold, tom_prefix=tom_prefix,
-                           use_symmetry=use_symmetry, progress_callback=progress_callback, include_neighbours=include_neighbors,
-                           max_neighbors=max_neighbors)
-        
+                                          use_symmetry=use_symmetry, progress_callback=progress_callback, include_neighbours=include_neighbors,
+                                          max_neighbors=max_neighbors)
+
     # Check, if ALL TOM matrices are empty
     if isinstance(tom, list):
         if all(tom.empty for tom in tom):
@@ -136,6 +139,19 @@ def analyze_co_expression_network(adata: Union[AnnData, List[AnnData]], config: 
         ortho_jaccaard_matrix = calculate_jaccard_matrix(ortho_df)
         plot_overlap(ortho_jaccaard_matrix, config, title="Jaccard Similarity Between Clusters Based on Orthogroups",
                      x_label="Cluster", y_label="Cluster", custom_filename=f"{custom_filename}_overlap", height=None, width=None)
+
+        if detail_only_nodes:
+            # Check if the number of nodes is too high for detailed plotting
+            if len(cyto_data['nodes']) < detail_only_nodes:
+                print(
+                    f"Nodes: {len(cyto_data['nodes'])} - Using detailed plotting")
+                detail_only = True
+            else:
+                print(
+                    f"Nodes: {len(cyto_data['nodes'])} - Using aggregated plotting")
+                detail_only = False
+        else:
+            detail_only = False
 
         if progress_callback:
             progress_callback(f"Plotting {tool} network")
@@ -169,10 +185,10 @@ def analyze_co_expression_network(adata: Union[AnnData, List[AnnData]], config: 
     if progress_callback:
         progress_callback(f"Calculating eigengenes")
     eigengene_files, module_trait_files, table_html, combined_plot_path, heatmap_paths = process_eigengenes(adata, cluster_map, config, topic,
-                                                                                             plot_module_trait_relationships, plot_bar_plots,
-                                                                                             custom_filename=custom_filename, tool=tool,
-                                                                                             progress_callback=progress_callback,
-                                                                                             trait=trait)
+                                                                                                            plot_module_trait_relationships, plot_bar_plots,
+                                                                                                            custom_filename=custom_filename, tool=tool,
+                                                                                                            progress_callback=progress_callback,
+                                                                                                            trait=trait)
 
     if plot_go_enrichment:
         print(f"Performing GO enrichment analysis for clusters")
@@ -197,7 +213,7 @@ def analyze_co_expression_network(adata: Union[AnnData, List[AnnData]], config: 
         combined_plot_path = os.path.basename(
             combined_plot_path) if combined_plot_path else None
         heatmap_paths = ([os.path.basename(path) if path else None for path in heatmap_paths]
-                    if heatmap_paths else None)
+                         if heatmap_paths else None)
 
         if progress_callback:
             progress_callback(f"Generating HTML report")
@@ -229,7 +245,7 @@ def get_tom_data(tom_path: Union[str, List[str]], adata: Union[AnnData, List[Ann
                  include_neighbours: bool = False, max_neighbors: int = 10) -> Union[Tuple[pd.DataFrame, set], Tuple[List[pd.DataFrame], List[AnnData], List[set]]]:
     """
     Loads the TOM matrix for one or multiple AnnData objects.
-    
+
     Parameters:
     - tom_path (str or List[str]): Path(s) to the TOM file(s).
     - adata (AnnData or List[AnnData]): The AnnData object(s).
@@ -243,7 +259,7 @@ def get_tom_data(tom_path: Union[str, List[str]], adata: Union[AnnData, List[Ann
     - progress_callback (Callable): Progress callback.
     - include_neighbours (bool): If True, include neighbor transcripts.
     - max_neighbors (int): Maximum neighbors per transcript.
-    
+
     Returns:
     - (pd.DataFrame, set): TOM matrix and neighbor set for a single AnnData.
     - (List[pd.DataFrame], List[AnnData], List[set]): Lists for multiple objects.
@@ -254,25 +270,32 @@ def get_tom_data(tom_path: Union[str, List[str]], adata: Union[AnnData, List[Ann
         toms = []
         neighbor_info_list = []
         for idx, ad in enumerate(adata):
-            current_tom_path = tom_path[idx] if isinstance(tom_path, list) else f"{tom_prefix}/tom_matrix_{ad.uns['name']}.h5"
+            current_tom_path = tom_path[idx] if isinstance(
+                tom_path, list) else f"{tom_prefix}/tom_matrix_{ad.uns['name']}.h5"
             if not os.path.exists(current_tom_path):
                 print(f"File not found: {current_tom_path}")
                 continue
             if not transcripts:
-                current_transcripts = [t[1] for t in list(transcript_ortho_browser(query, ad).index)]
+                current_transcripts = [t[1] for t in list(
+                    transcript_ortho_browser(query, ad).index)]
             else:
                 current_species = ad.uns['species']
                 if current_species in transcripts:
-                    current_transcripts = [t for t in transcripts[current_species] if t in ad.var_names]
+                    current_transcripts = [
+                        t for t in transcripts[current_species] if t in ad.var_names]
                 else:
-                    print(f"No transcripts found for species {current_species} in dataset {ad.uns['name']}")
+                    print(
+                        f"No transcripts found for species {current_species} in dataset {ad.uns['name']}")
                     continue
             if not current_transcripts:
-                print(f"No transcripts found for the query in dataset {ad.uns['name']}")
+                print(
+                    f"No transcripts found for the query in dataset {ad.uns['name']}")
                 continue
-            print(f"Loading {len(current_transcripts)} transcripts from {current_tom_path}")
+            print(
+                f"Loading {len(current_transcripts)} transcripts from {current_tom_path}")
             if progress_callback:
-                progress_callback(f"Loading {len(current_transcripts)} transcripts from TOM of dataset {ad.uns['name']}")
+                progress_callback(
+                    f"Loading {len(current_transcripts)} transcripts from TOM of dataset {ad.uns['name']}")
             tom, neighbor_set = load_subset_from_hdf5(
                 filename=current_tom_path,
                 rows=current_transcripts,
@@ -298,15 +321,19 @@ def get_tom_data(tom_path: Union[str, List[str]], adata: Union[AnnData, List[Ann
             print(f"File not found: {tom_path}")
             return None
         if transcripts:
-            transcripts = [t for t in transcripts[adata.uns['species']] if t in adata.var_names]
+            transcripts = [
+                t for t in transcripts[adata.uns['species']] if t in adata.var_names]
         else:
-            transcripts = [t[1] for t in list(transcript_ortho_browser(query, adata).index)]
+            transcripts = [t[1] for t in list(
+                transcript_ortho_browser(query, adata).index)]
         if not transcripts:
-            print(f"No transcripts found for the query in dataset {adata.uns['name']}")
+            print(
+                f"No transcripts found for the query in dataset {adata.uns['name']}")
             return None
         print(f"Loading {len(transcripts)} transcripts from {tom_path}")
         if progress_callback:
-            progress_callback(f"Loading {len(transcripts)} transcripts from TOM of dataset {adata.uns['name']}")
+            progress_callback(
+                f"Loading {len(transcripts)} transcripts from TOM of dataset {adata.uns['name']}")
         tom, neighbor_set = load_subset_from_hdf5(
             filename=tom_path,
             rows=transcripts,
@@ -373,7 +400,8 @@ def process_eigengenes(adata: Union[AnnData, List[AnnData]], cluster_map: dict, 
 
             if tool == "cytoscape":
                 # Filter cluster_map to only include clusters from the current species
-                cluster_map_temp = filter_cluster_map(cluster_map, ad.uns['species'])
+                cluster_map_temp = filter_cluster_map(
+                    cluster_map, ad.uns['species'])
 
             # Check if the cluster_map is empty
             if not cluster_map_temp:
@@ -489,7 +517,7 @@ def process_eigengenes(adata: Union[AnnData, List[AnnData]], cluster_map: dict, 
         if progress_callback:
             progress_callback(f"Plotting combined eigengene expression")
         combined_plot_path = plot_eigengene_expression_bokeh(combined_eigengene_data, config,
-                                                            custom_filename=f"{custom_filename}_combined_bokeh")
+                                                             custom_filename=f"{custom_filename}_combined_bokeh")
         heatmap_paths = plot_expression_heatmaps(combined_eigengene_data, "All Clusters", False, config, height=None, width=None,
                                                  custom_filename=f"{custom_filename}_heatmap")
         print(f"Heatmap paths: {heatmap_paths}")
@@ -522,7 +550,8 @@ def filter_cluster_map(cluster_map: dict, species: str) -> dict:
     - dict: A new cluster map with the species prefix (and underscore) removed from the keys.
     """
 
-    species_prefix = species + "_"  # Define the species prefix with underscore.
+    # Define the species prefix with underscore.
+    species_prefix = species + "_"
 
     return {k[len(species_prefix):]: v for k, v in cluster_map.items() if k.startswith(species_prefix)}
 
