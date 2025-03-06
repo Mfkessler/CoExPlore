@@ -468,7 +468,7 @@
             </div>
             <div id="plotClusterHeatmap" class="collapse show">
                 <div class="card-body">
-                    <iframe src="{{ heatmap_paths[0] }}" width="100%" height="800px" class="content-section"></iframe>
+                    <iframe src="{{ heatmap_paths[0] }}" width="100%" height="600px" class="content-section"></iframe>
                 </div>
             </div>
         </div>
@@ -485,7 +485,7 @@
             </div>
             <div id="plotSpeciesHeatmap" class="collapse show">
                 <div class="card-body">
-                    <iframe src="{{ heatmap_paths[1] }}" width="100%" height="800px" class="content-section"></iframe>
+                    <iframe src="{{ heatmap_paths[1] }}" width="100%" height="400px" class="content-section"></iframe>
                 </div>
             </div>
         </div>
@@ -593,18 +593,24 @@
                 $(this).DataTable(commonOptions);
             });
 
-            // Add specific options for the nodeResults table
             var nodeOptions = $.extend(true, {}, commonOptions, {
-                language: { search: "Global Search:" },
-                initComplete: function() {
-                    $('#nodeResults').on('draw.dt', function() {
-                        var info = nodeResultsTable.page.info();
-                        $('#tableEntriesInfo').text('Filtered table entries: ' + info.recordsDisplay);
-                    });
-                }
-            });
+            language: { search: "Global Search:" },
+            initComplete: function(settings, json) {
+                var api = this.api();
+                api.columns().every(function(index) {
+                    if (index > 5) {
+                        this.visible(false);
+                    }
+                });
+                $('#nodeResults').on('draw.dt', function() {
+                    var info = nodeResultsTable.page.info();
+                    $('#tableEntriesInfo').text('Filtered table entries: ' + info.recordsDisplay);
+                });
+            }
+        });
 
-            var nodeResultsTable = $('#nodeResults').DataTable(nodeOptions);
+        var nodeResultsTable = $('#nodeResults').DataTable(nodeOptions);
+
             var infoResultsTable = $('#infoResults').DataTable();
             var orthoResultsTable = $('#orthoResults').DataTable();
 
