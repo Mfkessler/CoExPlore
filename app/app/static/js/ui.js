@@ -368,10 +368,10 @@ export function updateBrowserInputFields() {
             $("#description_" + selectedAnalysis).toggle();
         });
     browserButton.prop("disabled", false);
-    $("#nTopPercentGroupBrowser, #nTopGroupBrowser, #thresholdGroupBrowser, #maxPvalGroupBrowser, #minFeGroupBrowser, #minDepthGroupBrowser, #useShapesGroupBrowser, #useShapesSpeciesGroupBrowser, #useColorsGroupBrowser, #interSpeciesOnlyGroupBrowser, #minOrthosGroupBrowser, #highlightListGroupBrowser, #maxNeighborsGroupBrowser, #forceDetailedViewGroupBrowser").hide();
+    $("#nTopPercentGroupBrowser, #nTopGroupBrowser, #thresholdGroupBrowser, #maxPvalGroupBrowser, #minFeGroupBrowser, #minDepthGroupBrowser, #useShapesGroupBrowser, #useShapesSpeciesGroupBrowser, #useColorsGroupBrowser, #interSpeciesOnlyGroupBrowser, #minOrthosGroupBrowser, #highlightListGroupBrowser, #maxNeighborsGroupBrowser, #forceDetailedViewGroupBrowser, #minClusterSizeGroupBrowser").hide();
     switch (selectedAnalysis) {
         case "plot_co_expression_network":
-            $("#thresholdGroupBrowser, #highlightListGroupBrowser, #useShapesSpeciesGroupBrowser, #useColorsGroupBrowser, #maxNeighborsGroupBrowser, #forceDetailedViewGroupBrowser").show();
+            $("#thresholdGroupBrowser, #highlightListGroupBrowser, #useShapesSpeciesGroupBrowser, #useColorsGroupBrowser, #maxNeighborsGroupBrowser, #forceDetailedViewGroupBrowser, #minClusterSizeGroupBrowser").show();
             hasParameters = true;
             break;
         case "plot_go_terms":
@@ -682,6 +682,7 @@ export function runBrowserAnalysisHandler(baseUrl, sessionId) {
     let useShapesSpecies = $("#useShapesSpeciesBrowser").is(":checked");
     let interSpeciesOnly = $("#interSpeciesOnlyBrowser").is(":checked");
     let minOrthos = $("#minOrthosBrowser").val();
+    let minClusterSize = $("#minClusterSizeBrowser").val();
     let prefix = $("#outputPrefix").val();
     let selectedPlotType = $('input[name="plotType"]:checked').val();
     let forceDetailedView = $("#forceDetailedViewBrowser").is(":checked");
@@ -747,6 +748,10 @@ export function runBrowserAnalysisHandler(baseUrl, sessionId) {
         isValid = false;
         errorMessage += "Max Neighbors must be between 0 and 10.\n";
     }
+    if (minClusterSize === "" || !isNumeric(minClusterSize) || parseInt(minClusterSize) < 2) {
+        isValid = false;
+        errorMessage += "Min Cluster Size must be at least 2.\n";
+    }
     if (!isValid) {
         alert(errorMessage);
         return;
@@ -781,6 +786,7 @@ export function runBrowserAnalysisHandler(baseUrl, sessionId) {
                                 requestData.useColors = useColors;
                                 requestData.maxNeighbors = parseInt(maxNeighbors);
                                 requestData.forceDetailedView = forceDetailedView;
+                                requestData.minClusterSize = parseInt(minClusterSize);
                                 text = true;
                             } else if (analysisType === "plot_go_terms") {
                                 requestData.maxPval = parseFloat(maxPval);

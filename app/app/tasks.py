@@ -70,6 +70,7 @@ def plot_co_expression_network_task(self, data):
     topic = ""
     max_neighbors = data.get('maxNeighbors', 0)
     force_detailed_view = data.get('forceDetailedView', False)
+    min_cluster_size = data.get('minClusterSize', 10)
 
     if force_detailed_view:
         detail_only_nodes = None
@@ -92,10 +93,10 @@ def plot_co_expression_network_task(self, data):
             adata = adata_cache.get_adata(plant)
 
         total_transcripts = sum(len(v) for v in transcripts.values())
-        if total_transcripts > 20000:
-            return {"status": "FAILURE", "result": {"status": "error", "message": "Too many transcripts selected, please select fewer than 20000"}}
+        if total_transcripts > 8000:
+            return {"status": "FAILURE", "result": {"status": "error", "message": "Too many transcripts selected, please select fewer than 8000"}}
 
-        html_path = rwrap.analyze_co_expression_network(adata, plot_config, transcripts=transcripts, threshold=threshold,
+        html_path = rwrap.analyze_co_expression_network(adata, plot_config, transcripts=transcripts, threshold=threshold, node_threshold=min_cluster_size,
                                                         obo_path=f"{Config.DATA_DIR}/go-basic.obo", topic=topic, plot_go_enrichment=False,
                                                         template_path=template_path, highlight=highlight_list, custom_filename=custom_filename,
                                                         use_colors=use_colors, use_shapes=use_shapes, progress_callback=progress_callback,
