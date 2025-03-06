@@ -282,10 +282,13 @@
                       style="display: none;">
                       <p>
                         The Co-Expression Network Analysis provides a view of transcript interactions using
-                        precomputed TOMs. Clusters are generated automatically based on your chosen threshold, and
-                        cluster–trait relationships are computed for each cluster. You can highlight specific
-                        transcripts, have nodes colored by their WGCNA module assignments, and choose different
+                        precomputed TOMs. Sub-modules¹ are generated automatically, and
+                        sub-module–trait relationships are computed for each sub-module. You can highlight specific
+                        transcripts, have nodes colored by their original WGCNA module assignments, and choose different
                         shapes per species.
+
+                        1. Sub-modules are subnetworks derived by applying a threshold to the edge weights (TOM values). 
+                        Each sub-module may contain transcripts from multiple original WGCNA modules.
                       </p>
                     </div>
                     <div id="description_plot_go_terms" class="analysis-description" style="display: none;">
@@ -440,6 +443,17 @@
                               </div>
                             </div>
 
+                            <!-- Form Group: Min Cluster Size -->
+                            <div class="row mb-3" id="minClusterSizeGroupBrowser" style="display: none;">
+                              <label for="minClusterSizeBrowser" class="col-sm-4 col-form-label text-end">
+                              Min Sub-module Size
+                              </label>
+                              <div class="col-sm-8">
+                              <input type="number" class="form-control" id="minClusterSizeBrowser" placeholder="Min nodes" value="10"
+                                step="1" min="2" max="1000" required>
+                              </div>
+                            </div>
+
                             <!-- Form Group: Highlight Nodes -->
                             <div class="row mb-3" id="highlightListGroupBrowser" style="display: none;">
                               <label for="highlightListBrowser" class="col-sm-4 col-form-label text-end">
@@ -517,7 +531,6 @@
                                 </div>
                               </div>
                             </div>
-
                           </div>
                         </div>
                     </details>

@@ -738,7 +738,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         if (node.data('aggregated')) {
             // For aggregated nodes, show only cluster-specific metadata
-            tooltipText += '<b>Cluster:</b> ' + node.data('label') + '<br>';
+            tooltipText += '<b>Sub-module:</b> ' + node.data('label') + '<br>';
             tooltipText += '<b>Average Edge Weight:</b> ' + node.data('avg_weight').toFixed(2) + '<br>';
             tooltipText += '<b>Node Count:</b> ' + node.data('node_count') + '<br>';
         } else {
@@ -754,7 +754,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             tooltipText += '<b>Degree:</b> ' + node.degree() + '<br>';
             if (useClusterTooltip) { 
-                tooltipText += '<b>Cluster:</b> ' + node.data('cluster');
+                tooltipText += '<b>Sub-module:</b> ' + node.data('cluster');
             }
         }
 

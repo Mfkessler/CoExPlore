@@ -1417,7 +1417,7 @@ def _generate_heatmap(df_filtered: pd.DataFrame, title: str, file_suffix: str,
     fig.update_layout(
         title=dict(text=title, font=dict(size=20), x=0.5),
         xaxis_title="Tissues",
-        yaxis_title="Clusters",
+        yaxis_title="Sub-modules",
         width=width,
         height=height,
         margin=dict(l=150, r=10, b=150, t=80),
@@ -1449,14 +1449,14 @@ def plot_expression_heatmaps(df: pd.DataFrame, cluster_keyword: str, include_all
     
     If 'include_all_clusters' is True, a single heatmap is generated including all clusters.
     If False, two heatmaps are produced:
-      - One excluding clusters that contain the keyword (e.g. excluding "All Clusters")
+      - One excluding clusters that contain the keyword (e.g. excluding "All Sub-modules")
       - One including only clusters that contain the keyword.
     
     Hover text shows the median (2 decimals), the tissue, and the individual sample expression values (2 decimals each).
     
     Parameters:
     - df (pd.DataFrame): DataFrame with columns 'Sample', 'Species', 'Tissue', 'Cluster', and 'Expression'.
-    - cluster_keyword (str): Keyword to identify clusters (e.g. "All Clusters").
+    - cluster_keyword (str): Keyword to identify clusters (e.g. "All Sub-modules").
     - include_all_clusters (bool): If True, include all clusters in one heatmap.
                                   If False, generate two separate heatmaps.
     - config: Plot configuration object (with 'show', 'save_plots', and 'output_path').
@@ -1475,19 +1475,19 @@ def plot_expression_heatmaps(df: pd.DataFrame, cluster_keyword: str, include_all
 
     if include_all_clusters:
         # Use the full DataFrame (all clusters)
-        paths.append(_generate_heatmap(df, title=title or "Heatmap: All Clusters Included",
+        paths.append(_generate_heatmap(df, title=title or "Heatmap: All Sub-modules Included",
                           file_suffix="all_clusters", config=config,
                           row_cluster=row_cluster, col_cluster=col_cluster,
                           width=width, height=height, custom_filename=custom_filename))
     else:
-        # Heatmap 1: Exclude clusters that contain the keyword ("All Clusters")
+        # Heatmap 1: Exclude clusters that contain the keyword ("All Sub-modules")
         df_exclude = df[~df['Cluster'].str.contains(cluster_keyword)]
         paths.append(_generate_heatmap(df_exclude,
-                          title=f"Cluster-trait Eigengenexpression",
+                          title=f"Sub-module-trait Eigengenexpression",
                           file_suffix="exclude_all_clusters", config=config,
                           row_cluster=row_cluster, col_cluster=col_cluster,
                           width=width, height=height, custom_filename=custom_filename))
-        # Heatmap 2: Only clusters that contain the keyword ("All Clusters")
+        # Heatmap 2: Only clusters that contain the keyword ("All Sub-modules")
         df_include = df[df['Cluster'].str.contains(cluster_keyword)]
         paths.append(_generate_heatmap(df_include,
                           title=f"Species-trait Eigengenexpression",
@@ -2903,12 +2903,12 @@ def plot_module_trait_relationships_heatmap(adata: AnnData, eigengenes: pd.DataF
 
     # Get the counts of each cluster from module_info
     cluster_counts = module_info['total_transcripts'].to_dict()
-    all_clusters_count = cluster_counts.get("All Clusters", 0)
+    all_clusters_count = cluster_counts.get("All Sub-modules", 0)
 
     xlabels = []
     for label in eigengenes.columns:
         if label.lower() == 'all clusters':
-            xlabels.append(f"All Clusters ({all_clusters_count})")
+            xlabels.append(f"All Sub-modules ({all_clusters_count})")
         else:
             xlabels.append(
                 f"{label.capitalize()} ({cluster_counts.get(label, 0)})")
@@ -3101,7 +3101,7 @@ def plot_eigengene_expression_bokeh(df: pd.DataFrame, config, custom_filename: s
     # Create the figure
     p = figure(
         x_range=FactorRange(*x_factors),
-        title='Eigengene Expression Across Traits and Clusters',
+        title='Eigengene Expression Across Traits and Sub-modules',
         toolbar_location="above",
         sizing_mode="stretch_both"
     )
@@ -3111,7 +3111,7 @@ def plot_eigengene_expression_bokeh(df: pd.DataFrame, config, custom_filename: s
     # Add HoverTool for bars
     hover_bars = HoverTool(tooltips=[
         ('Trait', '@Tissue'),
-        ('Cluster', '@Cluster'),
+        ('Sub-module', '@Cluster'),
         ('Mean Expression', '@Expression'),
         ('Std Dev', '@std')
     ], renderers=[])
@@ -3120,7 +3120,7 @@ def plot_eigengene_expression_bokeh(df: pd.DataFrame, config, custom_filename: s
     # Add HoverTool for individual points
     hover_points = HoverTool(tooltips=[
         ('Trait', '@Tissue'),
-        ('Cluster', '@Cluster'),
+        ('Sub-module', '@Cluster'),
         ('Expression', '@Expression'),
         ('Sample', '@Sample'),
         ('Species', '@Species')
@@ -3592,7 +3592,7 @@ def aggregate_network(network_data: dict):
     clusters = defaultdict(list)
     ortho_exists = False
     for node in network_data['nodes']:
-        cluster_label = node['data'].get('cluster', 'No clusters')
+        cluster_label = node['data'].get('cluster', 'No Sub-Modules')
         clusters[cluster_label].append(node)
         # Check if any node has the key "ortho_id"
         if 'ortho_id' in node['data']:
@@ -3608,9 +3608,9 @@ def aggregate_network(network_data: dict):
         # Find cluster of source and target nodes
         for node in network_data['nodes']:
             if node['data'].get('id') == source_id:
-                source_cluster = node['data'].get('cluster', 'No clusters')
+                source_cluster = node['data'].get('cluster', 'No Sub-Modules')
             if node['data'].get('id') == target_id:
-                target_cluster = node['data'].get('cluster', 'No clusters')
+                target_cluster = node['data'].get('cluster', 'No Sub-modules')
             if source_cluster and target_cluster:
                 break
         if source_cluster == target_cluster and source_cluster is not None:
@@ -3705,7 +3705,7 @@ def get_cluster_detail(network_data: dict, cluster_label: str):
     Extracts the detailed network for a given cluster label.
     Returns a network containing all nodes that belong to the cluster and all intra-cluster edges.
     """
-    detail_nodes = [node for node in network_data['nodes'] if node['data'].get('cluster', 'No clusters') == cluster_label]
+    detail_nodes = [node for node in network_data['nodes'] if node['data'].get('cluster', 'No Sub-modules') == cluster_label]
     node_ids = {node['data']['id'] for node in detail_nodes}
     detail_edges = [edge for edge in network_data['edges']
                     if edge['data'].get('source') in node_ids and edge['data'].get('target') in node_ids]
@@ -3755,7 +3755,7 @@ def plot_cyto_network(config, custom_filename: str = "cyto_network",
     if cluster_info:
         for node in network_data['nodes']:
             node_id = node['data']['id']
-            node['data']['cluster'] = cluster_info.get(node_id, "No clusters")
+            node['data']['cluster'] = cluster_info.get(node_id, "No Sub-modules")
     
     # Optionally assign shapes based on module_colors
     if use_shapes:

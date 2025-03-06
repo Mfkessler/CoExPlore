@@ -418,11 +418,11 @@
         </div>
         {% endif %}
 
-        <!-- Cluster Table -->
+        <!-- Sub-modules Table -->
         <div class="card mb-3">
             <div class="card-header">
                 <h5 class="mb-0 d-flex justify-content-between align-items-center">
-                    Cluster Table
+                    Sub-modules Table
                     <button class="btn btn-link toggle-button" data-toggle="collapse" data-target="#analysisTableSection" aria-expanded="true">
                         <span>Show</span>
                     </button>
@@ -441,7 +441,7 @@
         <div class="card mb-3">
             <div class="card-header">
                 <h5 class="mb-0 d-flex justify-content-between align-items-center">
-                    Cluster-trait Expression Bar Plots
+                    Sub-module-trait Expression Bar Plots
                     <button class="btn btn-link toggle-button" data-toggle="collapse" data-target="#imageGallerySection" aria-expanded="true">
                         <span>Show</span>
                     </button>
@@ -456,11 +456,11 @@
         {% endif %}
 
         {% if heatmap_paths %}
-        <!-- Heatmap of Clusters -->
+        <!-- Heatmap of Sub-modules -->
         <div class="card mb-3">
             <div class="card-header">
                 <h5 class="mb-0 d-flex justify-content-between align-items-center">
-                    Combined Cluster-trait Expression Heatmap
+                    Combined Sub-module-trait Expression Heatmap
                     <button class="btn btn-link toggle-button" data-toggle="collapse" data-target="#plotClusterHeatmap" aria-expanded="true">
                         <span>Show</span>
                     </button>
@@ -496,7 +496,7 @@
         <div class="card mb-3">
             <div class="card-header">
                 <h5 class="mb-0 d-flex justify-content-between align-items-center">
-                    Combined Custer-trait Expression Bar Plots
+                    Combined Sub-modules-trait Expression Bar Plots
                     <button class="btn btn-link toggle-button" data-toggle="collapse" data-target="#plotSectionCombined" aria-expanded="true">
                         <span>Show</span>
                     </button>
@@ -726,15 +726,15 @@
                 var cluster = data ? data[0] : null; // Assuming the first column is the cluster name
                 var species = data ? data[1] : null; // Assuming the second column is the species name
 
-                console.log("Selected Cluster:", cluster);
+                console.log("Selected Sub-module:", cluster);
 
                 if (cluster) {
                     var searchRegex = '\\b' + cluster + '\\b'; // Regex for exact match of the cluster name
 
                     // Apply the filter to the Node Table to display only relevant nodes
-                    if (cluster === "All Clusters") {
+                    if (cluster === "All Sub-modules") {
                         // Regex to show all nodes for the selected species, excluding "No clusters"
-                        searchRegex = '\\b' + species + '\\b(?!.*No clusters)';
+                        searchRegex = '\\b' + species + '\\b(?!.*No Sub-modules)';
                     }
 
                     nodeResultsTable.search(searchRegex, true, false).draw();

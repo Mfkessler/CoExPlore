@@ -1604,7 +1604,7 @@ def identify_network_clusters(G: nx.Graph, cluster_name: str,
     # Fill in transcripts that are not in any cluster
     for transcript in G.nodes:
         if transcript not in cluster_map:
-            cluster_map[transcript] = "No clusters"
+            cluster_map[transcript] = "No Sub-modules"
 
     if print_info:
         cluster_counts = pd.Series(cluster_map).value_counts().sort_index()
@@ -1712,7 +1712,7 @@ def calculate_eigengenes(adata: AnnData, cluster_map: Dict[str, str], column: st
                    value in cluster_map.items() if key in expr.columns}
 
     clusters = pd.Series(expr.columns.map(cluster_map).fillna(
-        "No clusters"), index=expr.columns, name=column)
+        "No Sub-modules"), index=expr.columns, name=column)
     modules = pd.Categorical(clusters).categories
 
     if exclude:
@@ -1729,8 +1729,8 @@ def calculate_eigengenes(adata: AnnData, cluster_map: Dict[str, str], column: st
         module_genes = expr.columns[clusters == mod]
         expr_mod = expr[module_genes]
 
-        # if mod is not "No clusters" include the gene
-        if mod != "No clusters":
+        # if mod is not "No Sub-modules" include the gene
+        if mod != "No Sub-modules":
             included_genes.extend(module_genes)
 
         mod = f"{mod}"
@@ -1771,7 +1771,7 @@ def calculate_eigengenes(adata: AnnData, cluster_map: Dict[str, str], column: st
             "unique_modules": unique_modules
         }
 
-    # Calculate for "All Clusters"
+    # Calculate for "All Sub-modules"
     all_dataModule = expr[included_genes]
     total_transcripts_all = len(included_genes)
 
@@ -1783,7 +1783,7 @@ def calculate_eigengenes(adata: AnnData, cluster_map: Dict[str, str], column: st
         ) if not color_counts_all.empty else 0
         unique_modules_all = color_counts_all[color_counts_all > 0].count()
 
-        moduleInfo["All Clusters"] = {
+        moduleInfo["All Sub-modules"] = {
             "species": adata.uns['species'],
             "total_transcripts": total_transcripts_all,
             "most_common_module": most_common_module_all,
@@ -1809,9 +1809,9 @@ def calculate_eigengenes(adata: AnnData, cluster_map: Dict[str, str], column: st
             avg_expr = all_dataModule.mean(axis=1)
             if np.corrcoef(eigengene, avg_expr)[0, 1] < 0:
                 eigengene = -eigengene
-        PrinComps[f"{adata.uns['name']}: All Clusters"] = eigengene
+        PrinComps[f"{adata.uns['name']}: All Sub-modules"] = eigengene
         averExpr[f"{adata.uns['name']}: AE_All"] = all_dataModule.mean(axis=1)
-        varExpl[f"{adata.uns['name']}: All Clusters"] = (
+        varExpl[f"{adata.uns['name']}: All Sub-modules"] = (
             s[:nPC]**2) / np.sum(s**2)
 
     # Store results in adata.obsm if specified
@@ -1822,9 +1822,9 @@ def calculate_eigengenes(adata: AnnData, cluster_map: Dict[str, str], column: st
     moduleInfo_df = pd.DataFrame(moduleInfo).T
     moduleInfo_df.index.name = "Cluster"
 
-    # Remove the "No clusters" key if it exists
-    PrinComps = PrinComps.drop(f"No clusters", axis=1, errors='ignore')
-    moduleInfo_df = moduleInfo_df.drop(f"No clusters", axis=0, errors='ignore')
+    # Remove the "No Sub-modules" key if it exists
+    PrinComps = PrinComps.drop(f"No Sub-modules", axis=1, errors='ignore')
+    moduleInfo_df = moduleInfo_df.drop(f"No Sub-modules", axis=0, errors='ignore')
 
     return {
         "eigengenes": PrinComps,
@@ -2121,11 +2121,11 @@ def identify_network_clusters_from_json(network_data: dict, cluster_name: str,
         for transcript in cluster[0]:
             cluster_map[transcript] = f"{cluster[1]}: {cluster_name} {new_cluster_id}"
 
-    # Assign 'No clusters' to transcripts that are not in any cluster
+    # Assign 'No Sub-modules' to transcripts that are not in any cluster
     all_transcripts = {node['data']['id'] for node in network_data['nodes']}
     for transcript in all_transcripts:
         if transcript not in cluster_map:
-            cluster_map[transcript] = "No clusters"
+            cluster_map[transcript] = "No Sub-modules"
 
     # Optional printing of cluster information
     if print_info:

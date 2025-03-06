@@ -134,12 +134,14 @@ def analyze_co_expression_network(adata: Union[AnnData, List[AnnData]], config: 
 
         ortho_df = prepare_dataframe(cyto_data['nodes'], cluster_map)
         ortho_table = summarize_orthogroups(ortho_df).reset_index()
+        # Rename "Clusters" to "Sub-modules"
+        ortho_table = ortho_table.rename(columns={"Clusters": "Sub-modules"})
         ortho_table_html = ortho_table.to_html(
             classes='dynamic-table display dataTable no-border', index=False, border=0, header=True, table_id="orthoResults")
 
         ortho_jaccaard_matrix = calculate_jaccard_matrix(ortho_df)
-        plot_overlap(ortho_jaccaard_matrix, config, title="Jaccard Similarity Between Clusters Based on Orthogroups",
-                     x_label="Cluster", y_label="Cluster", custom_filename=f"{custom_filename}_overlap", height=None, width=None)
+        plot_overlap(ortho_jaccaard_matrix, config, title="Jaccard Similarity Between Sub-modules Based on Orthogroups",
+                     x_label="Sub-module", y_label="Sub-module", custom_filename=f"{custom_filename}_overlap", height=None, width=None)
 
         if detail_only_nodes:
             # Check if the number of nodes is too high for detailed plotting
@@ -180,6 +182,8 @@ def analyze_co_expression_network(adata: Union[AnnData, List[AnnData]], config: 
         node_table[col] = node_table[col].astype(str)
     node_table = node_table.fillna("")
     node_table = node_table.astype(str)
+    # Rename "Cluster" to "Sub-module"
+    node_table = node_table.rename(columns={"Cluster": "Sub-module"})
     node_table_html = node_table.to_html(
         classes='dynamic-table display dataTable no-border', index=False, border=0, header=True, table_id="nodeResults")
 
@@ -519,7 +523,7 @@ def process_eigengenes(adata: Union[AnnData, List[AnnData]], cluster_map: dict, 
             progress_callback(f"Plotting combined eigengene expression")
         combined_plot_path = plot_eigengene_expression_bokeh(combined_eigengene_data, config,
                                                              custom_filename=f"{custom_filename}_combined_bokeh")
-        heatmap_paths = plot_expression_heatmaps(combined_eigengene_data, "All Clusters", False, config, height=None, width=None,
+        heatmap_paths = plot_expression_heatmaps(combined_eigengene_data, "All Sub-modules", False, config, height=None, width=None,
                                                  custom_filename=f"{custom_filename}_heatmap")
         print(f"Heatmap paths: {heatmap_paths}")
     else:
@@ -533,6 +537,11 @@ def process_eigengenes(adata: Union[AnnData, List[AnnData]], cluster_map: dict, 
 
     # Convert DataFrame to HTML table
     combined_module_info_df = combined_module_info_df.reset_index(drop=True)
+
+    # Replace "Clusters" heading with "Sub-modules"
+    combined_module_info_df = combined_module_info_df.rename(
+        columns={"Cluster": "Sub-module"})
+    
     table_html = combined_module_info_df.to_html(
         classes='dynamic-table display dataTable no-border', index=False, border=0, header=True, table_id="infoResults")
 
