@@ -676,7 +676,7 @@ export function runBrowserAnalysisHandler(baseUrl, sessionId) {
     let useColors = $("#useColorsBrowser").is(":checked");
     let highlightList = $("#highlightListBrowser")
         .val()
-        .split(",")
+        .split(/[\s,]+/)
         .map((item) => item.trim())
         .filter((item) => item.length > 0);
     let useShapesSpecies = $("#useShapesSpeciesBrowser").is(":checked");
