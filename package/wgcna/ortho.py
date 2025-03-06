@@ -504,7 +504,7 @@ def prepare_dataframe(data: List[Dict[str, Dict[str, str]]],
                       ortho_id_key: str = 'ortho_id', 
                       organism_key: str = 'species', 
                       cluster_col: str = 'Cluster', 
-                      no_clusters_label: str = 'No clusters', 
+                      no_clusters_label: str = 'No Sub-modules', 
                       no_orthogroup_label: str = 'No orthogroup') -> pd.DataFrame:
     """
     Prepares a DataFrame from the raw transcript data, mapping cluster information and handling
@@ -529,14 +529,14 @@ def prepare_dataframe(data: List[Dict[str, Dict[str, str]]],
     # Convert data to DataFrame
     df = pd.DataFrame([entry[data_key] for entry in data])
 
-    # Map cluster information to the DataFrame; default to 'No clusters' if id not in cluster_info
+    # Map cluster information to the DataFrame; default to 'No Sub-modules' if id not in cluster_info
     if cluster_info:
         df[cluster_col] = df[id_key].map(cluster_info).fillna(no_clusters_label)
 
     # Replace empty and NaN ortho_id values with 'No orthogroup'
     df[ortho_id_key] = df[ortho_id_key].replace('', no_orthogroup_label).fillna(no_orthogroup_label)
 
-    # Drop all rows where "Cluster" is "No clusters"
+    # Drop all rows where "Cluster" is "No Sub-modules"
     df = df[df[cluster_col] != no_clusters_label]
 
     return df
