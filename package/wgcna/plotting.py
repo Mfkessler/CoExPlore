@@ -1287,9 +1287,8 @@ def plot_overlap(overlap_matrix: pd.DataFrame, config: PlotConfig, column: str =
         hovermode='closest'
     )
 
-    # Responsive resizing for axis labels and title
     fig.update_xaxes(tickangle=45, automargin=True)
-    fig.update_yaxes(automargin=True, scaleanchor="x", scaleratio=1)
+    fig.update_yaxes(automargin=True)
 
     # Add zoom and pan
     fig.update_layout(
@@ -1300,6 +1299,8 @@ def plot_overlap(overlap_matrix: pd.DataFrame, config: PlotConfig, column: str =
     if config.save_plots:
         if custom_filename:
             fig.write_html(f"{config.output_path}/{custom_filename}.html")
+            fig.write_image(f"{config.output_path}/{custom_filename}.svg")
+            fig.write_image(f"{config.output_path}/{custom_filename}.png", scale=config.dpi/96)
         else:
             fig.write_html(f"{config.output_path}/overlap_{column}.html")
 
@@ -1418,27 +1419,28 @@ def _generate_heatmap(df_filtered: pd.DataFrame, title: str, file_suffix: str,
         title=dict(text=title, font=dict(size=20), x=0.5),
         xaxis_title="Tissues",
         yaxis_title="Sub-modules",
-        width=width,
-        height=height,
+        autosize=True,  # Automatische Größenanpassung
         margin=dict(l=150, r=10, b=150, t=80),
         hovermode='closest',
         dragmode='zoom',
         hoverlabel=dict(bgcolor="white", font_size=12)
     )
     fig.update_xaxes(tickangle=45, automargin=True)
-    fig.update_yaxes(automargin=True, scaleanchor="x", scaleratio=1)
-    
+    fig.update_yaxes(automargin=True)
+
     if config.save_plots:
         if custom_filename:
-            filename = f"{custom_filename}_{file_suffix}.html"
+            filename = f"{custom_filename}_{file_suffix}"
         else:
-            filename = f"median_expression_heatmap_{file_suffix}.html"
-        fig.write_html(f"{config.output_path}/{filename}")
+            filename = f"median_expression_heatmap_{file_suffix}"
+        fig.write_html(f"{config.output_path}/{filename}.html")
+        fig.write_image(f"{config.output_path}/{filename}.svg")
+        fig.write_image(f"{config.output_path}/{filename}.png", scale=config.dpi/96)
     
     if config.show:
         fig.show()
     
-    return os.path.abspath(f"{config.output_path}/{filename}")
+    return os.path.abspath(f"{config.output_path}/{filename}.html")
 
 
 def plot_expression_heatmaps(df: pd.DataFrame, cluster_keyword: str, include_all_clusters: bool,
