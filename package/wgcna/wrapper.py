@@ -25,9 +25,9 @@ import pandas as pd
 def analyze_co_expression_network(adata: Union[AnnData, List[AnnData]], config: PlotConfig, custom_filename: str = None, transcripts: str = None,
                                   query: Union[str, int, List[str],
                                                List[int], None] = "GO:0009908",
-                                  topic: str = "Flower development", threshold: float = 0.2,
+                                  topic: str = "Flower development", threshold: float = 0.2, 
                                   tom_prefix: str = "/vol/share/ranomics_app/data/tom", tom_path: str = None, goea_threshold: int = 10,
-                                  node_threshold_percent: float = 0.02, plot_module_trait_relationships: bool = False,
+                                  node_threshold_percent: float = 0.02, node_threshold: int = 10, plot_module_trait_relationships: bool = False,
                                   plot_bar_plots: bool = True, plot_go_enrichment: bool = True,
                                   out: str = "html", obo_path: str = "../go-basic.obo",
                                   template_path: str = "../flask/app_dev/templates", highlight: List[str] = None,
@@ -56,6 +56,7 @@ def analyze_co_expression_network(adata: Union[AnnData, List[AnnData]], config: 
     - tom_prefix (str): Prefix for the TOM path.
     - goea_threshold (int): Threshold for the GO enrichment analysis.
     - node_threshold_percent (float): Percentage of nodes required in a cluster to be assigned.
+    - node_threshold (int): Minimum number of nodes required in a cluster to be assigned.
     - plot_module_trait_relationships (bool): Plot module-trait relationships heatmap.
     - plot_bar_plots (bool): Plot bar plots of cluster eigengenes.
     - plot_go_enrichment (bool): Perform GO enrichment analysis for clusters.
@@ -129,7 +130,7 @@ def analyze_co_expression_network(adata: Union[AnnData, List[AnnData]], config: 
         if progress_callback:
             progress_callback(f"Identifying clusters")
         cluster_map = identify_network_clusters_from_json(
-            cyto_data, topic, node_threshold_percent=node_threshold_percent)
+            cyto_data, topic, node_threshold_percent=node_threshold_percent, node_threshold=node_threshold)
 
         ortho_df = prepare_dataframe(cyto_data['nodes'], cluster_map)
         ortho_table = summarize_orthogroups(ortho_df).reset_index()
