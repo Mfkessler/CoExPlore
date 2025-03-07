@@ -2818,7 +2818,16 @@ def plot_eigengenes(adata: AnnData, eigengenes: pd.DataFrame, config: PlotConfig
 
         fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(len(label) + 2, 4))
 
-        title = f"{adata.uns['name']}: Module Eigengene for {module_name.capitalize()}"
+        species_words = adata.uns['species'].split()
+        italic_species = ' '.join([f"$\\it{{{word}}}$" for word in species_words])
+
+        if module_name.capitalize() != "All sub-modules":
+            second_line = f"Sub-module {module_name.capitalize()}"
+        else:
+            second_line = "All Sub-modules"
+
+        title = f"{italic_species}\n{second_line}"
+
         file_name = f"{custom_filename}_barplot_eigengene_{module_name}" if custom_filename else f"barplot_eigengene_{module_name}"
 
         if column == "eigengenes":
@@ -2831,7 +2840,7 @@ def plot_eigengenes(adata: AnnData, eigengenes: pd.DataFrame, config: PlotConfig
 
         ind = list(range(len(label)))
         ax.tick_params(axis='y', labelsize=15)
-        ax.set_title(title, size=20, fontweight="bold")
+        ax.set_title(title, size=20)
         ax.bar(ind, ybar, align='center', color=palette)
         ax.errorbar(ind, ybar, yerr=ebar, fmt="o", color="r")
         ax.scatter(xdot, ydot, c='black', alpha=0.5)
@@ -2858,8 +2867,6 @@ def plot_eigengenes(adata: AnnData, eigengenes: pd.DataFrame, config: PlotConfig
     return file_paths
 
 # Based on module_trait_relationships_heatmap function from PyWGCNA "https://github.com/mortazavilab/PyWGCNA/blob/main/PyWGCNA/wgcna.py"
-
-
 def plot_module_trait_relationships_heatmap(adata: AnnData, eigengenes: pd.DataFrame, module_info: pd.DataFrame,
                                             config: PlotConfig, meta_data: Union[str, List[str]], topic,
                                             alternative: str = 'two-sided', custom_filename=None) -> None:
