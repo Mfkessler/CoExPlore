@@ -744,9 +744,9 @@ export function runBrowserAnalysisHandler(baseUrl, sessionId) {
         isValid = false;
         errorMessage += "Min Depth must be at least 1.\n";
     }
-    if (maxNeighbors === "" || !isNumeric(maxNeighbors) || parseInt(maxNeighbors) < 0 || parseInt(maxNeighbors) > 10) {
+    if (maxNeighbors === "" || !isNumeric(maxNeighbors) || parseInt(maxNeighbors) < 0 || parseInt(maxNeighbors) > 50) {
         isValid = false;
-        errorMessage += "Max Neighbors must be between 0 and 10.\n";
+        errorMessage += "Max Neighbors must be between 0 and 50.\n";
     }
     if (minClusterSize === "" || !isNumeric(minClusterSize) || parseInt(minClusterSize) < 2) {
         isValid = false;
