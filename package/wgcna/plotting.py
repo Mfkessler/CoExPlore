@@ -1287,9 +1287,8 @@ def plot_overlap(overlap_matrix: pd.DataFrame, config: PlotConfig, column: str =
         hovermode='closest'
     )
 
-    # Responsive resizing for axis labels and title
     fig.update_xaxes(tickangle=45, automargin=True)
-    fig.update_yaxes(automargin=True, scaleanchor="x", scaleratio=1)
+    fig.update_yaxes(automargin=True)
 
     # Add zoom and pan
     fig.update_layout(
@@ -1300,6 +1299,8 @@ def plot_overlap(overlap_matrix: pd.DataFrame, config: PlotConfig, column: str =
     if config.save_plots:
         if custom_filename:
             fig.write_html(f"{config.output_path}/{custom_filename}.html")
+            fig.write_image(f"{config.output_path}/{custom_filename}.svg")
+            fig.write_image(f"{config.output_path}/{custom_filename}.png", scale=config.dpi/96)
         else:
             fig.write_html(f"{config.output_path}/overlap_{column}.html")
 
@@ -1417,28 +1418,29 @@ def _generate_heatmap(df_filtered: pd.DataFrame, title: str, file_suffix: str,
     fig.update_layout(
         title=dict(text=title, font=dict(size=20), x=0.5),
         xaxis_title="Tissues",
-        yaxis_title="Clusters",
-        width=width,
-        height=height,
+        yaxis_title="Sub-modules",
+        autosize=True,  # Automatische Größenanpassung
         margin=dict(l=150, r=10, b=150, t=80),
         hovermode='closest',
         dragmode='zoom',
         hoverlabel=dict(bgcolor="white", font_size=12)
     )
     fig.update_xaxes(tickangle=45, automargin=True)
-    fig.update_yaxes(automargin=True, scaleanchor="x", scaleratio=1)
-    
+    fig.update_yaxes(automargin=True)
+
     if config.save_plots:
         if custom_filename:
-            filename = f"{custom_filename}_{file_suffix}.html"
+            filename = f"{custom_filename}_{file_suffix}"
         else:
-            filename = f"median_expression_heatmap_{file_suffix}.html"
-        fig.write_html(f"{config.output_path}/{filename}")
+            filename = f"median_expression_heatmap_{file_suffix}"
+        fig.write_html(f"{config.output_path}/{filename}.html")
+        fig.write_image(f"{config.output_path}/{filename}.svg")
+        fig.write_image(f"{config.output_path}/{filename}.png", scale=config.dpi/96)
     
     if config.show:
         fig.show()
     
-    return os.path.abspath(f"{config.output_path}/{filename}")
+    return os.path.abspath(f"{config.output_path}/{filename}.html")
 
 
 def plot_expression_heatmaps(df: pd.DataFrame, cluster_keyword: str, include_all_clusters: bool,
@@ -1449,14 +1451,14 @@ def plot_expression_heatmaps(df: pd.DataFrame, cluster_keyword: str, include_all
     
     If 'include_all_clusters' is True, a single heatmap is generated including all clusters.
     If False, two heatmaps are produced:
-      - One excluding clusters that contain the keyword (e.g. excluding "All Clusters")
+      - One excluding clusters that contain the keyword (e.g. excluding "All Sub-modules")
       - One including only clusters that contain the keyword.
     
     Hover text shows the median (2 decimals), the tissue, and the individual sample expression values (2 decimals each).
     
     Parameters:
     - df (pd.DataFrame): DataFrame with columns 'Sample', 'Species', 'Tissue', 'Cluster', and 'Expression'.
-    - cluster_keyword (str): Keyword to identify clusters (e.g. "All Clusters").
+    - cluster_keyword (str): Keyword to identify clusters (e.g. "All Sub-modules").
     - include_all_clusters (bool): If True, include all clusters in one heatmap.
                                   If False, generate two separate heatmaps.
     - config: Plot configuration object (with 'show', 'save_plots', and 'output_path').
@@ -1475,19 +1477,19 @@ def plot_expression_heatmaps(df: pd.DataFrame, cluster_keyword: str, include_all
 
     if include_all_clusters:
         # Use the full DataFrame (all clusters)
-        paths.append(_generate_heatmap(df, title=title or "Heatmap: All Clusters Included",
+        paths.append(_generate_heatmap(df, title=title or "Heatmap: All Sub-modules Included",
                           file_suffix="all_clusters", config=config,
                           row_cluster=row_cluster, col_cluster=col_cluster,
                           width=width, height=height, custom_filename=custom_filename))
     else:
-        # Heatmap 1: Exclude clusters that contain the keyword ("All Clusters")
+        # Heatmap 1: Exclude clusters that contain the keyword ("All Sub-modules")
         df_exclude = df[~df['Cluster'].str.contains(cluster_keyword)]
         paths.append(_generate_heatmap(df_exclude,
-                          title=f"Cluster-trait Eigengenexpression",
+                          title=f"Sub-module-trait Eigengenexpression",
                           file_suffix="exclude_all_clusters", config=config,
                           row_cluster=row_cluster, col_cluster=col_cluster,
                           width=width, height=height, custom_filename=custom_filename))
-        # Heatmap 2: Only clusters that contain the keyword ("All Clusters")
+        # Heatmap 2: Only clusters that contain the keyword ("All Sub-modules")
         df_include = df[df['Cluster'].str.contains(cluster_keyword)]
         paths.append(_generate_heatmap(df_include,
                           title=f"Species-trait Eigengenexpression",
@@ -2816,7 +2818,16 @@ def plot_eigengenes(adata: AnnData, eigengenes: pd.DataFrame, config: PlotConfig
 
         fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(len(label) + 2, 4))
 
-        title = f"{adata.uns['name']}: Module Eigengene for {module_name.capitalize()}"
+        species_words = adata.uns['species'].split()
+        italic_species = ' '.join([f"$\\it{{{word}}}$" for word in species_words])
+
+        if module_name.capitalize() != "All sub-modules":
+            second_line = f"Sub-module {module_name.capitalize()}"
+        else:
+            second_line = "All Sub-modules"
+
+        title = f"{italic_species}\n{second_line}"
+
         file_name = f"{custom_filename}_barplot_eigengene_{module_name}" if custom_filename else f"barplot_eigengene_{module_name}"
 
         if column == "eigengenes":
@@ -2829,7 +2840,7 @@ def plot_eigengenes(adata: AnnData, eigengenes: pd.DataFrame, config: PlotConfig
 
         ind = list(range(len(label)))
         ax.tick_params(axis='y', labelsize=15)
-        ax.set_title(title, size=20, fontweight="bold")
+        ax.set_title(title, size=20)
         ax.bar(ind, ybar, align='center', color=palette)
         ax.errorbar(ind, ybar, yerr=ebar, fmt="o", color="r")
         ax.scatter(xdot, ydot, c='black', alpha=0.5)
@@ -2856,8 +2867,6 @@ def plot_eigengenes(adata: AnnData, eigengenes: pd.DataFrame, config: PlotConfig
     return file_paths
 
 # Based on module_trait_relationships_heatmap function from PyWGCNA "https://github.com/mortazavilab/PyWGCNA/blob/main/PyWGCNA/wgcna.py"
-
-
 def plot_module_trait_relationships_heatmap(adata: AnnData, eigengenes: pd.DataFrame, module_info: pd.DataFrame,
                                             config: PlotConfig, meta_data: Union[str, List[str]], topic,
                                             alternative: str = 'two-sided', custom_filename=None) -> None:
@@ -2903,12 +2912,12 @@ def plot_module_trait_relationships_heatmap(adata: AnnData, eigengenes: pd.DataF
 
     # Get the counts of each cluster from module_info
     cluster_counts = module_info['total_transcripts'].to_dict()
-    all_clusters_count = cluster_counts.get("All Clusters", 0)
+    all_clusters_count = cluster_counts.get("All Sub-modules", 0)
 
     xlabels = []
     for label in eigengenes.columns:
         if label.lower() == 'all clusters':
-            xlabels.append(f"All Clusters ({all_clusters_count})")
+            xlabels.append(f"All Sub-modules ({all_clusters_count})")
         else:
             xlabels.append(
                 f"{label.capitalize()} ({cluster_counts.get(label, 0)})")
@@ -3101,7 +3110,7 @@ def plot_eigengene_expression_bokeh(df: pd.DataFrame, config, custom_filename: s
     # Create the figure
     p = figure(
         x_range=FactorRange(*x_factors),
-        title='Eigengene Expression Across Traits and Clusters',
+        title='Eigengene Expression Across Traits and Sub-modules',
         toolbar_location="above",
         sizing_mode="stretch_both"
     )
@@ -3111,7 +3120,7 @@ def plot_eigengene_expression_bokeh(df: pd.DataFrame, config, custom_filename: s
     # Add HoverTool for bars
     hover_bars = HoverTool(tooltips=[
         ('Trait', '@Tissue'),
-        ('Cluster', '@Cluster'),
+        ('Sub-module', '@Cluster'),
         ('Mean Expression', '@Expression'),
         ('Std Dev', '@std')
     ], renderers=[])
@@ -3120,7 +3129,7 @@ def plot_eigengene_expression_bokeh(df: pd.DataFrame, config, custom_filename: s
     # Add HoverTool for individual points
     hover_points = HoverTool(tooltips=[
         ('Trait', '@Tissue'),
-        ('Cluster', '@Cluster'),
+        ('Sub-module', '@Cluster'),
         ('Expression', '@Expression'),
         ('Sample', '@Sample'),
         ('Species', '@Species')
@@ -3580,16 +3589,24 @@ def aggregate_network(network_data: dict):
     For each cluster, creates an aggregated node with:
       - label: the cluster name and the number of nodes in that cluster
       - color: determined by the average intra-cluster edge weight mapped to the Viridis colormap.
+    Additionally, if nodes have the key "ortho_id", creates edges between aggregated nodes 
+    that represent the number of overlapping orthogroups.
+    
     Returns:
-      aggregated_network (dict): A network with aggregated nodes and no edges.
+      aggregated_network (dict): A network with aggregated nodes and (optionally) edges.
       clusters (dict): Mapping of each cluster label to the list of original nodes in that cluster.
     """
+
     # Group nodes by their cluster label
     clusters = defaultdict(list)
+    ortho_exists = False
     for node in network_data['nodes']:
-        cluster_label = node['data'].get('cluster', 'No clusters')
+        cluster_label = node['data'].get('cluster', 'No Sub-Modules')
         clusters[cluster_label].append(node)
-    
+        # Check if any node has the key "ortho_id"
+        if 'ortho_id' in node['data']:
+            ortho_exists = True
+
     # Calculate average edge weight for each cluster (only intra-cluster edges)
     cluster_edge_weights = defaultdict(list)
     for edge in network_data['edges']:
@@ -3600,9 +3617,9 @@ def aggregate_network(network_data: dict):
         # Find cluster of source and target nodes
         for node in network_data['nodes']:
             if node['data'].get('id') == source_id:
-                source_cluster = node['data'].get('cluster', 'No clusters')
+                source_cluster = node['data'].get('cluster', 'No Sub-Modules')
             if node['data'].get('id') == target_id:
-                target_cluster = node['data'].get('cluster', 'No clusters')
+                target_cluster = node['data'].get('cluster', 'No Sub-modules')
             if source_cluster and target_cluster:
                 break
         if source_cluster == target_cluster and source_cluster is not None:
@@ -3652,27 +3669,58 @@ def aggregate_network(network_data: dict):
         }
         aggregated_nodes.append(agg_node)
         cluster_to_agg_id[cluster_label] = f"cluster_{cluster_label}"
-    
-    # In the aggregated view we do not show edges since clusters do not interconnect.
+    # Create aggregated edges if ortho_id is present
+    aggregated_edges = []
+    if ortho_exists:
+        # For each cluster, collect orthogroups from nodes (as a set)
+        cluster_ortho = {}
+        for cluster_label, nodes in clusters.items():
+            ortho_set = set()
+            for node in nodes:
+                # If the node contains multiple orthogroups, you can split here
+                if 'ortho_id' in node['data']:
+                    ortho_set.add(node['data']['ortho_id'])
+            cluster_ortho[cluster_label] = ortho_set
+
+        # Compare all pairs of clusters
+        cluster_labels = list(clusters.keys())
+        for i in range(len(cluster_labels)):
+            for j in range(i + 1, len(cluster_labels)):
+                cl1 = cluster_labels[i]
+                cl2 = cluster_labels[j]
+                overlap = cluster_ortho[cl1].intersection(cluster_ortho[cl2])
+                if overlap:
+                    edge = {
+                        "data": {
+                            "id": f"edge_{cluster_to_agg_id[cl1]}_{cluster_to_agg_id[cl2]}",
+                            "source": cluster_to_agg_id[cl1],
+                            "target": cluster_to_agg_id[cl2],
+                            "weight": len(overlap),
+                            "overlap": list(overlap)
+                        }
+                    }
+                    aggregated_edges.append(edge)
+    # In the aggregated view, edges are either an empty list or aggregated edges.
     aggregated_network = {
         "nodes": aggregated_nodes,
-        "edges": []
+        "edges": aggregated_edges
     }
     
     return aggregated_network, clusters
+
 
 def get_cluster_detail(network_data: dict, cluster_label: str):
     """
     Extracts the detailed network for a given cluster label.
     Returns a network containing all nodes that belong to the cluster and all intra-cluster edges.
     """
-    detail_nodes = [node for node in network_data['nodes'] if node['data'].get('cluster', 'No clusters') == cluster_label]
+    detail_nodes = [node for node in network_data['nodes'] if node['data'].get('cluster', 'No Sub-modules') == cluster_label]
     node_ids = {node['data']['id'] for node in detail_nodes}
     detail_edges = [edge for edge in network_data['edges']
                     if edge['data'].get('source') in node_ids and edge['data'].get('target') in node_ids]
     return {"nodes": detail_nodes, "edges": detail_edges}
 
-# The main plotting function
+
 def plot_cyto_network(config, custom_filename: str = "cyto_network", 
                       network_data: Dict[str, List[Union[Node, Edge]]] = None,
                       searchpath: str = "../flask/app_dev/templates/", 
@@ -3681,16 +3729,18 @@ def plot_cyto_network(config, custom_filename: str = "cyto_network",
                       highlight: List[str] = None, edge_width: int = 1, 
                       highlight_color: str = "magenta",
                       use_edge_transparency: bool = False, 
-                      use_edge_coloring: bool = True, filter_edges: bool = True) -> str:
+                      use_edge_coloring: bool = True, filter_edges: bool = True,
+                      detail_only: bool = False) -> str:
     """
     Plot a network using Cytoscape.js and save it as an HTML file.
     
     Extended functionality:
       - If 'cluster_info' is provided, each node gets its 'cluster' attribute.
-      - The network is aggregated: an aggregated network JSON is created (one node per cluster,
-        with label = cluster name and node count, and color from Viridis based on average intra-cluster edge weight).
-      - Additionally, for each cluster the detailed network is saved as a separate JSON.
-      - The HTML file will render the aggregated network by default.
+      - By default, the network is aggregated: an aggregated network JSON is created 
+        (one node per cluster, with label = cluster name and node count, and color from Viridis 
+        based on average intra-cluster edge weight) and for each cluster a detail network is saved.
+      - If detail_only is True, NO aggregation is done and ONLY the detail network(s) are saved.
+      - The HTML file will render the aggregated network by default unless detail_only is True.
     
     Parameters:
       config: PlotConfig object with output_path, etc.
@@ -3700,6 +3750,7 @@ def plot_cyto_network(config, custom_filename: str = "cyto_network",
       use_colors, use_shapes, node_size, highlight, edge_width, highlight_color,
       use_edge_transparency, use_edge_coloring, filter_edges: Plotting parameters.
       cluster_info: Dictionary mapping node IDs to cluster names.
+      detail_only: If True, skip network aggregation and save only the detailed network(s).
     
     Returns:
       The absolute path to the saved HTML file.
@@ -3713,9 +3764,9 @@ def plot_cyto_network(config, custom_filename: str = "cyto_network",
     if cluster_info:
         for node in network_data['nodes']:
             node_id = node['data']['id']
-            node['data']['cluster'] = cluster_info.get(node_id, "No clusters")
+            node['data']['cluster'] = cluster_info.get(node_id, "No Sub-modules")
     
-    # Optionally assign shapes based on module_colors (unchanged)
+    # Optionally assign shapes based on module_colors
     if use_shapes:
         shape_dict = generate_cyto_shape_dict(
             [node['data']['module_colors'] for node in network_data['nodes']], None)
@@ -3736,27 +3787,38 @@ def plot_cyto_network(config, custom_filename: str = "cyto_network",
     css_content = css_template.render()
     
     # --- Aggregation and Saving JSONs ---
-    # If cluster_info is provided, compute aggregated network and save JSON files.
     if cluster_info:
-        aggregated_net, clusters = aggregate_network(network_data)
-        # Save aggregated network JSON
-        aggregated_json_filename = f"{custom_filename}_aggregated.json"
-        aggregated_json_path = os.path.join(config.output_path, aggregated_json_filename)
-        with open(aggregated_json_path, 'w') as f:
-            json.dump(aggregated_net, f, indent=2)
-        
-        # For each cluster, save the detailed network JSON
-        for cluster_label in clusters.keys():
-            detail_net = get_cluster_detail(network_data, cluster_label)
-            # Replace spaces or special characters in cluster label if needed
-            safe_cluster_label = cluster_label.replace(" ", "_")
-            detail_json_filename = f"{custom_filename}_detail_{safe_cluster_label}.json"
-            detail_json_path = os.path.join(config.output_path, detail_json_filename)
-            with open(detail_json_path, 'w') as f:
-                json.dump(detail_net, f, indent=2)
-        
-        # For plotting, we use the aggregated network
-        network_data_to_plot = aggregated_net
+        if not detail_only:
+            # Standard: Create aggregated network data and save both JSONs
+            aggregated_net, clusters = aggregate_network(network_data)
+            # Save aggregated network JSON
+            aggregated_json_filename = f"{custom_filename}_aggregated.json"
+            aggregated_json_path = os.path.join(config.output_path, aggregated_json_filename)
+            with open(aggregated_json_path, 'w') as f:
+                json.dump(aggregated_net, f, indent=2)
+            
+            # For each cluster, save the detailed network JSON
+            for cluster_label in clusters.keys():
+                detail_net = get_cluster_detail(network_data, cluster_label)
+                safe_cluster_label = cluster_label.replace(" ", "_")
+                detail_json_filename = f"{custom_filename}_detail_{safe_cluster_label}.json"
+                detail_json_path = os.path.join(config.output_path, detail_json_filename)
+                with open(detail_json_path, 'w') as f:
+                    json.dump(detail_net, f, indent=2)
+            
+            # For plotting, use the aggregated network
+            network_data_to_plot = aggregated_net
+        else:
+            # detail_only True: No aggregation, ONLY save detailed networks
+            for cluster_label in set(cluster_info.values()):
+                detail_net = get_cluster_detail(network_data, cluster_label)
+                safe_cluster_label = cluster_label.replace(" ", "_")
+                detail_json_filename = f"{custom_filename}_detail_{safe_cluster_label}.json"
+                detail_json_path = os.path.join(config.output_path, detail_json_filename)
+                with open(detail_json_path, 'w') as f:
+                    json.dump(detail_net, f, indent=2)
+            # For plotting, use the original (detailed) network
+            network_data_to_plot = network_data
     else:
         network_data_to_plot = network_data
 
@@ -3774,8 +3836,9 @@ def plot_cyto_network(config, custom_filename: str = "cyto_network",
         highlight_color=highlight_color,
         use_edge_transparency=use_edge_transparency,
         use_edge_coloring=use_edge_coloring,
-        outputPath=config.output_path,      # new: output path for JSON files
-        custom_filename=custom_filename       # new: base filename for JSONs
+        outputPath=config.output_path,
+        custom_filename=custom_filename,
+        detail_only=detail_only
     )
     
     # Render the final HTML template with embedded CSS and JS

@@ -1,17 +1,19 @@
 document.addEventListener('DOMContentLoaded', function() {
     // Initialize Cytoscape
-    var filterEdges = {{ filter_edges|tojson }};  // Flag from Python
-    var useBackgroundColor = {{ use_background_color|tojson }};  // Flag from Python
-    var useShapes = {{ use_shapes|tojson }};
-    var useClusterTooltip = {{ use_cluster_tooltip|tojson }};
-    var nodeSize = {{node_size}};  // Initial node size
-    var edgeWidth = {{edge_width}};  // Initial edge width
-    var highlightColor = '{{ highlight_color }}';  // Highlight color from Python
-    var useEdgeTransparency = {{ use_edge_transparency|tojson }};  // Transparency flag
-    var useEdgeColoring = {{ use_edge_coloring|tojson }};  // Edge coloring flag
+    let filterEdges = {{ filter_edges|tojson }};  // Flag from Python
+    let useBackgroundColor = {{ use_background_color|tojson }};  // Flag from Python
+    let useShapes = {{ use_shapes|tojson }};
+    let detailOnly = {{ detail_only|tojson }};
+    let useClusterTooltip = {{ use_cluster_tooltip|tojson }};
+    let nodeSize = {{node_size}};  // Initial node size
+    let aggNodeSize = nodeSize * 4;  // Aggregated node size
+    let edgeWidth = {{edge_width}};  // Initial edge width
+    let highlightColor = '{{ highlight_color }}';  // Highlight color from Python
+    let useEdgeTransparency = {{ use_edge_transparency|tojson }};  // Transparency flag
+    let useEdgeColoring = {{ use_edge_coloring|tojson }};  // Edge coloring flag
 
     // Get the output path and custom filename from the template
-    var customFilename = "{{ custom_filename }}";  // e.g., 'cyto_network'
+    let customFilename = "{{ custom_filename }}";  // e.g., 'cyto_network'
 
     // Metadata
     const METADATA_MAPPING = {{ metadata_dict|tojson }};
@@ -21,8 +23,15 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Aggregated network
     let aggregated = true;
-    
-    var cy = cytoscape({
+    let selectedAggNodes = new Set();
+    const aggregatedFile = customFilename + "_aggregated.json";
+
+    let spinner = document.getElementById('loading-spinner');
+
+    // Initialize the network cache
+    const networkDataCache = {};
+
+    let cy = cytoscape({
         container: document.getElementById('cy'),
         elements: {{ network_data|tojson }},  // Data from Python
         style: [
@@ -38,10 +47,10 @@ document.addEventListener('DOMContentLoaded', function() {
                         return useBackgroundColor ? node.data('module_colors') : 'black';
                     },
                     'width': function(node) {
-                        return node.data('aggregated') ? nodeSize * 2 : nodeSize;
+                        return node.data('aggregated') ? aggNodeSize : nodeSize;
                     },
                     'height': function(node) {
-                        return node.data('aggregated') ? nodeSize * 2 : nodeSize;
+                        return node.data('aggregated') ? aggNodeSize : nodeSize;
                     },
                     'text-valign': function(node) {
                         return node.data('aggregated') ? 'top' : 'center';
@@ -54,7 +63,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         return node.data('aggregated') ? 'black' : 'white';
                     },
                     'font-size': function(node) {
-                        return node.data('aggregated') ? 4 : 2;
+                        return node.data('aggregated') ? 6 : 2;
                     },
                     'label': function(node) {
                         return node.data('aggregated') ? node.data('label') : '';
@@ -66,14 +75,7 @@ document.addEventListener('DOMContentLoaded', function() {
             {
                 selector: 'node[is_neighbor]',
                 style: {
-                    'opacity': 0.25
-                }
-            },
-            {
-                selector: 'edge',
-                style: {
-                    'line-color': 'gray',  // Start with default color
-                    'width': edgeWidth  // Default width
+                    'opacity': 0.40
                 }
             },
             {
@@ -92,11 +94,19 @@ document.addEventListener('DOMContentLoaded', function() {
             nodeRepulsion: 400000,  // Increase this value to spread nodes further apart
             idealEdgeLength: 100,  // Sets an ideal edge length
             nodeDimensionsIncludeLabels: false,  // Doesn't include labels when calculating size
-            animate: false,  // Animates the layout
-            animationDuration: 50  // Sets animation duration
+            animate: false  // Animates the layout
         }
     });
 
+    function computeAggregatedFactor(count, minCount, maxCount) {
+        const minScale = 1.33;
+        const maxScale = 2.5;
+        if (maxCount === minCount) {
+            return (minScale + maxScale) / 2;
+        }
+        return minScale + ((count - minCount) / (maxCount - minCount)) * (maxScale - minScale);
+    }
+    
     /* SVG Shape Creation */
     function createShapeSVG(shape, color = 'black', size = 15) {
         const svgNS = "http://www.w3.org/2000/svg";
@@ -164,6 +174,122 @@ document.addEventListener('DOMContentLoaded', function() {
         return svg;
     }    
 
+    function assignDynamicNetworkIconToAggregatedNodes() {
+        let aggregatedNodes = cy.nodes().filter(node => node.data('aggregated'));
+        if (aggregatedNodes.empty()) return;
+    
+        // Determine the global minimum and maximum node_count (default value: 1)
+        let counts = aggregatedNodes.map(node => node.data('node_count') || 1);
+        let minCount = Math.min(...counts);
+        let maxCount = Math.max(...counts);
+    
+        // For each aggregated node: Determine a scaled node count (between 2 and 10)
+        aggregatedNodes.forEach(function(node) {
+            let rawCount = node.data('node_count') || 1;
+            let scaledCount;
+            if (maxCount === minCount) {
+                scaledCount = 6; // If all are the same, set a median value
+            } else {
+                scaledCount = Math.round(2 + ((rawCount - minCount) / (maxCount - minCount)) * (10 - 2));
+            }
+            // Base size: aggNodeSize (can be adjusted as needed)
+            let baseSize = aggNodeSize;
+            let newSize = baseSize; // Optionally, you can add additional scaling based on rawCount
+    
+            // Create the dynamic network icon with the scaled node count
+            let svgElement = createDynamicNetworkIconSVG(node.data('color') || 'gray', newSize, scaledCount);
+            
+            // Serialize the SVG and create a Data URL from it
+            let serializer = new XMLSerializer();
+            let svgString = serializer.serializeToString(svgElement);
+            let encodedData = encodeURIComponent(svgString);
+            let dataUrl = 'data:image/svg+xml;charset=utf-8,' + encodedData;
+            
+            // Assign the new style to the node:
+            node.style({
+                'width': newSize,
+                'height': newSize,
+                'background-image': 'url(' + dataUrl + ')',
+                'background-fit': 'cover',
+                'background-opacity': 0.8,
+                'background-color': 'lightgray',
+                'border-width': 1,
+                'border-color': 'darkgrey',
+                'border-opacity': 0.8,
+                'shape': 'ellipse',
+                'label': '' // Remove the text if any
+            });
+        });
+    }
+
+    // Creates a dynamic network icon as SVG without a central circle.
+    // Parameters:
+    //   color: Fill color of the small nodes (taken from node data).
+    //   size: Total size of the icon (in pixels).
+    //   count: Number of small nodes (scaled value between 2 and 10).
+    function createDynamicNetworkIconSVG(color, size, count) {
+        const svgNS = "http://www.w3.org/2000/svg";
+        // Create the SVG element.
+        let svg = document.createElementNS(svgNS, "svg");
+        svg.setAttribute("width", size);
+        svg.setAttribute("height", size);
+        svg.setAttribute("viewBox", "0 0 100 100");
+
+        // Center and parameters for positioning
+        const centerX = 50, centerY = 50;
+        const placementRadius = 35; // Distance from the center
+        const nodeRadius = 8;       // Radius of the small nodes
+
+        // Calculate the positions of the small nodes (evenly distributed)
+        let positions = [];
+        for (let i = 0; i < count; i++) {
+            let angle = (2 * Math.PI * i) / count;
+            let cx = centerX + placementRadius * Math.cos(angle);
+            let cy = centerY + placementRadius * Math.sin(angle);
+            positions.push({ cx, cy });
+        }
+
+        // Draw lines from each small node to the center (for a network-like appearance)
+        positions.forEach(pos => {
+            let line = document.createElementNS(svgNS, "line");
+            line.setAttribute("x1", pos.cx);
+            line.setAttribute("y1", pos.cy);
+            line.setAttribute("x2", centerX);
+            line.setAttribute("y2", centerY);
+            line.setAttribute("stroke", color);
+            line.setAttribute("stroke-width", "2");
+            svg.appendChild(line);
+        });
+
+        // Draw lines connecting adjacent nodes (close the circle)
+        for (let i = 0; i < count; i++) {
+            let start = positions[i];
+            let end = positions[(i + 1) % count];
+            let line = document.createElementNS(svgNS, "line");
+            line.setAttribute("x1", start.cx);
+            line.setAttribute("y1", start.cy);
+            line.setAttribute("x2", end.cx);
+            line.setAttribute("y2", end.cy);
+            line.setAttribute("stroke", color);
+            line.setAttribute("stroke-width", "2");
+            svg.appendChild(line);
+        }
+
+        // Create the small nodes (circles) – with fill color and black border.
+        positions.forEach(pos => {
+            let circle = document.createElementNS(svgNS, "circle");
+            circle.setAttribute("cx", pos.cx);
+            circle.setAttribute("cy", pos.cy);
+            circle.setAttribute("r", nodeRadius);
+            circle.setAttribute("fill", "white");
+            circle.setAttribute("stroke", color);
+            circle.setAttribute("stroke-width", "1");
+            svg.appendChild(circle);
+        });
+
+        return svg;
+    }
+    
     function debounce(func, wait) {
         let timeout;
         return function(...args) {
@@ -175,14 +301,12 @@ document.addEventListener('DOMContentLoaded', function() {
     const metadataKeys = Object.keys(METADATA_MAPPING).filter(key => !HIDDEN_KEYS.includes(key));
 
     cy.ready(function() {
-        /* Init edge visibility */
+        if (detailOnly) {
+            aggregated = false;
+        }
+
         const initialZoom = cy.zoom();
         cy.scratch('initialZoom', initialZoom);
-        updateEdgesVisibility();
-
-        // Hide Legend
-        document.getElementById('legend').style.display = 'none';
-        
         const debouncedUpdateEdgesVisibility = debounce(updateEdgesVisibility, 100);
         document.getElementById('edge-visibility-range').addEventListener('input', debouncedUpdateEdgesVisibility);
         cy.on('zoom', debouncedUpdateEdgesVisibility);
@@ -190,21 +314,21 @@ document.addEventListener('DOMContentLoaded', function() {
 
         /* Edge Filtering */
         if (filterEdges) {
-            var thresholdDegree = 10; // Threshold for node degree
-            var topEdges = 10;        // Number of edges to show for high-degree nodes
+            let thresholdDegree = 10; // Threshold for node degree
+            let topEdges = 10;        // Number of edges to show for high-degree nodes
 
             // Calculate the degree for all nodes
-            var degreeCount = {};
+            let degreeCount = {};
             cy.nodes().forEach(function(node) {
                 degreeCount[node.id()] = node.degree();
             });
 
             // Create a map for edges between high-degree nodes
-            var highDegreeEdges = {};
+            let highDegreeEdges = {};
 
             cy.edges().forEach(function(edge) {
-                var source = edge.source().id();
-                var target = edge.target().id();
+                let source = edge.source().id();
+                let target = edge.target().id();
 
                 // Check if both nodes exceed the degree threshold
                 if (degreeCount[source] >= thresholdDegree && degreeCount[target] >= thresholdDegree) {
@@ -221,12 +345,12 @@ document.addEventListener('DOMContentLoaded', function() {
             });
 
             // Reduce the number of edges for high-degree nodes
-            var hiddenEdges = new Set();
+            let hiddenEdges = new Set();
             Object.keys(highDegreeEdges).forEach(function(nodeId) {
-                var edges = highDegreeEdges[nodeId];
+                let edges = highDegreeEdges[nodeId];
 
                 // Sort edges by weight
-                var sortedEdges = edges.sort(function(a, b) {
+                let sortedEdges = edges.sort(function(a, b) {
                     return b.data('weight') - a.data('weight');
                 });
 
@@ -236,9 +360,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
 
                 // Show only the top edges for this node (starting from index 1 as the strongest edge is already shown)
-                for (var i = 1; i < sortedEdges.length && i < topEdges; i++) {
-                    var edge = sortedEdges[i];
-                    var edgeId = edge.id();
+                for (let i = 1; i < sortedEdges.length && i < topEdges; i++) {
+                    let edge = sortedEdges[i];
+                    let edgeId = edge.id();
 
                     // Check if the edge has already been shown
                     if (!hiddenEdges.has(edgeId)) {
@@ -248,9 +372,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
 
                 // Hide all remaining edges
-                for (var i = topEdges; i < sortedEdges.length; i++) {
-                    var edge = sortedEdges[i];
-                    var edgeId = edge.id();
+                for (let i = topEdges; i < sortedEdges.length; i++) {
+                    let edge = sortedEdges[i];
+                    let edgeId = edge.id();
 
                     if (!hiddenEdges.has(edgeId)) {
                         edge.hide();
@@ -316,93 +440,81 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 speciesLegendList.appendChild(li);
             });
-            // Show Legend
-            document.getElementById('legend').style.display = 'block';
-            // Show the species legend
-            document.getElementById('species-legend').style.display = 'block';
-        } else {
-            // Hide the species legend if shapes are not used
-            document.getElementById('species-legend').style.display = 'none';
+
         }
-    }
-
-    function clamp(val, min, max) {
-        return Math.max(min, Math.min(max, val));
-    }
-
-    function lerp(a, b, t) {
-        return a + (b - a) * t;
     }
 
     function updateEdgesVisibility() {
-        // Read the slider value (0 to 100)
-        const sliderValue = parseInt(document.getElementById('edge-visibility-range').value, 10);
-        
-        // Parameters
-        const exponentHigh = 4;    // For high-degree nodes – higher value = slower growth
-        const thresholdLow = 15;   // Nodes with <= 10 edges are considered low-degree
-        
-        // Determine the current viewport (model coordinates)
-        const extent = cy.extent();
-        
-        // Initialize sorted edges (once), sorted in descending order by weight
-        if (!cy.scratch('sortedEdges')) {
-            const sortedEdges = {};
-            cy.nodes().forEach(node => {
-                const nodeEdges = node.connectedEdges();
-                const sorted = nodeEdges.sort((a, b) => (b.data('weight') || 0) - (a.data('weight') || 0));
-                sortedEdges[node.id()] = sorted.map(edge => edge.id());
-            });
-            cy.scratch('sortedEdges', sortedEdges);
-        }
-        const sortedEdges = cy.scratch('sortedEdges');
-        
-        // Hide all edges initially
-        cy.edges().hide();
-        
-        function nodeInExtent(node) {
-            const pos = node.position();
-            return pos.x >= extent.x1 && pos.x <= extent.x2 &&
-                   pos.y >= extent.y1 && pos.y <= extent.y2;
-        }
-        
-        // For each node in the viewport: Calculate how many edges should be shown.
-        cy.nodes().forEach(node => {
-            if (nodeInExtent(node)) {
-                const edgeIds = sortedEdges[node.id()] || [];
-                const totalEdges = edgeIds.length;
-                let effectiveFraction;
-                
-                if (totalEdges <= thresholdLow) {
-                    // For low-degree nodes: If slider ≥20%, show all edges; otherwise scale linearly.
-                    effectiveFraction = sliderValue >= 20 ? 1 : sliderValue / 20;
-                } else {
-                    // For high-degree nodes: Convex mapping for slower growth.
-                    effectiveFraction = Math.pow(sliderValue / 100, exponentHigh);
-                }
-                
-                const allowedEdges = Math.ceil(effectiveFraction * totalEdges);
-                for (let i = 0; i < allowedEdges && i < totalEdges; i++) {
-                    cy.getElementById(edgeIds[i]).show();
-                }
+        if(!aggregated) {
+            // Read the slider value (0 to 100)
+            const sliderValue = parseInt(document.getElementById('edge-visibility-range').value, 10);
+            
+            // Parameters
+            const exponentHigh = 4;    // For high-degree nodes – higher value = slower growth
+            const thresholdLow = 15;   // Nodes with <= 10 edges are considered low-degree
+            
+            // Determine the current viewport (model coordinates)
+            const extent = cy.extent();
+            
+            // Initialize sorted edges (once), sorted in descending order by weight
+            if (!cy.scratch('sortedEdges')) {
+                const sortedEdges = {};
+                cy.nodes().forEach(node => {
+                    const nodeEdges = node.connectedEdges();
+                    const sorted = nodeEdges.sort((a, b) => (b.data('weight') || 0) - (a.data('weight') || 0));
+                    sortedEdges[node.id()] = sorted.map(edge => edge.id());
+                });
+                cy.scratch('sortedEdges', sortedEdges);
             }
-        });
+            const sortedEdges = cy.scratch('sortedEdges');
+            
+            // Hide all edges initially
+            cy.edges().hide();
+            
+            function nodeInExtent(node) {
+                const pos = node.position();
+                return pos.x >= extent.x1 && pos.x <= extent.x2 &&
+                    pos.y >= extent.y1 && pos.y <= extent.y2;
+            }
+            
+            // For each node in the viewport: Calculate how many edges should be shown.
+            cy.nodes().forEach(node => {
+                if (nodeInExtent(node)) {
+                    const edgeIds = sortedEdges[node.id()] || [];
+                    const totalEdges = edgeIds.length;
+                    let effectiveFraction;
+                    
+                    if (totalEdges <= thresholdLow) {
+                        // For low-degree nodes: If slider ≥20%, show all edges; otherwise scale linearly.
+                        effectiveFraction = sliderValue >= 20 ? 1 : sliderValue / 20;
+                    } else {
+                        // For high-degree nodes: Convex mapping for slower growth.
+                        effectiveFraction = Math.pow(sliderValue / 100, exponentHigh);
+                    }
+                    
+                    const allowedEdges = Math.ceil(effectiveFraction * totalEdges);
+                    for (let i = 0; i < allowedEdges && i < totalEdges; i++) {
+                        cy.getElementById(edgeIds[i]).show();
+                    }
+                }
+            });
+        }
     }
 
     // Calculate the minimum and maximum TOM value
-    var minTOM = Math.min(...cy.edges().map(edge => edge.data('weight')));
-    var maxTOM = Math.max(...cy.edges().map(edge => edge.data('weight')));
+    let minTOM = Math.min(...cy.edges().map(edge => edge.data('weight')));
+    let maxTOM = Math.max(...cy.edges().map(edge => edge.data('weight')));
 
     /* Zoom Controls */
 
     // Store the initial zoom level and position
-    var initialZoom = cy.zoom();
-    var initialPan = cy.pan();
-    var initialCenter = cy.center;
+    let initialZoom = cy.zoom();
+    let initialPan = cy.pan();
+    let initialCenter = cy.center;
 
     // Zoom In button
     document.getElementById('zoom-in').addEventListener('click', function() {
-        var currentZoom = cy.zoom();
+        let currentZoom = cy.zoom();
         cy.zoom({
             level: currentZoom * 1.2,  // Zoom in by 20%
             renderedPosition: { x: cy.width() / 2, y: cy.height() / 2 }
@@ -411,58 +523,49 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Zoom Out button
     document.getElementById('zoom-out').addEventListener('click', function() {
-        var currentZoom = cy.zoom();
+        let currentZoom = cy.zoom();
         cy.zoom({
             level: currentZoom * 0.8,  // Zoom out by 20%
             renderedPosition: { x: cy.width() / 2, y: cy.height() / 2 }
         });
     });
 
-    // Reset button
+    // Reset button (Network View)
     document.getElementById('zoom-reset').addEventListener('click', function() {
-        var aggregatedFile = customFilename + "_aggregated.json";
-        fetch(aggregatedFile)
-            .then(function(response) { return response.json(); })
-            .then(function(aggregatedData) {
-                cy.json({ elements: aggregatedData });
-                // Run a layout to reposition nodes properly
-                cy.layout({ name: 'cose', fit: true, padding: 10, animate: false }).run();
-                aggregated = true; // Aggregated network is shown
-                // Hide Legend
-                document.getElementById('legend').style.display = 'none';
-            })
-            .catch(function(error) {
-                console.error("Error loading aggregated network:", error);
-            });
-        
-        // Reset zoom and pan if not in fullscreen
-        if (document.fullscreenElement) {
-            cy.resize();
-            cy.fit();
-        } else {
-            cy.fit();
-            cy.zoom(initialZoom);
-            cy.pan(initialPan);
-            cy.center();
+        if (!aggregated && !detailOnly) {
+            spinner.style.display = 'flex';
+            loadNetworkData(aggregatedFile)
+                .then(aggregatedData => {
+                    cy.json({ elements: aggregatedData });
+                    cy.layout({
+                        name: 'cose',
+                        fit: true,
+                        padding: 10,
+                        nodeRepulsion: 400000,
+                        idealEdgeLength: 100,
+                        animate: false,
+                    }).run();
+                    aggregated = true;
+                    resetParameters();
+                })
+                .catch(error => {
+                    console.error("Error loading aggregated network:", error);
+                    spinner.style.display = 'none';
+                });
         }
-        
-        // Reset node and edge sizes
-        cy.nodes().forEach(node => {
-            node.style('width', nodeSize);
-            node.style('height', nodeSize);
-        });
-        cy.edges().forEach(edge => {
-            edge.style('width', edgeWidth);
-        });
-        
-        adjustNodeAndEdgeSize();
-    });    
+    
+        cy.zoom(initialZoom);
+        cy.pan(initialPan);
+        cy.center();
+    
+        resetParameters();
+    });      
 
     /* Toggle scroll zoom */
 
     // Variable to track the state of scroll zoom
     let scrollZoomActive = false; // Initial state off
-    var rectangleZoomMode = false; // Rectangle zoom is off by default
+    let rectangleZoomMode = false; // Rectangle zoom is off by default
     cy.userZoomingEnabled(false); // Ensure consistency
 
     document.getElementById('toggleZoom').addEventListener('click', function() {
@@ -487,16 +590,16 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Event listener for the export button
     document.getElementById('export-json').addEventListener('click', function() {
-        var cyJson = cy.json();  // Get the current Cytoscape network as JSON
+        let cyJson = cy.json();  // Get the current Cytoscape network as JSON
         
         // Convert the JSON to a string
-        var jsonString = JSON.stringify(cyJson, null, 2);
+        let jsonString = JSON.stringify(cyJson, null, 2);
 
         // Create a blob from the JSON string
-        var blob = new Blob([jsonString], { type: 'application/json' });
+        let blob = new Blob([jsonString], { type: 'application/json' });
 
         // Create a link element to trigger the download
-        var link = document.createElement('a');
+        let link = document.createElement('a');
         link.href = URL.createObjectURL(blob);
         link.download = 'cyto_network.json';  // Name of the exported file
 
@@ -508,19 +611,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
     /* Legend */
 
-    updateLegendDisplay();
-
     // Toggle Legend
     document.getElementById('toggle-legend').addEventListener('click', function() {
-        if(aggregated) {
-            return;
-        } else {
-            // Show the legend if the detailed network is shown
-            var legend = document.getElementById('legend');
-            legend.classList.toggle('hidden');
-            this.classList.toggle('active');
-        }
-      });
+        let legend = document.getElementById('legend');
+        legend.classList.toggle('hidden');
+        this.classList.toggle('active');
+    });
 
     /* Highlight Button */
 
@@ -533,25 +629,27 @@ document.addEventListener('DOMContentLoaded', function() {
         this.classList.toggle('active', highlightingActive);
     });
 
-    /* Edge Coloring and Transparency */
-    updateEdgeStyles();
-
     function updateLegendDisplay() {
-        var legend = document.getElementById('legend');
-        var legendGradient = document.getElementById('legend-gradient');
+        let legend = document.getElementById('legend');
+        let legendGradient = document.getElementById('legend-gradient');
 
         if (useEdgeColoring || useEdgeTransparency) {
             // Set the actual min and max TOM values in the legend
-            document.getElementById('minTOM').textContent = minTOM.toFixed(2);
-            document.getElementById('maxTOM').textContent = maxTOM.toFixed(2);
+            if (aggregated) {
+                document.getElementById('minTOM').textContent = minTOM.toFixed(0);
+                document.getElementById('maxTOM').textContent = maxTOM.toFixed(0);
+            } else {
+                document.getElementById('minTOM').textContent = minTOM.toFixed(2);
+                document.getElementById('maxTOM').textContent = maxTOM.toFixed(2);
+            }
 
             // Update gradient for coloring or transparency
             if (useEdgeColoring) {
                 // Set Viridis gradient if edge coloring is enabled
                 legendGradient.style.background = 'linear-gradient(to right, #440154, #3b528b, #21918c, #5dc962, #fde725)';
             } else if (useEdgeTransparency) {
-                // Set transparency gradient (gray-to-opacity) if only transparency is enabled
-                legendGradient.style.background = 'linear-gradient(to right, rgba(169, 169, 169, 0.1), rgba(169, 169, 169, 1))';
+                // Set transparency gradient (black-to-opacity) if only transparency is enabled
+                legendGradient.style.background = 'linear-gradient(to right, rgba(0, 0, 0, 0.05),rgb(0, 0, 0))';
             }
         } else {
             // Hide the legend if neither edge coloring nor transparency is enabled
@@ -560,44 +658,64 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function updateEdgeStyles() {
-        if (useEdgeTransparency || useEdgeColoring) {
-            /* Color Scale */
-            var colorScale = null;
-            if (useEdgeColoring) {
-                // Define the continuous Viridis scale based on the actual TOM values
-                colorScale = d3.scaleSequential()
-                    .domain([minTOM, maxTOM])
-                    .interpolator(d3.interpolateViridis);
-            }
-
-            /* Transparency Scale */
-            var opacityScale = null;
-            if (useEdgeTransparency) {
-                // Define a transparency scale, 0.1 for the lowest weight and 1 for the highest
-                opacityScale = d3.scaleLinear()
-                    .domain([minTOM, maxTOM])
-                    .range([0.1, 1]);
-            }
-
-            // Use cy.batch() for optimized batch updates of either color or transparency
-            cy.batch(function () {
+        cy.batch(function () {
+            if (aggregated) {
+                // Filter aggregated edges (assumed to have the "overlap" attribute defined)
+                let aggregatedEdges = cy.edges().filter(edge => edge.data('overlap') !== undefined);
+                // Compute global min and max weight among these edges
+                let weights = aggregatedEdges.map(edge => edge.data('weight'));
+                let minWeight = Math.min(...weights);
+                let maxWeight = Math.max(...weights);
+                const fixedEdgeWidth = 1; // Adjust as needed
+                const minOpacity = 0.05;
+            
+                // Shift values to avoid log(0) by ensuring minWeight > 0
+                let shift = (minWeight <= 0) ? Math.abs(minWeight) + 1 : 0;
+            
+                aggregatedEdges.forEach(edge => {
+                    let weight = edge.data('weight') + shift; // Apply shift
+                    let logWeight = Math.log(weight);
+            
+                    // Normalize log-transformed values
+                    let logMin = Math.log(minWeight + shift);
+                    let logMax = Math.log(maxWeight + shift);
+                    let norm = (logMax === logMin) ? 1 : (logWeight - logMin) / (logMax - logMin);
+            
+                    let opacity = minOpacity + norm * (1 - minOpacity);
+                    edge.style({
+                        'width': fixedEdgeWidth,
+                        'line-color': 'black',
+                        'line-opacity': opacity
+                    });
+                });
+            } else {
+                // Detail view: apply D3-based scaling for edge color and transparency
                 cy.edges().forEach(function (edge) {
-                    var weight = edge.data('weight');
-                    var styleUpdate = {};
-
+                    let styleUpdate = {};
                     if (useEdgeColoring) {
-                        styleUpdate['line-color'] = colorScale(weight); // Determine the color based on TOM value
+                        let colorScale = d3.scaleSequential()
+                            .domain([minTOM, maxTOM])
+                            .interpolator(d3.interpolateViridis);
+                        styleUpdate['line-color'] = colorScale(edge.data('weight'));
                     }
-
                     if (useEdgeTransparency) {
-                        styleUpdate['opacity'] = opacityScale(weight); // Determine opacity based on TOM value
+                        let opacityScale = d3.scaleLinear()
+                            .domain([minTOM, maxTOM])
+                            .range([0.1, 1]);
+                        styleUpdate['opacity'] = opacityScale(edge.data('weight'));
                     }
-
+                    // Set default values if no scaling is applied
+                    if (!styleUpdate['line-color']) {
+                        styleUpdate['line-color'] = 'gray';
+                    }
+                    if (!styleUpdate['opacity']) {
+                        styleUpdate['opacity'] = 1;
+                    }
                     edge.style(styleUpdate);
                 });
-            });
-        }
-    }
+            }
+        });
+    }      
 
     function formatList(value) {
         if (typeof value !== 'string' || value.trim() === '') {
@@ -614,21 +732,21 @@ document.addEventListener('DOMContentLoaded', function() {
 
     /* Tooltip on hover */
     cy.on('mouseover', 'node', function(evt) {
-        var node = evt.target;
-        var tooltip = document.getElementById('tooltip');
-        var tooltipText = '';
+        let node = evt.target;
+        let tooltip = document.getElementById('tooltip');
+        let tooltipText = '';
 
         if (node.data('aggregated')) {
             // For aggregated nodes, show only cluster-specific metadata
-            tooltipText += '<b>Cluster:</b> ' + node.data('label') + '<br>';
+            tooltipText += '<b>Sub-module:</b> ' + node.data('label') + '<br>';
             tooltipText += '<b>Average Edge Weight:</b> ' + node.data('avg_weight').toFixed(2) + '<br>';
             tooltipText += '<b>Node Count:</b> ' + node.data('node_count') + '<br>';
         } else {
             // For detailed nodes, iterate through METADATA_MAPPING
-            var dataDict = METADATA_MAPPING;
-            for (var key in dataDict) {
+            let dataDict = METADATA_MAPPING;
+            for (let key in dataDict) {
                 if (HIDDEN_KEYS.includes(key)) continue;
-                var value = node.data(key);
+                let value = node.data(key);
                 if (value !== undefined && value !== null) {
                     let formattedValue = FORMATTED_KEYS.includes(key) ? formatList(value) : value;
                     tooltipText += `<b>${dataDict[key]}:</b> ${formattedValue}<br>`;
@@ -636,14 +754,14 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             tooltipText += '<b>Degree:</b> ' + node.degree() + '<br>';
             if (useClusterTooltip) { 
-                tooltipText += '<b>Cluster:</b> ' + node.data('cluster');
+                tooltipText += '<b>Sub-module:</b> ' + node.data('cluster');
             }
         }
 
         tooltip.style.display = 'block';
         tooltip.innerHTML = tooltipText;
-        var mouseX = evt.originalEvent.clientX;
-        var mouseY = evt.originalEvent.clientY;
+        let mouseX = evt.originalEvent.clientX;
+        let mouseY = evt.originalEvent.clientY;
         tooltip.style.left = (mouseX + 15) + 'px';
         tooltip.style.top = (mouseY) + 'px';
     });
@@ -661,25 +779,26 @@ document.addEventListener('DOMContentLoaded', function() {
     let currentEdgeWidth = edgeWidth;
 
     function adjustNodeAndEdgeSize() {
-        var zoomLevel = cy.zoom();
+        let zoomLevel = cy.zoom();
     
-        // Use the stored values for scaling, not the original values
-        var scaledNodeSize = currentNodeSize / zoomLevel;
-        var scaledEdgeWidth = currentEdgeWidth / zoomLevel;
+        // Calculate scaled sizes
+        let scaledNodeSize = currentNodeSize / zoomLevel;
+        let scaledEdgeWidth = currentEdgeWidth / zoomLevel;
     
+        // For non-aggregated nodes: Adjust size
         cy.nodes().forEach(function(node) {
-            if (node.data('aggregated')) return;  // Skip aggregated nodes
-
+            if (node.data('aggregated')) return;
             node.style('width', scaledNodeSize);
             node.style('height', scaledNodeSize);
         });
     
+        // For edges: Do not overwrite aggregated edges
         cy.edges().forEach(function(edge) {
+            // If it is an aggregated edge (assumed overlap is always defined) – skip
+            if (aggregated && edge.data('overlap') !== undefined) return;
             edge.style('width', scaledEdgeWidth);
         });
     }
-    
-    adjustNodeAndEdgeSize();
 
     // Jitter effect for all metadata
     let currentMetadataIndex = 0;
@@ -766,6 +885,11 @@ document.addEventListener('DOMContentLoaded', function() {
         toggleFullscreen();
     });
 
+    document.addEventListener("fullscreenchange", function() {
+        cy.resize();
+        cy.fit();
+    });
+      
     function restoreNodeAndEdgeSize(initialNodeSize, initialEdgeWidth) {
         // Restore node and edge sizes
         cy.nodes().forEach(function(node) {
@@ -781,21 +905,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
-    
-    // Event listener for fullscreen change -> Resize and fit the graph, adjust button status
-    document.addEventListener("fullscreenchange", function() {
-        cy.resize(); // Ensure the canvas is resized
-        cy.fit(); // Fit the graph to the container
-        adjustNodeAndEdgeSize(); // Apply the new size
-
-        // If fullscreen is exited, reset the button
-        if (!document.fullscreenElement) {
-            cy.zoom(initialZoom);  // Restore the initial zoom level
-            cy.pan(initialPan);    // Reset to the initial pan position
-            cy.center();           // Ensure the graph is centered correctly
-            fullscreenButton.classList.remove("active");
-        } 
-    });
 
     const toggleMetadataButton = document.getElementById("toggle-metadata");
     const buttonTooltip = document.getElementById("button-tooltip");
@@ -852,12 +961,12 @@ document.addEventListener('DOMContentLoaded', function() {
     nodeSizeRange.value = currentNodeSize;
 
     nodeSizeRange.addEventListener('input', function() {
-        var oldNodeSize = currentNodeSize; // Store the old node size
+        let oldNodeSize = currentNodeSize; // Store the old node size
     
         currentNodeSize = parseInt(this.value);  // Get node size from slider
     
         // Calculate the scaling factor based on the old and new node sizes
-        var scaleFactor = currentNodeSize / oldNodeSize;
+        let scaleFactor = currentNodeSize / oldNodeSize;
     
         // Scale the edge width by the same factor as the node size
         currentEdgeWidth *= scaleFactor; 
@@ -871,14 +980,14 @@ document.addEventListener('DOMContentLoaded', function() {
     window.addEventListener('message', function(event) {
         cy.batch(function() {
             if (event.data && event.data.tableSelectedNode !== undefined) {
-                var selectedNode = event.data.tableSelectedNode;
+                let selectedNode = event.data.tableSelectedNode;
 
                 // Only reset table-highlight on affected nodes
                 cy.nodes('.table-highlight').removeClass('table-highlight');
 
                 if (selectedNode) {
                     // Highlight the node selected from the table in a different color
-                    var node = cy.$("node[id='" + selectedNode + "']");
+                    let node = cy.$("node[id='" + selectedNode + "']");
                     if (!node.hasClass('table-highlight')) {
                         node.addClass('table-highlight');
                     }
@@ -886,14 +995,14 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             if (event.data && event.data.visibleNodes) {
-                var visibleNodes = event.data.visibleNodes;
+                let visibleNodes = event.data.visibleNodes;
 
                 // Remove highlight only from previously highlighted nodes
                 cy.nodes('.highlight').removeClass('highlight');
 
                 // Highlight only the nodes that are visible based on the search in the DataTable
                 visibleNodes.forEach(function(nodeID) {
-                    var node = cy.$("node[id='" + nodeID + "']");
+                    let node = cy.$("node[id='" + nodeID + "']");
                     if (!node.hasClass('highlight')) {
                         node.addClass('highlight');
                     }
@@ -923,93 +1032,139 @@ document.addEventListener('DOMContentLoaded', function() {
     let lastClickedNode = null; // Track the last clicked node
 
     cy.on('tap', 'node', function(evt) {
-        var node = evt.target;
-        var nodeId = node.id();
+        let node = evt.target;
+        let nodeId = node.id();
         lastClickedNode = nodeId;
 
-        if (highlightingActive) {
-            cy.batch(function() {
-                if (node.hasClass('highlight')) {
-                    // Highlight the neighborhood of the clicked node
-                    node.neighborhood().addClass('highlight');
-                } else {
-                    // Remove highlight from all nodes and highlight the clicked node
-                    cy.nodes('.highlight').removeClass('highlight');
-                    node.addClass('highlight');
-                }
-            });
-
-            // Collect highlighted nodes
-            var highlightedNodes = cy.nodes('.highlight').map(function(node) {
-                return node.data('id'); 
-            });
-
-            // Send the highlighted nodes back to the main page
-            window.parent.postMessage({ highlightedNodes: highlightedNodes }, '*');
-        }
-
-        if (metadataActive) { // Only jitter if metadata highlighting is active
-            highlightNodesByMetadata(metadataKeys[currentMetadataIndex], node);
-        }
-
-        // If the node is aggregated, load its detail network
-        if (node.data('aggregated')) {
-            // Extract cluster name from label (assumes "ClusterName (n nodes)")
-            var label = node.data('label');
-            var clusterName = label.split(" (")[0]; 
-            var safeClusterName = clusterName.replace(/\s/g, "_");
-            // Build file name WITHOUT outputPath prefix (files are in the same folder)
-            var detailNetworkFile = customFilename + "_detail_" + safeClusterName + ".json";
-            
-            fetch(detailNetworkFile)
-                .then(function(response) { return response.json(); })
-                .then(function(detailData) {
-                    // Replace current network with detailed network and run layout
-                    cy.json({ elements: detailData });
-                    cy.layout({
-                        name: 'cose',
-                        fit: true,  // Ensures the entire graph is visible
-                        padding: 10,  // Adds padding around the layout
-                        nodeRepulsion: 400000,  // Increase this value to spread nodes further apart
-                        idealEdgeLength: 100,  // Sets an ideal edge length
-                        nodeDimensionsIncludeLabels: false,  // Doesn't include labels when calculating size
-                        animate: false,  // Animates the layout
-                        animationDuration: 50  // Sets animation duration
-                    }).run();
-                    aggregated = false;  // Detailed network is now shown
-                    // Show Legend
-                    document.getElementById('legend').style.display = 'block';
-                    resetParameters();
-                })
-                .catch(function(error) {
-                    console.error("Error loading detail network:", error);
+        if (!aggregated) {
+            if (highlightingActive) {
+                cy.batch(function() {
+                    if (node.hasClass('highlight')) {
+                        // Highlight the neighborhood of the clicked node
+                        node.neighborhood().addClass('highlight');
+                    } else {
+                        // Remove highlight from all nodes and highlight the clicked node
+                        cy.nodes('.highlight').removeClass('highlight');
+                        node.addClass('highlight');
+                    }
                 });
+
+                // Collect highlighted nodes
+                let highlightedNodes = cy.nodes('.highlight').map(function(node) {
+                    return node.data('id'); 
+                });
+
+                // Send the highlighted nodes back to the main page
+                window.parent.postMessage({ highlightedNodes: highlightedNodes }, '*');
+            }
+
+            if (metadataActive) { // Only jitter if metadata highlighting is active
+                highlightNodesByMetadata(metadataKeys[currentMetadataIndex], node);
+            }
+        } else {
+            if (selectedAggNodes.has(nodeId)) {
+                selectedAggNodes.delete(nodeId);
+                node.removeClass('selected-agg');
+
+                // Stop jitter effect for this node
+                clearInterval(jitterIntervals[nodeId]);
+            } else {
+                selectedAggNodes.add(nodeId);
+                node.addClass('selected-agg');
+            }
+
+            // Jitter all selected nodes
+            jitterNodes(cy.nodes('.selected-agg'));
         }
     });
 
+    document.getElementById('load-detail-view').addEventListener('click', function() {
+        if (selectedAggNodes.size === 0) {
+          alert('Please select at least one aggregated node.');
+          return;
+        }
+
+        spinner.style.display = 'flex';
+        
+        // Array with promises for each detail network
+        let detailPromises = [];
+        selectedAggNodes.forEach(nodeId => {
+          let node = cy.getElementById(nodeId);
+          let label = node.data('label');
+          let clusterName = label.split(" (")[0];
+          let safeClusterName = clusterName.replace(/\s/g, "_");
+          let detailNetworkFile = customFilename + "_detail_" + safeClusterName + ".json";
+          
+          // All detail networks are loaded via the common cache
+          detailPromises.push(loadNetworkData(detailNetworkFile));
+        });
+        
+        // Wait until all networks are loaded and merged
+        Promise.all(detailPromises)
+          .then(networks => {
+            let mergedElements = { nodes: [], edges: [] };
+            networks.forEach(net => {
+              mergedElements.nodes = mergedElements.nodes.concat(net.nodes || []);
+              mergedElements.edges = mergedElements.edges.concat(net.edges || []);
+            });
+            
+            // Update Cytoscape with the merged elements
+            cy.json({ elements: mergedElements });
+            cy.layout({
+              name: 'cose',
+              fit: true,
+              padding: 100,
+              nodeRepulsion: 400000,
+              idealEdgeLength: 100,
+              nodeDimensionsIncludeLabels: false,
+              animate: false
+            }).run();
+            
+            // After loading: Reset selection and adjust parameters
+            selectedAggNodes.clear();
+            cy.nodes().removeClass('selected-agg');
+            aggregated = false;
+            resetParameters();
+          })
+          .catch(error => {
+            console.error("Error loading combined detail networks:", error);
+          })
+          .finally(() => {
+            spinner.style.display = 'none';
+          });
+    });
+    
     // When clicking anywhere in the Cytoscape plot (but not on nodes), reset the table
     cy.on('tap', function(event) {
         if (event.target === cy) { // If we clicked on an empty space (not a node)
+            if (aggregated) {
+                cy.batch(function() {
+                    // Reset the highlights
+                    cy.nodes('.selected-agg').removeClass('selected-agg');
+                    selectedAggNodes.clear();
+                    lastClickedNode = null; // Clear the last clicked node tracking
+                });
+            } else {
+                window.parent.postMessage({ highlightedNodes: [] }, '*');
+            }
+
             cy.batch(function() {
                 // Reset the highlights
                 cy.nodes('.highlight').removeClass('highlight');
                 lastClickedNode = null; // Clear the last clicked node tracking
             });
 
-            stopJitter(); // Stop the jitter effect
-
-            // Send an empty array to the main page to reset the DataTable
-            window.parent.postMessage({ highlightedNodes: [] }, '*');
+            stopJitter(); // Stop any ongoing jitter effect
         }
     });
 
     /* Rectangle Zoom */
 
     // Variables for rectangle zoom
-    var isMouseDown = false;
-    var startX, startY;
-    var rectangleOverlayElement;
-    var containerOffset;
+    let isMouseDown = false;
+    let startX, startY;
+    let rectangleOverlayElement;
+    let containerOffset;
 
     // Disable default interactions during rectangle zoom
     if (rectangleZoomMode) {
@@ -1019,7 +1174,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Determine container offset for coordinate calculation
-    var rect = cy.container().getBoundingClientRect();
+    let rect = cy.container().getBoundingClientRect();
     containerOffset = {
         left: rect.left + window.scrollX,
         top: rect.top + window.scrollY
@@ -1042,7 +1197,7 @@ document.addEventListener('DOMContentLoaded', function() {
             cy.userZoomingEnabled(false);
             cy.container().style.cursor = 'crosshair';
     
-            var rect = cy.container().getBoundingClientRect();
+            let rect = cy.container().getBoundingClientRect();
             containerOffset = {
                 left: rect.left + window.scrollX,
                 top: rect.top + window.scrollY
@@ -1083,13 +1238,13 @@ document.addEventListener('DOMContentLoaded', function() {
     cy.on('mousemove', function(event) {
         if (!rectangleZoomMode || !isMouseDown) return;
 
-        var currentX = event.originalEvent.pageX - containerOffset.left;
-        var currentY = event.originalEvent.pageY - containerOffset.top;
+        let currentX = event.originalEvent.pageX - containerOffset.left;
+        let currentY = event.originalEvent.pageY - containerOffset.top;
 
-        var x = Math.min(startX, currentX);
-        var y = Math.min(startY, currentY);
-        var width = Math.abs(startX - currentX);
-        var height = Math.abs(startY - currentY);
+        let x = Math.min(startX, currentX);
+        let y = Math.min(startY, currentY);
+        let width = Math.abs(startX - currentX);
+        let height = Math.abs(startY - currentY);
 
         rectangleOverlayElement.style.left = x + 'px';
         rectangleOverlayElement.style.top = y + 'px';
@@ -1103,8 +1258,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
         isMouseDown = false;
 
-        var endX = event.originalEvent.pageX - containerOffset.left;
-        var endY = event.originalEvent.pageY - containerOffset.top;
+        let endX = event.originalEvent.pageX - containerOffset.left;
+        let endY = event.originalEvent.pageY - containerOffset.top;
 
         // Remove the rectangle overlay
         if (rectangleOverlayElement && rectangleOverlayElement.parentNode) {
@@ -1117,22 +1272,22 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         // Calculate the bounding box in model coordinates
-        var x1 = (Math.min(startX, endX) - cy.pan().x) / cy.zoom();
-        var y1 = (Math.min(startY, endY) - cy.pan().y) / cy.zoom();
-        var x2 = (Math.max(startX, endX) - cy.pan().x) / cy.zoom();
-        var y2 = (Math.max(startY, endY) - cy.pan().y) / cy.zoom();
+        let x1 = (Math.min(startX, endX) - cy.pan().x) / cy.zoom();
+        let y1 = (Math.min(startY, endY) - cy.pan().y) / cy.zoom();
+        let x2 = (Math.max(startX, endX) - cy.pan().x) / cy.zoom();
+        let y2 = (Math.max(startY, endY) - cy.pan().y) / cy.zoom();
 
-        var boundingBox = { x1: x1, y1: y1, x2: x2, y2: y2 };
+        let boundingBox = { x1: x1, y1: y1, x2: x2, y2: y2 };
 
         // Zoom into the bounding box
         cy.fit(boundingBox);
     });
 
     document.getElementById('export-png').addEventListener('click', function() {
-        var exportScale = 2; // Higher resolution (2x)
-        var cyImageData = cy.png({ full: false, scale: exportScale }); // Only visible area!
+        let exportScale = 2; // Higher resolution (2x)
+        let cyImageData = cy.png({ full: false, scale: exportScale }); // Only visible area!
     
-        var cyImage = new Image();
+        let cyImage = new Image();
         cyImage.src = cyImageData;
     
         cyImage.onload = function() {
@@ -1142,12 +1297,12 @@ document.addEventListener('DOMContentLoaded', function() {
     
     /* Export Image */
     function createExportImage(cyImage) {
-        var exportCanvas = document.createElement('canvas');
-        var ctx = exportCanvas.getContext('2d');
+        let exportCanvas = document.createElement('canvas');
+        let ctx = exportCanvas.getContext('2d');
     
         // Define canvas size based on Cytoscape container
-        var width = cy.container().clientWidth * 2;
-        var height = cy.container().clientHeight * 2;
+        let width = cy.container().clientWidth * 2;
+        let height = cy.container().clientHeight * 2;
     
         exportCanvas.width = width;
         exportCanvas.height = height;
@@ -1160,12 +1315,27 @@ document.addEventListener('DOMContentLoaded', function() {
         ctx.drawImage(cyImage, 0, 0, width, height);
     
         // Save as PNG
-        var link = document.createElement('a');
+        let link = document.createElement('a');
         link.download = 'cytoscape_export.png';
         link.href = exportCanvas.toDataURL('image/png');
         link.click();
     }
     
+    async function loadNetworkData(file) {
+        if (networkDataCache[file]) {
+          console.log("Using cached network data for:", file);
+          return Promise.resolve(networkDataCache[file]);
+        } else {
+          console.log("Loading network data for:", file);
+          return fetch(file)
+            .then(response => response.json())
+            .then(data => {
+              networkDataCache[file] = data;
+              return data;
+            });
+        }
+    }
+
     function resetParameters() {
         // Clear the sortedEdges cache so that edge filtering is recalculated
         cy.scratch('sortedEdges', null);
@@ -1177,39 +1347,63 @@ document.addEventListener('DOMContentLoaded', function() {
         // Reset node sizes for all nodes:
         cy.nodes().forEach(function(node) {
             if (node.data('aggregated')) {
-                // For aggregated nodes, set them to 2x (oder 4x, je nach Wunsch) der normalen Größe
-                node.style('width', nodeSize * 2);
-                node.style('height', nodeSize * 2);
+                // For aggregated nodes
+                node.style('width', aggNodeSize);
+                node.style('height', aggNodeSize);
             } else {
                 // For detail nodes, use the default nodeSize
                 node.style('width', nodeSize);
                 node.style('height', nodeSize);
             }
-        });
-        
-        // Reset edge sizes
-        cy.edges().forEach(function(edge) {
-            edge.style('width', edgeWidth);
-        });
-        
-        // Update Species Legend
-        assignOrganismShapes();
-
-        // Re-run the edge visibility update (this will rebuild the sortedEdges cache)
-        updateEdgesVisibility();
+        });          
         
         // Calculate the minimum and maximum TOM value
         minTOM = Math.min(...cy.edges().map(edge => edge.data('weight')));
         maxTOM = Math.max(...cy.edges().map(edge => edge.data('weight')));
 
+        if (!aggregated) {
+            updateEdgesVisibility();
+            useEdgeTransparency = false
+            useEdgeColoring = true;
+        } else {
+            minTOM = Math.floor(minTOM);
+            maxTOM = Math.floor(maxTOM);
+            useEdgeColoring = false;
+            useEdgeTransparency = true;
+            assignDynamicNetworkIconToAggregatedNodes();
+            cy.batch(function() {
+                // Reset the highlights
+                cy.nodes('.selected-agg').removeClass('selected-agg');
+                lastClickedNode = null; // Clear the last clicked node tracking
+            });
+        }
+
+        if (!useShapes || aggregated) {
+            // Hide the species legend if shapes are not used
+            document.getElementById('species-legend').style.display = 'none';
+        } else if (useShapes && !aggregated) {
+            // Show the species legend if shapes are used
+            assignOrganismShapes();
+            document.getElementById('species-legend').style.display = 'block';
+        }
+
         updateEdgeStyles();
         updateLegendDisplay();
+
+        adjustNodeAndEdgeSize();
+
+        if (aggregated) {
+            document.querySelector('#edge-legend p b').textContent = "Overlapping Orthogroups";
+            document.getElementById('load-detail-view').style.display = 'block';
+        } else {
+            document.querySelector('#edge-legend p b').textContent = "TOM Value";
+            document.getElementById('load-detail-view').style.display = 'none';
+        }
+
+        spinner.style.display = 'none';
     }
-    
 
-    // Hide the loading spinner when the layout is complete
-    cy.on('render', function(){
-        document.getElementById('loading-spinner').style.display = 'none';
-    });
+    resetParameters();
 
+    console.log("Cytoscape network visualization initialized successfully.");
 });

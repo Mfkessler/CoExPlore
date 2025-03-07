@@ -444,7 +444,13 @@
                 ],
                 columnDefs: columnDefs,
                 initComplete: function() {
-                    toggleEmptyColumns(this.api());
+                    var api = this.api();
+                    api.columns().every(function(index) {
+                        if (index > 5) {
+                            this.visible(false);
+                        }
+                    });
+                    toggleEmptyColumns(api);
                     $('#browserRes').on('draw.dt', function() {
                         toggleEmptyColumns(table);
                         sendHeight();
