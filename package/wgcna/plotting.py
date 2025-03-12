@@ -1316,7 +1316,8 @@ def plot_overlap(overlap_matrix: pd.DataFrame, config: PlotConfig, column: str =
 def _generate_heatmap(df_filtered: pd.DataFrame, title: str, file_suffix: str,
                       config, row_cluster: bool, col_cluster: bool,
                       width: int, height: int, custom_filename: str = None,
-                      sort_rows: bool = True, exclude_columns: list = ['Unknown']) -> str:
+                      sort_rows: bool = True, sort_cols: bool = True,
+                      exclude_columns: list = ['Unknown']) -> str:
     """
     This helper function generates and saves/displays a heatmap from a filtered DataFrame.
 
@@ -1330,7 +1331,8 @@ def _generate_heatmap(df_filtered: pd.DataFrame, title: str, file_suffix: str,
     - width (int): Plot width.
     - height (int): Plot height.
     - custom_filename (str): Custom filename for the plot.
-    - sort_rows (bool): If True, rows are sorted alphabetically (ascending) by cluster names.
+    - sort_rows (bool): If True, rows (Cluster) are sorted alphabetically ascending.
+    - sort_cols (bool): If True, columns (Tissue) are sorted alphabetically ascending.
     - exclude_columns (list): List of column names to exclude from the heatmap.
 
     Returns:
@@ -1338,17 +1340,25 @@ def _generate_heatmap(df_filtered: pd.DataFrame, title: str, file_suffix: str,
     """
 
     # Pivot: rows = Cluster, columns = Tissue; value = median(Expression)
-    pivot_table = df_filtered.pivot_table(index='Cluster', columns='Tissue', 
+    pivot_table = df_filtered.pivot_table(index='Cluster', columns='Tissue',
                                           values='Expression', aggfunc="median")
 
+    # Exclude specified columns
     if exclude_columns:
-        pivot_table = pivot_table.drop(columns=[col for col in exclude_columns if col in pivot_table.columns], errors='ignore')
+        pivot_table = pivot_table.drop(columns=[col for col in exclude_columns if col in pivot_table.columns],
+                                       errors='ignore')
 
+    # Sort rows if requested
     if sort_rows:
         pivot_table.index = pivot_table.index.astype(str)
         pivot_table = pivot_table.sort_index(ascending=True)
 
-    # Create custom hover text matrix with the desired order and information
+    # Sort columns if requested
+    if sort_cols:
+        pivot_table.columns = pivot_table.columns.astype(str)
+        pivot_table = pivot_table.sort_index(axis=1, ascending=True)
+
+    # Build hover text
     hover_text = []
     for cluster in pivot_table.index:
         row_text = []
@@ -1360,7 +1370,8 @@ def _generate_heatmap(df_filtered: pd.DataFrame, title: str, file_suffix: str,
                 species_unique = group['Species'].unique()
                 species_str = ", ".join(species_unique)
                 median_val = group['Expression'].median()
-                samples_str = "<br>".join([f"{row['Sample']}: {row['Expression']:.2f}" for _, row in group.iterrows()])
+                samples_str = "<br>".join([f"{row['Sample']}: {row['Expression']:.2f}"
+                                           for _, row in group.iterrows()])
                 row_text.append(
                     f"Species: {species_str}<br>"
                     f"Tissue: {tissue}<br>"
@@ -1381,6 +1392,7 @@ def _generate_heatmap(df_filtered: pd.DataFrame, title: str, file_suffix: str,
         col_linkage = linkage(pivot_table.fillna(0).T.values, method='ward')
         col_order = leaves_list(col_linkage)
         pivot_table = pivot_table.iloc[:, col_order]
+        # Reorder each row of hover_text accordingly
         hover_text = [[row[i] for i in col_order] for row in hover_text]
 
     # Determine data range
@@ -1404,7 +1416,9 @@ def _generate_heatmap(df_filtered: pd.DataFrame, title: str, file_suffix: str,
         colorbar=dict(
             title=dict(text="Median Expression", side="right"),
             tickvals=[data_min, (data_min + data_max) / 2, data_max],
-            ticktext=[f"{data_min:.2f}", f"{(data_min + data_max) / 2:.2f}", f"{data_max:.2f}"],
+            ticktext=[f"{data_min:.2f}",
+                      f"{(data_min + data_max) / 2:.2f}",
+                      f"{data_max:.2f}"],
             thickness=15,
             len=0.5
         )
@@ -1434,6 +1448,8 @@ def _generate_heatmap(df_filtered: pd.DataFrame, title: str, file_suffix: str,
     )
 
     fig.update_xaxes(tickangle=45, automargin=True)
+    # By default, the Y-axis is inverted in Plotly
+    # -> 'autorange="reversed"' ensures "top row at the top"
     fig.update_yaxes(automargin=True, autorange='reversed')
 
     filename = f"{custom_filename or 'median_expression_heatmap'}_{file_suffix}"
@@ -1450,7 +1466,7 @@ def _generate_heatmap(df_filtered: pd.DataFrame, title: str, file_suffix: str,
 
 
 def plot_expression_heatmaps(df: pd.DataFrame, cluster_keyword: str, include_all_clusters: bool,
-                             config, title: str = "", row_cluster: bool = False, col_cluster: bool = True,
+                             config, title: str = "", row_cluster: bool = False, col_cluster: bool = False,
                              width: int = 1200, height: int = 800, custom_filename: str = None) -> None:
     """
     This function creates heatmaps of median gene expression per tissue per cluster.
