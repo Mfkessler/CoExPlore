@@ -1315,10 +1315,11 @@ def plot_overlap(overlap_matrix: pd.DataFrame, config: PlotConfig, column: str =
 
 def _generate_heatmap(df_filtered: pd.DataFrame, title: str, file_suffix: str,
                       config, row_cluster: bool, col_cluster: bool,
-                      width: int, height: int, custom_filename: str = None) -> str:
+                      width: int, height: int, custom_filename: str = None,
+                      sort_rows: bool = True, exclude_columns: list = ['Unknown']) -> str:
     """
     This helper function generates and saves/displays a heatmap from a filtered DataFrame.
-    
+
     Parameters:
     - df_filtered (pd.DataFrame): Filtered DataFrame with columns 'Sample', 'Species', 'Tissue', 'Cluster', 'Expression'.
     - title (str): Title for the heatmap.
@@ -1329,14 +1330,23 @@ def _generate_heatmap(df_filtered: pd.DataFrame, title: str, file_suffix: str,
     - width (int): Plot width.
     - height (int): Plot height.
     - custom_filename (str): Custom filename for the plot.
+    - sort_rows (bool): If True, rows are sorted alphabetically (ascending) by cluster names.
+    - exclude_columns (list): List of column names to exclude from the heatmap.
 
     Returns:
     - str: Absolute path to the saved plot.
     """
-    
+
     # Pivot: rows = Cluster, columns = Tissue; value = median(Expression)
     pivot_table = df_filtered.pivot_table(index='Cluster', columns='Tissue', 
                                           values='Expression', aggfunc="median")
+
+    if exclude_columns:
+        pivot_table = pivot_table.drop(columns=[col for col in exclude_columns if col in pivot_table.columns], errors='ignore')
+
+    if sort_rows:
+        pivot_table.index = pivot_table.index.astype(str)
+        pivot_table = pivot_table.sort_index(ascending=True)
 
     # Create custom hover text matrix with the desired order and information
     hover_text = []
@@ -1358,31 +1368,28 @@ def _generate_heatmap(df_filtered: pd.DataFrame, title: str, file_suffix: str,
                     f"Samples:<br>{samples_str}"
                 )
         hover_text.append(row_text)
-    
+
     # Optional: Cluster rows
     if row_cluster and pivot_table.shape[0] > 1:
         row_linkage = linkage(pivot_table.fillna(0).values, method='ward')
         row_order = leaves_list(row_linkage)
         pivot_table = pivot_table.iloc[row_order, :]
         hover_text = [hover_text[i] for i in row_order]
-    
+
     # Optional: Cluster columns
     if col_cluster and pivot_table.shape[1] > 1:
         col_linkage = linkage(pivot_table.fillna(0).T.values, method='ward')
         col_order = leaves_list(col_linkage)
         pivot_table = pivot_table.iloc[:, col_order]
         hover_text = [[row[i] for i in col_order] for row in hover_text]
-    
+
     # Determine data range
-    if not np.isnan(pivot_table.values).all():
-        data_min = np.nanmin(pivot_table.values)
-        data_max = np.nanmax(pivot_table.values)
-    else:
-        data_min, data_max = 0, 1
-    
+    data_min = np.nanmin(pivot_table.values) if not np.isnan(pivot_table.values).all() else 0
+    data_max = np.nanmax(pivot_table.values) if not np.isnan(pivot_table.values).all() else 1
+
     mask = pivot_table.isna()
-    
-    # Main heatmap trace with updated colorbar design (only three tick labels: min, mid, max)
+
+    # Heatmap trace
     heatmap_trace = go.Heatmap(
         z=pivot_table.values,
         x=pivot_table.columns,
@@ -1402,8 +1409,8 @@ def _generate_heatmap(df_filtered: pd.DataFrame, title: str, file_suffix: str,
             len=0.5
         )
     )
-    
-    # Trace for missing values (displayed in grey)
+
+    # Trace for missing values
     missing_trace = go.Heatmap(
         z=np.where(mask, data_max, np.nan),
         x=pivot_table.columns,
@@ -1412,39 +1419,38 @@ def _generate_heatmap(df_filtered: pd.DataFrame, title: str, file_suffix: str,
         showscale=False,
         hoverinfo='none'
     )
-    
-    # Build figure with main trace first, then overlay missing trace
+
     fig = go.Figure(data=[missing_trace, heatmap_trace])
+
     fig.update_layout(
         title=dict(text=title, font=dict(size=20), x=0.5),
         xaxis_title="Tissues",
         yaxis_title="Sub-modules",
-        autosize=True,  # Automatische Größenanpassung
+        autosize=True,
         margin=dict(l=150, r=10, b=150, t=80),
         hovermode='closest',
         dragmode='zoom',
         hoverlabel=dict(bgcolor="white", font_size=12)
     )
+
     fig.update_xaxes(tickangle=45, automargin=True)
-    fig.update_yaxes(automargin=True)
+    fig.update_yaxes(automargin=True, autorange='reversed')
+
+    filename = f"{custom_filename or 'median_expression_heatmap'}_{file_suffix}"
 
     if config.save_plots:
-        if custom_filename:
-            filename = f"{custom_filename}_{file_suffix}"
-        else:
-            filename = f"median_expression_heatmap_{file_suffix}"
         fig.write_html(f"{config.output_path}/{filename}.html")
         fig.write_image(f"{config.output_path}/{filename}.svg")
-        fig.write_image(f"{config.output_path}/{filename}.png", scale=config.dpi/96)
-    
+        fig.write_image(f"{config.output_path}/{filename}.png", scale=config.dpi / 96)
+
     if config.show:
         fig.show()
-    
+
     return os.path.abspath(f"{config.output_path}/{filename}.html")
 
 
 def plot_expression_heatmaps(df: pd.DataFrame, cluster_keyword: str, include_all_clusters: bool,
-                             config, title: str = "", row_cluster: bool = True, col_cluster: bool = False,
+                             config, title: str = "", row_cluster: bool = False, col_cluster: bool = True,
                              width: int = 1200, height: int = 800, custom_filename: str = None) -> None:
     """
     This function creates heatmaps of median gene expression per tissue per cluster.
@@ -2753,7 +2759,8 @@ def plot_cluster_expression(adata: AnnData, config: PlotConfig, cluster_id: int,
 
 
 def plot_eigengenes(adata: AnnData, eigengenes: pd.DataFrame, config: PlotConfig, column: str = "clusters",
-                    trait: str = "tissue", custom_filename: str = None, custom_stages: List[str] = None) -> None:
+                    trait: str = "tissue", custom_filename: str = None, custom_stages: List[str] = None,
+                    exclude_columns: list = ['Unknown']) -> None:
     """
     Bar plot of module eigengene figure in given eigengenes DataFrame.
 
@@ -2765,7 +2772,7 @@ def plot_eigengenes(adata: AnnData, eigengenes: pd.DataFrame, config: PlotConfig
     - trait (str): Column name in adata.obs containing the trait information.
     - custom_filename (str): Custom filename for the plot.
     - custom_stages (List[str]): List of custom stages to use for coloring.
-    - trait (str): The trait column to use for grouping the data.
+    - exclude_columns (list): List of trait values and eigengene columns to exclude from plotting.
     """
 
     plt.rcParams['savefig.bbox'] = 'tight'
@@ -2773,12 +2780,16 @@ def plot_eigengenes(adata: AnnData, eigengenes: pd.DataFrame, config: PlotConfig
     if trait not in adata.obs.columns:
         trait = "Combined_Trait"
         if trait not in adata.obs.columns:
-            print(
-                f"Trait {trait} not found in adata.obs. Skipping plot_eigengenes function.")
+            print(f"Trait {trait} not found in adata.obs. Skipping plot_eigengenes function.")
             return
-
-    # Use the trait information from adata.obs
+        
     sample_info = adata.obs[trait]
+    mask = ~sample_info.isin(exclude_columns)
+    sample_info = sample_info[mask]
+    if pd.api.types.is_categorical_dtype(sample_info):
+        sample_info = sample_info.cat.remove_unused_categories()
+    eigengenes = eigengenes.loc[mask]
+
     metadata_colors = generate_stage_color_dict(custom_stages=custom_stages)
     file_paths = []
 
@@ -2786,22 +2797,18 @@ def plot_eigengenes(adata: AnnData, eigengenes: pd.DataFrame, config: PlotConfig
         print("WARNING: There is no sample information in the given object! Skipping plot_eigengenes function.")
         return None
 
-    # Calculate the number of valid samples (non-null) for each module
     cluster_counts = eigengenes.notnull().sum().sort_values()
 
     for module_name in cluster_counts.index:
-        ME = pd.DataFrame(eigengenes[module_name].values, columns=[
-                          'eigengeneExp'], index=eigengenes.index)
+        ME = pd.DataFrame(eigengenes[module_name].values, columns=['eigengeneExp'], index=eigengenes.index)
 
         if module_name.startswith(f"{adata.uns['name']}: "):
             module_name = module_name[len(f"{adata.uns['name']}: "):]
 
         df = ME.copy(deep=True)
         df['all'] = sample_info
-        ybar = df[['all', 'eigengeneExp']].groupby(['all'], observed=False).mean()[
-            'eigengeneExp']
-        ebar = df[['all', 'eigengeneExp']].groupby(['all'], observed=False).std()[
-            'eigengeneExp']
+        ybar = df[['all', 'eigengeneExp']].groupby(['all'], observed=True).mean()['eigengeneExp']
+        ebar = df[['all', 'eigengeneExp']].groupby(['all'], observed=True).std()['eigengeneExp']
         label = list(ybar.index)
         dot = df[['all', 'eigengeneExp']].copy()
         ind = {val: i for i, val in enumerate(label)}
@@ -2811,28 +2818,20 @@ def plot_eigengenes(adata: AnnData, eigengenes: pd.DataFrame, config: PlotConfig
         xdot = dot['all']
         ydot = dot['eigengeneExp']
 
-        if metadata_colors is None:
-            palette = "lightblue"
-        else:
-            palette = [metadata_colors.get(val, "lightblue") for val in label]
+        palette = [metadata_colors.get(val, "lightblue") for val in label] if metadata_colors else "lightblue"
 
         fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(len(label) + 2, 4))
 
         species_words = adata.uns['species'].split()
         italic_species = ' '.join([f"$\\it{{{word}}}$" for word in species_words])
 
-        if module_name.capitalize() != "All sub-modules":
-            second_line = f"Sub-module {module_name.capitalize()}"
-        else:
-            second_line = "All Sub-modules"
-
+        second_line = f"Sub-module {module_name.capitalize()}" if module_name.capitalize() != "All sub-modules" else "All Sub-modules"
         title = f"{italic_species}\n{second_line}"
 
         file_name = f"{custom_filename}_barplot_eigengene_{module_name}" if custom_filename else f"barplot_eigengene_{module_name}"
 
         if column == "eigengenes":
-            if module_name.startswith("ME"):
-                module_name = module_name[2:]
+            module_name = module_name[2:] if module_name.startswith("ME") else module_name
             title = f"Module Eigengene for {module_name}"
             file_name = f"module_barplot_eigengene_{module_name}"
         elif column == "modules":
@@ -2857,10 +2856,8 @@ def plot_eigengenes(adata: AnnData, eigengenes: pd.DataFrame, config: PlotConfig
         if config.show:
             plt.show()
         if config.save_plots:
-            fig.savefig(
-                f"{config.output_path}/{file_name}.{config.file_format}", dpi=config.dpi)
-            file_paths.append(
-                f"{config.output_path}/{file_name}.{config.file_format}")
+            fig.savefig(f"{config.output_path}/{file_name}.{config.file_format}", dpi=config.dpi)
+            file_paths.append(f"{config.output_path}/{file_name}.{config.file_format}")
 
         plt.close(fig)
 
