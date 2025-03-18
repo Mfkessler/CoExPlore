@@ -20,6 +20,10 @@
 
 ## Workflow
 
+<h2 align="center">
+  <img src="./workflow.png" alt="Logo" width="400">
+</h2>
+
 1. **Preprocessing with Pipeline**:
    - Use `docker-compose-pipeline.yaml` to convert count matrices and metadata into `.h5ad` and TOM files.
 
