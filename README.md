@@ -11,18 +11,21 @@
 ## Features
 
 - **Comparative Co-Expression Analysis**: Supports cross-dataset comparisons of co-expression networks, eigengenes, and module-trait relationships.
-- **Metadata Integration**: Enhances biological insights with GO terms and orthogroups.
+- **Metadata Integration**: Enhances biological insights with GO terms, orthogroups and more.
 - **Automated Workflow**: Transforms count matrices and metadata into `.h5ad` and TOM files using Snakemake.
 - **Interactive Visualization**: Explores co-expression networks via a web-based interface.
-- **Scalable and Reproducible**: Fully containerized solution with Docker for consistent results.
+- **Sub-module Analysis**: Identification and exploration of refined sub-modules, such as transcription factor networks or specific gene groups, enabling targeted investigation of gene regulatory mechanisms across species.
 
 ---
 
 ## Workflow
 
+<h2 align="center">
+  <img src="./workflow.png" alt="Logo" width="400">
+</h2>
+
 1. **Preprocessing with Pipeline**:
    - Use `docker-compose-pipeline.yaml` to convert count matrices and metadata into `.h5ad` and TOM files.
-   - Fully automated with Snakemake inside Docker.
 
 2. **Start the Web App**:
    - Use `docker-compose-app.yaml` to deploy the interactive web application.
@@ -41,15 +44,17 @@ git clone https://github.com/Mfkessler/CoExPlore.git
 cd CoExPlore
 ```
 
-### 2. Build the Docker Image
+### 2. Build the Docker Images
 
 ```bash
-docker build -t coexplore:latest .
+docker build -t coexplore-base -f Dockerfile.base .
+docker build -t coexplore-pipeline -f Dockerfile.pipe .
+docker build -t coexplore-app -f Dockerfile.app .
 ```
 
 ### 3. Run Preprocessing
 
-1. **Edit `wgcna-pipeline/config.yml`**:
+1. **Edit `pipeline/config.yml`**:
    - Set paths for input data like count matrices and metadata.
 
 2. **Execute Pipeline**:
@@ -64,7 +69,7 @@ docker build -t coexplore:latest .
 docker compose -f docker-compose-app.yaml up
 ```
 
-Access the application at [http://localhost:5000](http://localhost:5000) to analyze your data interactively.
+Access the application at [http://localhost:5001](http://localhost:5001) to analyze your data interactively.
 
 ---
 
