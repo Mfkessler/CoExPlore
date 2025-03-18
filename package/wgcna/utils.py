@@ -360,7 +360,7 @@ def generate_stage_color_dict(custom_stages: List[str] = None) -> Dict[str, str]
 
 def process_anndata(
     adata: AnnData,
-    gaf_gz_path: str = None,
+    go_path: str = None,
     ortho_dir: str = None,
     ortho_column_name: str = None,
     decimal_places: int = 2,
@@ -381,7 +381,7 @@ def process_anndata(
 
     Parameters:
     - adata (AnnData): The AnnData object to be processed.
-    - gaf_gz_path (str): Path to the Gene Annotation File (GAF) in gzipped format.
+    - go_path (str): Path to the Gene Annotation File (GAF).
     - ortho_dir (str): Path to the dir containing orthogroups.
     - ortho_column_name (str): Column name under which orthologous IDs are stored. E.g. species abbreviation.
     - decimal_places (int): Number of decimal places to round float columns to.
@@ -390,8 +390,8 @@ def process_anndata(
     - qc_metrics (bool): If True, recalculates quality control metrics for the AnnData object.
     """
 
-    if go_terms and gaf_gz_path:
-        add_go_terms_to_anndata(adata, gaf_gz_path=gaf_gz_path)
+    if go_terms and go_path:
+        add_go_terms_to_anndata(adata, go_path=go_path)
     if ortho_id and ortho_column_name:
         add_ortho_ids_to_anndata(
             adata, column_name=ortho_column_name, base_path=ortho_dir)
@@ -405,48 +405,47 @@ def process_anndata(
         adata.var[float_cols] = adata.var[float_cols].round(decimal_places)
 
 
-def add_go_terms_to_anndata(adata: AnnData, gaf_gz_path: str, hog: bool = False) -> None:
+def add_go_terms_to_anndata(adata: AnnData, go_path: str, hog: bool = False) -> None:
     """
-    Reads a GAF.gz (Gene Annotation File) and adds the GO (Gene Ontology) terms 
+    Reads a GAF (Gene Annotation File) and adds the GO (Gene Ontology) terms 
     associated with each gene to the .var attribute of an AnnData object. The 
     function assumes that the AnnData object's .var attribute contains gene 
     identifiers as the index.
 
-    The GAF file is expected to be compressed in gzip format. The function 
-    extracts the GO terms and the corresponding gene symbols from the GAF file, 
+    The function supports both compressed (.gaf.gz) and uncompressed (.gaf) GAF files. 
+    It extracts the GO terms and the corresponding gene symbols from the file, 
     then merges this information into the .var table of the specified AnnData object
     as a comma-separated string.
 
     Parameters:
     - adata (AnnData): An AnnData object containing gene expression data.
-    - gaf_gz_path (str): Path to the GAF.gz file containing gene annotations and GO terms.
+    - go_path (str): Path to the GAF file (.gaf or .gaf.gz) containing gene annotations and GO terms.
     - hog (bool): If True, the function assumes that the identifiers in the .var are HOG IDs.
     """
 
+    compression = 'gzip' if go_path.endswith('.gaf.gz') else None
+
     if hog:
-        mapping_df = pd.read_csv(gaf_gz_path, sep='\t', header=None, names=[
-                                 'hog_id', 'go_terms'])
-        hog_to_go_dict = pd.Series(
-            mapping_df.go_terms.values, index=mapping_df.hog_id).to_dict()
+        # Read HOG ID to GO term mapping
+        mapping_df = pd.read_csv(go_path, sep='\t', header=None, names=['hog_id', 'go_terms'])
+        hog_to_go_dict = pd.Series(mapping_df.go_terms.values, index=mapping_df.hog_id).to_dict()
         adata.var['go_terms'] = adata.var.index.map(hog_to_go_dict).fillna('')
     else:
         # Read GAF file and extract necessary columns
-        gaf_df = pd.read_csv(gaf_gz_path, sep='\t', header=None, comment='!', compression='gzip',
+        gaf_df = pd.read_csv(go_path, sep='\t', header=None, comment='!', compression=compression,
                              usecols=[1, 4], names=['Transcript', 'GO_ID'])
 
         # Group by transcript and aggregate GO terms into a comma-separated string
-        gene_go_df = gaf_df.groupby('Transcript')['GO_ID'].agg(
-            lambda x: ','.join(x)).reset_index()
+        gene_go_df = gaf_df.groupby('Transcript')['GO_ID'].agg(lambda x: ','.join(x)).reset_index()
+
         # Rename the 'GO_ID' column to 'go_terms'
         gene_go_df.columns = ['Transcript', 'go_terms']
 
-        # Merge the GO terms into the '.var' table of AnnData
-        adata.var = adata.var.merge(
-            gene_go_df, left_index=True, right_on='Transcript', how='left').set_index('Transcript')
+        # Merge the GO terms into the .var table of AnnData
+        adata.var = adata.var.merge(gene_go_df, left_index=True, right_on='Transcript', how='left').set_index('Transcript')
 
         # Count the number of GO terms for each transcript
-        adata.var['n_go_terms'] = adata.var['go_terms'].apply(
-            lambda x: 0 if pd.isna(x) else x.count(',') + 1)
+        adata.var['n_go_terms'] = adata.var['go_terms'].apply(lambda x: 0 if pd.isna(x) else x.count(',') + 1)
 
 
 def aggregate_go_terms(series: pd.Series) -> str:
@@ -1177,7 +1176,7 @@ def prepare_and_save_wgcna(pyWGCNA_obj: object, output_path: str, gaf_path: str 
 
     # Process adata
     if gaf_path:
-        add_go_terms_to_anndata(adata, gaf_gz_path=gaf_path)
+        add_go_terms_to_anndata(adata, go_path=gaf_path)
     if ortho_file:
         add_ortho_id_to_anndata(adata, ortho_file, column_name=name)
     if qc_metrics:
