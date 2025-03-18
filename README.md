@@ -22,7 +22,6 @@
 
 1. **Preprocessing with Pipeline**:
    - Use `docker-compose-pipeline.yaml` to convert count matrices and metadata into `.h5ad` and TOM files.
-   - Fully automated with Snakemake inside Docker.
 
 2. **Start the Web App**:
    - Use `docker-compose-app.yaml` to deploy the interactive web application.
@@ -64,7 +63,7 @@ docker build -t coexplore:latest .
 docker compose -f docker-compose-app.yaml up
 ```
 
-Access the application at [http://localhost:5000](http://localhost:5000) to analyze your data interactively.
+Access the application at [http://localhost:5001](http://localhost:5001) to analyze your data interactively.
 
 ---
 
