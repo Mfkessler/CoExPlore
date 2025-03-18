@@ -1040,21 +1040,18 @@ document.addEventListener('DOMContentLoaded', function() {
             if (highlightingActive) {
                 cy.batch(function() {
                     if (node.hasClass('highlight')) {
-                        // Highlight the neighborhood of the clicked node
+                        // If already highlighted, highlight neighbors as well
                         node.neighborhood().addClass('highlight');
                     } else {
-                        // Remove highlight from all nodes and highlight the clicked node
-                        cy.nodes('.highlight').removeClass('highlight');
+                        // If not highlighted, highlight the node (do not unhighlight others)
                         node.addClass('highlight');
                     }
                 });
 
-                // Collect highlighted nodes
-                let highlightedNodes = cy.nodes('.highlight').map(function(node) {
-                    return node.data('id'); 
-                });
+                // Collect all highlighted nodes
+                let highlightedNodes = cy.nodes('.highlight').map(n => n.data('id'));
 
-                // Send the highlighted nodes back to the main page
+                // Send the list of highlighted nodes back
                 window.parent.postMessage({ highlightedNodes: highlightedNodes }, '*');
             }
 
@@ -1076,6 +1073,27 @@ document.addEventListener('DOMContentLoaded', function() {
             // Jitter all selected nodes
             jitterNodes(cy.nodes('.selected-agg'));
         }
+    });
+
+    // Right-click function (cxttap)
+    cy.on('cxttap', 'node', function(evt) {
+        let node = evt.target;
+
+        cy.batch(function() {
+            if (node.hasClass('highlight')) {
+                // If highlighted, unhighlight only this node
+                node.removeClass('highlight');
+            } else {
+                // If not highlighted, unhighlight all highlighted neighbors
+                node.neighborhood('.highlight').removeClass('highlight');
+            }
+        });
+
+        // Update the list of highlighted nodes
+        let highlightedNodes = cy.nodes('.highlight').map(n => n.data('id'));
+
+        // Send the updated list back
+        window.parent.postMessage({ highlightedNodes: highlightedNodes }, '*');
     });
 
     document.getElementById('load-detail-view').addEventListener('click', function() {
