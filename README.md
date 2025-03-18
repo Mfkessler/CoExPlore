@@ -11,10 +11,10 @@
 ## Features
 
 - **Comparative Co-Expression Analysis**: Supports cross-dataset comparisons of co-expression networks, eigengenes, and module-trait relationships.
-- **Metadata Integration**: Enhances biological insights with GO terms and orthogroups.
+- **Metadata Integration**: Enhances biological insights with GO terms, orthogroups and more.
 - **Automated Workflow**: Transforms count matrices and metadata into `.h5ad` and TOM files using Snakemake.
 - **Interactive Visualization**: Explores co-expression networks via a web-based interface.
-- **Scalable and Reproducible**: Fully containerized solution with Docker for consistent results.
+- **Sub-module Analysis**: Identification and exploration of refined sub-modules, such as transcription factor networks or specific gene groups, enabling targeted investigation of gene regulatory mechanisms across species.
 
 ---
 
