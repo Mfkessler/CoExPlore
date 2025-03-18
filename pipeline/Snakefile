@@ -31,6 +31,11 @@ iprid_list = config.get("iprid", [""] * len(names_list))
 goid_list = config.get("goid", [""] * len(names_list))
 orthogroups = config.get("orthogroups", "")
 
+# New metadata parameters for pfam, uniprot, and tf_family
+pfam_list = config.get("pfam", [""] * len(names_list))
+uniprot_list = config.get("uniprot", [""] * len(names_list))
+tf_family_list = config.get("tf_family", [""] * len(names_list))
+
 # Boolean or single-value entries from config
 save_tom = config["save_tom"]
 save_adjacency_matrix = config["save_adjacency_matrix"]
@@ -67,7 +72,10 @@ rule wgcna_pipeline:
         count_matrix = lambda wc: count_matrix_list[names_list.index(wc.name)],
         sample_mapping = lambda wc: sample_mapping_list[names_list.index(wc.name)],
         iprid = lambda wc: iprid_list[names_list.index(wc.name)] if iprid_list[names_list.index(wc.name)] != "" else [],
-        goid = lambda wc: goid_list[names_list.index(wc.name)] if goid_list[names_list.index(wc.name)] != "" else []
+        goid = lambda wc: goid_list[names_list.index(wc.name)] if goid_list[names_list.index(wc.name)] != "" else [],
+        pfam = lambda wc: pfam_list[names_list.index(wc.name)] if pfam_list[names_list.index(wc.name)] != "" else [],
+        uniprot = lambda wc: uniprot_list[names_list.index(wc.name)] if uniprot_list[names_list.index(wc.name)] != "" else [],
+        tf_family = lambda wc: tf_family_list[names_list.index(wc.name)] if tf_family_list[names_list.index(wc.name)] != "" else []
     output:
         H5AD_FILE = output_path + "{name}/{name}.h5ad",
         TOM_FILE = output_path + "{name}/tom_matrix.h5",
@@ -126,7 +134,7 @@ rule wgcna_pipeline:
         pyWGCNA_obj.analyseWGCNA(show=False)
 
         # Determine if a .gaf.gz file was provided for GO terms
-        gaf_path = go if go.endswith(".gaf.gz") else None
+        gaf_path = go if go.endswith((".gaf.gz", ".gaf")) else None
         ortho_file = orthogroups if orthogroups.endswith(".tsv") else None
 
         # If GO is a .tsv file, add GO terms
@@ -136,6 +144,18 @@ rule wgcna_pipeline:
         # If ipr file is provided, add InterPro IDs
         if ipr:
             rutils.add_ipr_columns(pyWGCNA_obj.datExpr, ipr)
+
+        # If pfam file is provided, add PFAM columns
+        if input.pfam:
+            rutils.add_pfam_columns(pyWGCNA_obj.datExpr, input.pfam)
+
+        # If uniprot file is provided, add Uniprot metadata
+        if input.uniprot:
+            rutils.add_metadata_uniprot(pyWGCNA_obj.datExpr, input.uniprot)
+
+        # If tf_family file is provided, add TF family column
+        if input.tf_family:
+            rutils.add_tf_columns(pyWGCNA_obj.datExpr, input.tf_family)
 
         # Final saving depending on configuration
         rutils.prepare_and_save_wgcna(
