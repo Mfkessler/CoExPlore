@@ -1,4 +1,8 @@
-# CoExPlore
+<h1 align="center">CoExPlore</h1>
+
+<h2 align="center">
+  <img src="./logo.webp" alt="Logo" width="200">
+</h2>
 
 **CoExPlore** is a modular framework designed for comparative co-expression network analysis across multiple datasets. It integrates automated data preprocessing, network construction, and interactive visualization in a single workflow. CoExPlore enables users to identify co-expression modules, analyze eigengenes, and explore module-trait relationships while integrating functional metadata like GO terms and orthogroups.
 
