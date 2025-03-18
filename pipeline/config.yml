@@ -7,27 +7,39 @@
 species:
   - "Species 1"
   - "Species 2"
+  - "Species 3"
+  - "Species 4"
   
 name:
   - "S1"
   - "S2"
+  - "S3"
+  - "S4"
 
 count_matrix:
   - "/CoExPlore/input/testdata_out/S1.isoform.TMM.matrix"
   - "/CoExPlore/input/testdata_out/S2.isoform.TMM.matrix"
+  - "/CoExPlore/input/testdata_out/S3.isoform.TMM.matrix"
+  - "/CoExPlore/input/testdata_out/S4.isoform.TMM.matrix"
 
 sample_mapping:
-  - "/CoExPlore/input/testdata_out/S1.sample_mapping.tsv"
+  - "/CoExPlore/input/testdata_out/S1.sample_mapping.tsv"a
   - "/CoExPlore/input/testdata_out/S2.sample_mapping.tsv"
+  - "/CoExPlore/input/testdata_out/S3.sample_mapping.tsv"
+  - "/CoExPlore/input/testdata_out/S4.sample_mapping.tsv"
 
 # Optional parameters:
 iprid:
   - "/CoExPlore/input/testdata_out/S1.iprid.tsv"
-  - ""
+  - "" # Use "" if the metadata is not available
+  - "" # Use "" if the metadata is not available
+  - "" # Use "" if the metadata is not available
 
 goid:
-  - ""
+  - "/CoExPlore/input/testdata_out/S1.goid.tsv"
   - "/CoExPlore/input/testdata_out/S2.goid.tsv"
+  - "" # Use "" if the metadata is not available
+  - "" # Use "" if the metadata is not available
 
 orthogroups: "/CoExPlore/input/testdata_out/N0.tsv"
 
