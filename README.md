@@ -44,15 +44,17 @@ git clone https://github.com/Mfkessler/CoExPlore.git
 cd CoExPlore
 ```
 
-### 2. Build the Docker Image
+### 2. Build the Docker Images
 
 ```bash
-docker build -t coexplore:latest .
+docker build -t coexplore-base -f Dockerfile.base .
+docker build -t coexplore-pipeline -f Dockerfile.pipe .
+docker build -t coexplore-app -f Dockerfile.app .
 ```
 
 ### 3. Run Preprocessing
 
-1. **Edit `wgcna-pipeline/config.yml`**:
+1. **Edit `pipeline/config.yml`**:
    - Set paths for input data like count matrices and metadata.
 
 2. **Execute Pipeline**:
