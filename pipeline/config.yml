@@ -23,7 +23,7 @@ count_matrix:
   - "/CoExPlore/input/testdata_out/S4.isoform.TMM.matrix"
 
 sample_mapping:
-  - "/CoExPlore/input/testdata_out/S1.sample_mapping.tsv"a
+  - "/CoExPlore/input/testdata_out/S1.sample_mapping.tsv"
   - "/CoExPlore/input/testdata_out/S2.sample_mapping.tsv"
   - "/CoExPlore/input/testdata_out/S3.sample_mapping.tsv"
   - "/CoExPlore/input/testdata_out/S4.sample_mapping.tsv"
