@@ -617,6 +617,7 @@ def plot_goea(adata: AnnData, config: PlotConfig, transcripts: Dict[str, List[st
     - adata (AnnData): The AnnData object containing transcripts and their associated GO terms.
     - config (PlotConfig): Configuration object for plot control.
     - transcripts (Dict[str, List[str]]): Dictionary with species as keys and lists of transcripts.
+    - name (str): Name of the species.
     - obo_path (str): Path to the .obo file containing the GO ontology.
     - go_column (str): Column in adata.var containing comma separated GO terms for each transcript.
     - top_percentage (int): The top percentage of transcripts to be used for GOEA based on average expression.
