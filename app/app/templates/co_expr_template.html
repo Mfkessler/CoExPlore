@@ -212,6 +212,12 @@
                 display: block;
             }
         }
+
+        #ortho-tab-pane table.dataTable,
+        #submodules-tab-pane table.dataTable { 
+            width: 100% !important; 
+            table-layout: fixed;
+        }
     </style>
 
     <!-- jQuery, Bootstrap JS, DataTables, and Lightbox JS -->
@@ -928,10 +934,6 @@
             if (isInIframe) {
                 sendHeight();
             }
-    
-            $('a[data-bs-toggle="tab"]').on('shown.bs.tab', function (e) {
-                $.fn.dataTable.tables({ visible: true, api: true }).columns.adjust();
-            });
         });
     
         var isInIframe = (window.self !== window.top);
