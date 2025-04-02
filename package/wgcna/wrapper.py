@@ -6,6 +6,7 @@ from .utils import (load_subset_from_hdf5,
                     get_goea_df,
                     export_co_expression_network_to_cytoscape,
                     identify_network_clusters_from_json,
+                    identify_network_clusters_tree_cut,
                     get_node_table)
 from .plotting import (PlotConfig,
                        plot_co_expression_network,
@@ -35,7 +36,7 @@ def analyze_co_expression_network(adata: Union[AnnData, List[AnnData]], config: 
                                   use_colors: bool = False, use_shapes: bool = False,
                                   node_size: int = 10, use_symmetry: bool = False, progress_callback: Callable[[str], None] = None,
                                   trait: str = "tissue", filter_edges: bool = True, include_neighbors: bool = False,
-                                  max_neighbors: int = 10, detail_only_nodes: int = 500) -> dict:
+                                  max_neighbors: int = 10, detail_only_nodes: int = 500, cluster_method: str = "threshold") -> dict:
     """
     Analyze co-expression network for a given topic:
     - Plot the co-expression network and identify clusters.
@@ -78,11 +79,23 @@ def analyze_co_expression_network(adata: Union[AnnData, List[AnnData]], config: 
     - max_neighbors (int): Maximum number of neighbours to include.
     - detail_only_nodes (int): Maximum number of nodes to use for detailed plotting. 
                                If the number of nodes is higher, aggregated plotting is used.
+    - cluster_method (str): Clustering method to use; either "threshold" or "tree_cut". 
+                            "tree_cut" applies a dynamic tree cut on the complete TOM
+                            while "threshold" uses the TOM value threshold to identify clusters.
 
     Returns:
     - dict: Eigengenes for clusters if out is not "html".
     - str: Path to the generated HTML if out is "html".
     """
+
+    if cluster_method not in ["threshold", "tree_cut"]:
+        raise ValueError(
+            f"Invalid cluster_method: {cluster_method}, use 'threshold' or 'tree_cut'")
+    
+    if cluster_method == "tree_cut":
+        tom_threshold = 0.0
+    else:
+        tom_threshold = threshold
 
     if tool not in ["cytoscape", "plotly"]:
         raise ValueError(f"Invalid tool: {tool}, use 'cytoscape' or 'plotly'")
@@ -104,11 +117,11 @@ def analyze_co_expression_network(adata: Union[AnnData, List[AnnData]], config: 
 
     # Load TOM data (with neighbor information)
     if isinstance(adata, list):
-        tom, adata, neighbor_info = get_tom_data(tom_path, adata, transcripts=transcripts, query=query, threshold=threshold, tom_prefix=tom_prefix,
+        tom, adata, neighbor_info = get_tom_data(tom_path, adata, transcripts=transcripts, query=query, threshold=tom_threshold, tom_prefix=tom_prefix,
                                                  use_symmetry=use_symmetry, progress_callback=progress_callback, include_neighbours=include_neighbors,
                                                  max_neighbors=max_neighbors)
     else:
-        tom, neighbor_info = get_tom_data(tom_path, adata, transcripts=transcripts, query=query, threshold=threshold, tom_prefix=tom_prefix,
+        tom, neighbor_info = get_tom_data(tom_path, adata, transcripts=transcripts, query=query, threshold=tom_threshold, tom_prefix=tom_prefix,
                                           use_symmetry=use_symmetry, progress_callback=progress_callback, include_neighbours=include_neighbors,
                                           max_neighbors=max_neighbors)
 
@@ -129,8 +142,16 @@ def analyze_co_expression_network(adata: Union[AnnData, List[AnnData]], config: 
 
         if progress_callback:
             progress_callback(f"Identifying clusters")
-        cluster_map = identify_network_clusters_from_json(
-            cyto_data, topic, node_threshold_percent=node_threshold_percent, node_threshold=node_threshold)
+
+        # Identify clusters using the specified method
+        if cluster_method == "tree_cut":
+            print(f"Identifying clusters using dynamic tree cut")
+            cluster_map = identify_network_clusters_tree_cut(tom, adata, topic, node_threshold_percent=node_threshold_percent,
+                                                             node_threshold=node_threshold)
+        else:
+            print(f"Identifying clusters using TOM value threshold")
+            cluster_map = identify_network_clusters_from_json(
+                cyto_data, topic, node_threshold_percent=node_threshold_percent, node_threshold=node_threshold)
 
         ortho_df = prepare_dataframe(cyto_data['nodes'], cluster_map)
         ortho_table = summarize_orthogroups(ortho_df).reset_index()
