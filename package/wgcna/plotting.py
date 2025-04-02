@@ -28,7 +28,7 @@ from goatools.godag_plot import plot_gos
 from typing import List, Dict, Union
 from scipy.stats import zscore
 from jinja2 import Environment, FileSystemLoader
-from scipy.cluster.hierarchy import linkage, leaves_list
+from scipy.cluster.hierarchy import linkage, leaves_list, dendrogram
 from IPython.display import display, IFrame
 from bokeh.plotting import figure, save, show, output_file
 from bokeh.models import (
@@ -3877,3 +3877,22 @@ def plot_cyto_network(config, custom_filename: str = "cyto_network",
             json.dump(network_data, f, indent=2)
     
     return os.path.abspath(html_file_path)
+
+# TODO: Update this function to use the config object
+def plot_dendrogram(Z, cut_threshold: float):
+    """
+    Plot the dendrogram and mark the cut threshold with a horizontal red dashed line.
+    
+    Parameters:
+    - Z (ndarray): The linkage matrix from hierarchical clustering.
+    - cut_threshold (float): The threshold value for cutting the dendrogram.
+    """
+
+    plt.figure(figsize=(10, 5))
+    dendrogram(Z)
+    plt.axhline(y=cut_threshold, color='red', linestyle='--', label=f"Cut threshold: {cut_threshold}")
+    plt.title("Hierarchical Clustering Dendrogram")
+    plt.xlabel("Samples")
+    plt.ylabel("Distance")
+    plt.legend()
+    plt.show()
