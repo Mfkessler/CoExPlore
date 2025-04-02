@@ -21,6 +21,7 @@ from sklearn.preprocessing import scale
 from pandas.api.types import is_numeric_dtype
 from jinja2 import Environment, FileSystemLoader
 from collections import defaultdict
+from scipy.cluster.hierarchy import linkage, fcluster
 from scipy.spatial.distance import squareform
 from .config import METADATA_DICT
 
@@ -2135,6 +2136,103 @@ def identify_network_clusters_from_json(network_data: dict, cluster_name: str,
             print(
                 f"{cluster_id}: {count} transcripts - {', '.join(cluster_transcripts)}")
 
+    return cluster_map
+
+
+def identify_network_clusters_tree_cut(
+    tom: Union[pd.DataFrame, List[pd.DataFrame]],
+    adata: Union[object, List[object]],
+    cluster_prefix: str,  # e.g., "subset_new"
+    node_threshold_percent: float = 0.02,
+    node_threshold: int = 10,
+    cut_threshold: float = 0.5
+) -> dict:
+    """
+    Identify clusters using a tree cut method based on TOM matrices and assign full transcript IDs.
+    
+    The full transcript ID is constructed as: "{species}_{transcript_id}", where the species is 
+    extracted from adata.uns['species']. Cluster names are generated as 
+    "{speciesAbbrev}: {cluster_prefix} {new_label}", where new_label is a continuous numbering 
+    starting at 1 for clusters that meet the minimum size. Clusters below the minimum size are 
+    labeled as "{speciesAbbrev}: No Sub-modules".
+    
+    Parameters:
+    - tom (Union[pd.DataFrame, List[pd.DataFrame]]): A TOM matrix or list of TOM matrices.
+    - adata (Union[object, List[object]]): AnnData object(s) corresponding to each TOM. The species 
+      name is expected in adata.uns['species'] and an abbreviation in ad.uns['name'].
+    - cluster_prefix (str): The prefix for cluster assignment (e.g., "subset_new").
+    - node_threshold_percent (float): Minimum percentage of nodes required for a cluster.
+    - node_threshold (int): Minimum absolute number of nodes required for a cluster.
+    - cut_threshold (float): Threshold for cutting the dendrogram to form clusters.
+    
+    Returns:
+    - dict: A dictionary mapping full transcript IDs to their cluster labels.
+    """
+    # Convert inputs to lists if they are not already
+    if not isinstance(tom, list):
+        tom = [tom]
+    if not isinstance(adata, list):
+        adata = [adata]
+    
+    cluster_map = {}
+    
+    # Iterate over each TOM and its corresponding AnnData object
+    for tom_df, ad in zip(tom, adata):
+        # Retrieve species name from ad.uns['species'] (e.g., "Staphisagria picta")
+        species = ad.uns.get("species", "UnknownSpecies")
+        # Retrieve species abbreviation from ad.uns['name'] (e.g., "SP", "CS", "EC")
+        species_abbrev = ad.uns.get("name", "UnknownAbbrev")
+        
+        # Get the list of transcript IDs from the TOM index
+        transcripts = tom_df.index.tolist()
+        # Construct full transcript names, e.g., "Staphisagria picta_evm.model.ptg000xxx"
+        full_transcripts = [f"{species}_{t}" for t in transcripts]
+        
+        # Replace NaN values with 0 and set the diagonal to 1
+        tom_filled = tom_df.fillna(0).copy()
+        np.fill_diagonal(tom_filled.values, 1)
+        
+        # Calculate dissimilarity: distance = 1 - TOM similarity
+        diss = 1 - tom_filled
+        # Convert the square distance matrix into condensed form
+        condensed = squareform(diss.values, checks=False)
+        
+        # Perform hierarchical clustering using average linkage
+        Z = linkage(condensed, method='average')
+        # Cut the dendrogram at a fixed threshold (e.g., 0.2)
+        labels = fcluster(Z, t=cut_threshold, criterion='distance')
+        
+        # Determine the minimum number of nodes required in a cluster
+        if not node_threshold:
+            if not node_threshold_percent:
+                raise ValueError("Either node_threshold or node_threshold_percent must be provided")
+            node_threshold = int(len(tom_df) * node_threshold_percent)
+        
+        # Count the size of each cluster
+        cluster_sizes = pd.Series(labels).value_counts()
+        
+        # Identify valid clusters (clusters meeting the minimum node threshold)
+        valid_clusters = cluster_sizes[cluster_sizes >= node_threshold].index.tolist()
+        # Sort valid clusters to assign new labels in ascending order
+        valid_clusters_sorted = sorted(valid_clusters)
+        
+        # Create a mapping from original cluster label to new continuous label starting at 1
+        label_map = {}
+        new_label = 1
+        for orig_label in valid_clusters_sorted:
+            label_map[orig_label] = new_label
+            new_label += 1
+        
+        # Assign each transcript its cluster label
+        for full_id, label in zip(full_transcripts, labels):
+            if label not in label_map:
+                # Cluster is too small: assign "No Sub-modules"
+                cluster_label = f"{species_abbrev}: No Sub-modules"
+            else:
+                # Assign new label for valid cluster, starting at 1
+                cluster_label = f"{species_abbrev}: {cluster_prefix} {label_map[label]}"
+            cluster_map[full_id] = cluster_label
+    
     return cluster_map
 
 
