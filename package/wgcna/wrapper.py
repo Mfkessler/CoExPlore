@@ -7,6 +7,7 @@ from .utils import (load_subset_from_hdf5,
                     export_co_expression_network_to_cytoscape,
                     identify_network_clusters_from_json,
                     identify_network_clusters_tree_cut,
+                    combine_cluster_maps,
                     get_node_table)
 from .plotting import (PlotConfig,
                        plot_co_expression_network,
@@ -87,12 +88,8 @@ def analyze_co_expression_network(adata: Union[AnnData, List[AnnData]], config: 
     - dict: Eigengenes for clusters if out is not "html".
     - str: Path to the generated HTML if out is "html".
     """
-
-    if cluster_method not in ["threshold", "tree_cut"]:
-        raise ValueError(
-            f"Invalid cluster_method: {cluster_method}, use 'threshold' or 'tree_cut'")
     
-    if cluster_method == "tree_cut":
+    if cluster_method != "threshold":
         tom_threshold = 0.0
     else:
         tom_threshold = threshold
@@ -148,11 +145,17 @@ def analyze_co_expression_network(adata: Union[AnnData, List[AnnData]], config: 
             print(f"Identifying clusters using dynamic tree cut")
             cluster_map = identify_network_clusters_tree_cut(tom, adata, topic, node_threshold_percent=node_threshold_percent,
                                                              node_threshold=node_threshold)
-        else:
+        elif cluster_method == "threshold":
             print(f"Identifying clusters using TOM value threshold")
             cluster_map = identify_network_clusters_from_json(
                 cyto_data, topic, node_threshold_percent=node_threshold_percent, node_threshold=node_threshold)
             
+        else:
+            # Use combined method
+            print(f"Identifying clusters using combined method")
+            cluster_map = combine_cluster_maps(cyto_data, tom, adata, node_threshold=node_threshold,
+                                               node_threshold_percent=node_threshold_percent, cut_threshold=0.5, print_info=False)
+
         # If cluster_map is empty, return a message
         if not cluster_map:
             return {"message": "No clusters found for the given topic"}
