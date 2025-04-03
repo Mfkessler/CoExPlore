@@ -1033,7 +1033,7 @@ def get_jaccard_df(dicts: List[Dict[str, List[str]]], suffixes: List[str] = None
     Parameters
     ----------
     - dicts (List[Dict[str, List[str]]]): List of dictionaries.
-    - suffixes (List[str], optional): List of suffixes corresponding to each dictionary. If not provided,
+    - suffixes (List[str]): List of suffixes corresponding to each dictionary. If not provided,
       the suffixes will be extracted from the keys in the dictionaries.
 
     Returns
@@ -1571,7 +1571,7 @@ def identify_network_clusters(G: nx.Graph, cluster_name: str,
     Parameters:
     - G (nx.Graph): The graph object.
     - cluster_name (str): Prefix for cluster assignment.
-    - node_threshold (int, optional): Minimum number of nodes required in a cluster to be assigned.
+    - node_threshold (int): Minimum number of nodes required in a cluster to be assigned.
     - node_threshold_percent (float): Percentage of nodes required in a cluster to be assigned.
     - print_info (bool): If True, prints cluster information.
 
@@ -2230,6 +2230,66 @@ def identify_network_clusters_tree_cut(
     return cluster_map
 
 
+def combine_cluster_maps(
+    network_data: dict,
+    tom: Union[pd.DataFrame, List[pd.DataFrame]],
+    adata: Union[object, List[object]],
+    node_threshold: int = None,
+    node_threshold_percent: float = 0.02,
+    cut_threshold: float = 0.5,
+    print_info: bool = False
+) -> Dict[str, List[str]]:
+    """
+    Combines cluster assignments from the threshold-based method and the tree cut method.
+    Some nodes may belong to multiple clusters.
+
+    Parameters:
+    - network_data (dict): Network data in Cytoscape.js format for the threshold-based method.
+    - tom (Union[pd.DataFrame, List[pd.DataFrame]]): TOM matrix (or list of TOM matrices) for the tree cut method.
+    - adata (Union[object, List[object]]): AnnData object (or list of objects) corresponding to the TOM matrix.
+    - node_threshold (int): Minimum number of nodes required in a cluster.
+    - node_threshold_percent (float): Minimum percentage of nodes required in a cluster.
+    - cut_threshold (float): Threshold for cutting the dendrogram (tree cut method).
+    - print_info (bool): If True, prints additional information.
+
+    Returns:
+    - Dict[str, List[str]]: A dictionary where each node (key) is assigned a list of cluster labels (values).
+      The labels are prefixed with "TH" for the threshold-based method and "TC" for the tree cut method.
+    """
+
+    # Cluster assignments using the threshold-based method (edge-weight based)
+    threshold_map = identify_network_clusters_from_json(
+        network_data,
+        cluster_name="TH",
+        node_threshold=node_threshold,
+        node_threshold_percent=node_threshold_percent,
+        print_info=print_info
+    )
+    
+    # Cluster assignments using the tree cut method
+    tree_cut_map = identify_network_clusters_tree_cut(
+        tom,
+        adata,
+        cluster_prefix="TC",
+        node_threshold_percent=node_threshold_percent,
+        node_threshold=node_threshold,
+        cut_threshold=cut_threshold
+    )
+    
+    # Combine the two cluster assignments into a single map, where each node is assigned all relevant clusters
+    combined_map: Dict[str, List[str]] = {}
+    all_nodes = set(threshold_map.keys()) | set(tree_cut_map.keys())
+    for node in all_nodes:
+        assignments = []
+        if node in threshold_map:
+            assignments.append(threshold_map[node])
+        if node in tree_cut_map:
+            assignments.append(tree_cut_map[node])
+        combined_map[node] = assignments
+
+    return combined_map
+
+
 def get_node_table(
     tom: Union[pd.DataFrame, List[pd.DataFrame]],
     adata: Union[AnnData, List[AnnData]],
@@ -2256,7 +2316,7 @@ def get_node_table(
     - adata (AnnData or List[AnnData]): AnnData object(s) containing gene metadata in .var and species info in .uns.
     - cluster_info (dict): Dictionary mapping node identifiers to cluster assignments.
     - tool (str): Tool used to generate cluster assignments (e.g., "cytoscape").
-    - progress_callback (Callable[[str], None], optional): Callback for reporting progress.
+    - progress_callback (Callable[[str], None]): Callback for reporting progress.
     
     Returns:
     - pd.DataFrame: Combined DataFrame with columns "Node", "Species", "Degree", "Orthogroup", "Cluster"
