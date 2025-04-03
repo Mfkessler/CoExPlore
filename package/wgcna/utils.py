@@ -1931,7 +1931,8 @@ def export_co_expression_network_to_cytoscape(
     source_key: str = 'source',
     target_key: str = 'target',
     weight_key: str = 'weight',
-    is_neighbor_key: str = 'is_neighbor'
+    is_neighbor_key: str = 'is_neighbor',
+    remove_single_nodes: bool = True
 ) -> dict:
     """
     Exports the co-expression network(s) in a format compatible with Cytoscape.js.
@@ -1954,6 +1955,7 @@ def export_co_expression_network_to_cytoscape(
     - target_key (str): Key for edge target in the output dictionary.
     - weight_key (str): Key for edge weight in the output dictionary.
     - is_neighbor_key (str): Key for neighbor flag in the output dictionary.
+    - remove_single_nodes (bool): If True, nodes without any connections are removed.
 
     Returns:
     - dict: Dictionary with nodes, edges, and neighbors for each TOM.
@@ -1998,8 +2000,7 @@ def export_co_expression_network_to_cytoscape(
         species_key = METADATA_DICT.get("species", "Species")
 
         # Prepare neighbor output using species information
-        current_neighbors = neighbor_list[idx] if neighbor_list[idx] is not None else set(
-        )
+        current_neighbors = neighbor_list[idx] if neighbor_list[idx] is not None else set()
         neighbors_output.append(
             {species_key: species_value, 'neighbors': list(current_neighbors)})
 
@@ -2016,8 +2017,7 @@ def export_co_expression_network_to_cytoscape(
                 elif meta_key == "species":
                     value = species_value
                 else:
-                    value = gene_metadata.loc[gene,
-                                              meta_key] if meta_key in gene_metadata.columns else ""
+                    value = gene_metadata.loc[gene, meta_key] if meta_key in gene_metadata.columns else ""
                 # Replace NaN values with empty string
                 if pd.isna(value):
                     value = ""
@@ -2050,6 +2050,14 @@ def export_co_expression_network_to_cytoscape(
                         }
                     }
                     edges.append(edge_data)
+
+    # Remove single nodes if specified
+    if remove_single_nodes:
+        connected_ids = set()
+        for edge in edges:
+            connected_ids.add(edge['data'][source_key])
+            connected_ids.add(edge['data'][target_key])
+        nodes = [node for node in nodes if node['data'][id_key] in connected_ids]
 
     return {'nodes': nodes, 'edges': edges, 'neighbors': neighbors_output}
 
@@ -2149,13 +2157,16 @@ def identify_network_clusters_tree_cut(
 ) -> dict:
     """
     Identify clusters using a tree cut method based on TOM matrices and assign full transcript IDs.
-    
+
     The full transcript ID is constructed as: "{species}_{transcript_id}", where the species is 
     extracted from adata.uns['species']. Cluster names are generated as 
     "{speciesAbbrev}: {cluster_prefix} {new_label}", where new_label is a continuous numbering 
     starting at 1 for clusters that meet the minimum size. Clusters below the minimum size are 
     labeled as "{speciesAbbrev}: No Sub-modules".
-    
+
+    If only one "No Sub-modules" cluster is found for a species (i.e., no valid clusters), 
+    no entries for that species will be included in the resulting dictionary.
+
     Parameters:
     - tom (Union[pd.DataFrame, List[pd.DataFrame]]): A TOM matrix or list of TOM matrices.
     - adata (Union[object, List[object]]): AnnData object(s) corresponding to each TOM. The species 
@@ -2164,75 +2175,58 @@ def identify_network_clusters_tree_cut(
     - node_threshold_percent (float): Minimum percentage of nodes required for a cluster.
     - node_threshold (int): Minimum absolute number of nodes required for a cluster.
     - cut_threshold (float): Threshold for cutting the dendrogram to form clusters.
-    
+
     Returns:
     - dict: A dictionary mapping full transcript IDs to their cluster labels.
     """
-    # Convert inputs to lists if they are not already
+    # Ensure input types are lists
     if not isinstance(tom, list):
         tom = [tom]
     if not isinstance(adata, list):
         adata = [adata]
-    
+
     cluster_map = {}
-    
-    # Iterate over each TOM and its corresponding AnnData object
+
+    # Iterate over each TOM and corresponding AnnData object
     for tom_df, ad in zip(tom, adata):
-        # Retrieve species name from ad.uns['species'] (e.g., "Staphisagria picta")
         species = ad.uns.get("species", "UnknownSpecies")
-        # Retrieve species abbreviation from ad.uns['name'] (e.g., "SP", "CS", "EC")
         species_abbrev = ad.uns.get("name", "UnknownAbbrev")
-        
-        # Get the list of transcript IDs from the TOM index
+
         transcripts = tom_df.index.tolist()
-        # Construct full transcript names, e.g., "Staphisagria picta_evm.model.ptg000xxx"
         full_transcripts = [f"{species}_{t}" for t in transcripts]
-        
-        # Replace NaN values with 0 and set the diagonal to 1
+
         tom_filled = tom_df.fillna(0).copy()
         np.fill_diagonal(tom_filled.values, 1)
-        
-        # Calculate dissimilarity: distance = 1 - TOM similarity
+
         diss = 1 - tom_filled
-        # Convert the square distance matrix into condensed form
         condensed = squareform(diss.values, checks=False)
-        
-        # Perform hierarchical clustering using average linkage
+
         Z = linkage(condensed, method='average')
-        # Cut the dendrogram at a fixed threshold (e.g., 0.2)
         labels = fcluster(Z, t=cut_threshold, criterion='distance')
-        
-        # Determine the minimum number of nodes required in a cluster
+
         if not node_threshold:
             if not node_threshold_percent:
                 raise ValueError("Either node_threshold or node_threshold_percent must be provided")
             node_threshold = int(len(tom_df) * node_threshold_percent)
-        
-        # Count the size of each cluster
+
         cluster_sizes = pd.Series(labels).value_counts()
-        
-        # Identify valid clusters (clusters meeting the minimum node threshold)
+
         valid_clusters = cluster_sizes[cluster_sizes >= node_threshold].index.tolist()
-        # Sort valid clusters to assign new labels in ascending order
+
+        if len(valid_clusters) == 0:
+            # Only one "No Sub-modules" cluster for species, skip species
+            continue
+
         valid_clusters_sorted = sorted(valid_clusters)
-        
-        # Create a mapping from original cluster label to new continuous label starting at 1
-        label_map = {}
-        new_label = 1
-        for orig_label in valid_clusters_sorted:
-            label_map[orig_label] = new_label
-            new_label += 1
-        
-        # Assign each transcript its cluster label
+        label_map = {orig_label: new_label for new_label, orig_label in enumerate(valid_clusters_sorted, start=1)}
+
         for full_id, label in zip(full_transcripts, labels):
             if label not in label_map:
-                # Cluster is too small: assign "No Sub-modules"
-                cluster_label = f"{species_abbrev}: No Sub-modules"
+                cluster_label = f"No Sub-modules"
             else:
-                # Assign new label for valid cluster, starting at 1
                 cluster_label = f"{species_abbrev}: {cluster_prefix} {label_map[label]}"
             cluster_map[full_id] = cluster_label
-    
+
     return cluster_map
 
 
