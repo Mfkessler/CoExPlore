@@ -152,6 +152,10 @@ def analyze_co_expression_network(adata: Union[AnnData, List[AnnData]], config: 
             print(f"Identifying clusters using TOM value threshold")
             cluster_map = identify_network_clusters_from_json(
                 cyto_data, topic, node_threshold_percent=node_threshold_percent, node_threshold=node_threshold)
+            
+        # If cluster_map is empty, return a message
+        if not cluster_map:
+            return {"message": "No clusters found for the given topic"}
 
         ortho_df = prepare_dataframe(cyto_data['nodes'], cluster_map)
         ortho_table = summarize_orthogroups(ortho_df).reset_index()
