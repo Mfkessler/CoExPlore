@@ -2133,7 +2133,10 @@ def identify_network_clusters_from_json(network_data: dict, cluster_name: str,
     all_transcripts = {node['data']['id'] for node in network_data['nodes']}
     for transcript in all_transcripts:
         if transcript not in cluster_map:
-            cluster_map[transcript] = "No Sub-modules"
+            if cluster_name == "TH":
+                cluster_map[transcript] = f"{cluster_name} No Sub-modules"
+            else:
+                cluster_map[transcript] = "No Sub-modules"
 
     # Optional printing of cluster information
     if print_info:
@@ -2222,7 +2225,10 @@ def identify_network_clusters_tree_cut(
 
         for full_id, label in zip(full_transcripts, labels):
             if label not in label_map:
-                cluster_label = f"No Sub-modules"
+                if cluster_prefix == "TC":
+                    cluster_label = f"{cluster_prefix} No Sub-modules"
+                else:
+                    cluster_label = f"No Sub-modules"
             else:
                 cluster_label = f"{species_abbrev}: {cluster_prefix} {label_map[label]}"
             cluster_map[full_id] = cluster_label
@@ -2263,7 +2269,7 @@ def combine_cluster_maps(
         cluster_name="TH",
         node_threshold=node_threshold,
         node_threshold_percent=node_threshold_percent,
-        print_info=print_info
+        print_info=False
     )
     
     # Cluster assignments using the tree cut method
@@ -2286,6 +2292,15 @@ def combine_cluster_maps(
         if node in tree_cut_map:
             assignments.append(tree_cut_map[node])
         combined_map[node] = assignments
+ 
+    # Print the count of both cluster assignments
+    if print_info:
+        threshold_count = pd.Series(threshold_map).value_counts().sort_index()
+        tree_cut_count = pd.Series(tree_cut_map).value_counts().sort_index()
+        print(f"Threshold-based cluster assignments: {threshold_count}")
+        print(f"Tree cut cluster assignments: {tree_cut_count}")
+        print(f"Number of nodes in combined cluster assignments: {len(combined_map)}")
+        print(f"Combined cluster assignments: {combined_map}")
 
     return combined_map
 
