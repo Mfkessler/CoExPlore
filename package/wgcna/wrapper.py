@@ -138,27 +138,27 @@ def analyze_co_expression_network(adata: Union[AnnData, List[AnnData]], config: 
             tom, adata, threshold=threshold, neighbor_info=neighbor_info)
 
         if progress_callback:
-            progress_callback(f"Identifying clusters")
+            progress_callback(f"Identifying sub-modules")
 
         # Identify clusters using the specified method
         if cluster_method == "tree_cut":
-            print(f"Identifying clusters using dynamic tree cut")
+            print(f"Identifying sub-modules using dynamic tree cut")
             cluster_map = identify_network_clusters_tree_cut(tom, adata, topic, node_threshold_percent=node_threshold_percent,
                                                              node_threshold=node_threshold)
         elif cluster_method == "threshold":
-            print(f"Identifying clusters using TOM value threshold")
+            print(f"Identifying sub-modules using TOM value threshold")
             cluster_map = identify_network_clusters_from_json(
                 cyto_data, topic, node_threshold_percent=node_threshold_percent, node_threshold=node_threshold)
             
         else:
             # Use combined method
-            print(f"Identifying clusters using combined method")
+            print(f"Identifying sub-modules using combined method")
             cluster_map = combine_cluster_maps(cyto_data, tom, adata, node_threshold=node_threshold,
-                                               node_threshold_percent=node_threshold_percent, cut_threshold=0.5, print_info=False)
+                                               node_threshold_percent=node_threshold_percent, cut_threshold=0.5, print_info=True)
 
         # If cluster_map is empty, return a message
         if not cluster_map:
-            return {"message": "No clusters found for the given topic"}
+            return {"message": "No sub-modules found for the given topic"}
 
         ortho_df = prepare_dataframe(cyto_data['nodes'], cluster_map)
         ortho_table = summarize_orthogroups(ortho_df).reset_index()
@@ -277,7 +277,7 @@ def get_tom_data(tom_path: Union[str, List[str]], adata: Union[AnnData, List[Ann
                  columns_map: dict = None, progress_callback: Callable[[str], None] = None,
                  include_neighbours: bool = False, max_neighbors: int = 10) -> Union[Tuple[pd.DataFrame, set], Tuple[List[pd.DataFrame], List[AnnData], List[set]]]:
     """
-    Loads the TOM matrix for one or multiple AnnData objects.
+    Loads the TOM for one or multiple AnnData objects.
 
     Parameters:
     - tom_path (str or List[str]): Path(s) to the TOM file(s).
