@@ -315,7 +315,7 @@ def plot_module_goea_task(self, data):
 
         if f"goea_modules_{top_percentage}" not in adata.uns:
             goea_modules_key = f"goea_modules_{top_percentage}"
-            rutils.add_goea_to_anndata(adata, column="moduleColors", results_dir=f"{plot_config.output_path}", 
+            rutils.add_goea_to_anndata(adata, column="module_colors", results_dir=f"{plot_config.output_path}", 
                                        uns_key=goea_modules_key, top_percentage=top_percentage, obo_path=f"{Config.DATA_DIR}/go-basic.obo")
         df = rutils.get_goea_df(adata, key=f"goea_modules_{top_percentage}", column_name="Module")
 
