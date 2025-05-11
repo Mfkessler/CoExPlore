@@ -47,6 +47,7 @@ kaleido==0.2.1
 kiwisolver==1.4.8
 kombu==5.4.2
 legacy-api-wrap==1.4.1
+leidenalg==0.10.2
 llvmlite==0.44.0
 markdown-it-py==3.0.0
 MarkupSafe==3.0.2
