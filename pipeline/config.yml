@@ -5,49 +5,46 @@
 
 # Mandatory parameters:
 species:
-  - "Species 1"
-  - "Species 2"
-  - "Species 3"
-  - "Species 4"
+  - "Physcomitrella patens"
   
 name:
-  - "S1"
-  - "S2"
-  - "S3"
-  - "S4"
+  - "PP"
 
 count_matrix:
-  - "/CoExPlore/input/testdata_out/S1.isoform.TMM.matrix"
-  - "/CoExPlore/input/testdata_out/S2.isoform.TMM.matrix"
-  - "/CoExPlore/input/testdata_out/S3.isoform.TMM.matrix"
-  - "/CoExPlore/input/testdata_out/S4.isoform.TMM.matrix"
+  - "/CoExPlore/input/ppatens/PPatens.PSEUDO_BULK.EXPR.matrix"
 
 sample_mapping:
-  - "/CoExPlore/input/testdata_out/S1.sample_mapping.tsv"
-  - "/CoExPlore/input/testdata_out/S2.sample_mapping.tsv"
-  - "/CoExPlore/input/testdata_out/S3.sample_mapping.tsv"
-  - "/CoExPlore/input/testdata_out/S4.sample_mapping.tsv"
+  - "/CoExPlore/input/ppatens/sample_mapping.tsv"
 
-# Optional parameters:
+# Optional metadata files:
 iprid:
-  - "/CoExPlore/input/testdata_out/S1.iprid.tsv"
-  - "" # Use "" if the metadata is not available
-  - "" # Use "" if the metadata is not available
-  - "" # Use "" if the metadata is not available
+  - "/CoExPlore/input/ppatens/gene2interpro.tsv"
 
 goid:
-  - "/CoExPlore/input/testdata_out/S1.goid.tsv"
-  - "/CoExPlore/input/testdata_out/S2.goid.tsv"
-  - "" # Use "" if the metadata is not available
-  - "" # Use "" if the metadata is not available
+  - "/CoExPlore/input/ppatens/gene2go.tsv"
 
-orthogroups: "/CoExPlore/input/testdata_out/N0.tsv"
+orthogroups: ""
 
+# Output parameters
 save_tom: true # Required for using the Co-Expression Network Analysis 
 save_adjacency_matrix: false
 save_WGCNA: false
 figure_type: "png"
 reduce_matrix: false
+
+# WGCNA parameters
+wgcna_parameters:
+  TPMcutoff: 1
+  powers: null              # If null, the pipeline will calculate the best power
+  RsquaredCut: 0.9
+  MeanCut: 50
+  networkType: "signed hybrid"
+  TOMType: "signed"
+  minModuleSize: 30
+  naColor: "grey"
+  cut: inf
+  MEDissThres: 0.2
+
 
 output_path: "/CoExPlore/output"
 
