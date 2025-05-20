@@ -99,7 +99,7 @@ scikit-learn==1.6.1
 scipy==1.15.1
 seaborn==0.13.2
 session_info==1.0.0
-setuptools==75.8.0
+setuptools==78.1.1
 six==1.17.0
 SQLAlchemy==2.0.38
 stack-data==0.6.3
