@@ -313,6 +313,20 @@ def start_task(task_name):
 Table routes helper functions
 """
 
+def force_select(query: str) -> str:
+    # Only apply if SELECT * is not already used
+    if re.search(r'select\s+\*\s+from', query, re.IGNORECASE):
+        return query
+
+    # If aggregations or GROUP BY are present, do not modify
+    if any(kw in query.lower() for kw in ["group by", "having", "count(", "sum(", "avg(", "min(", "max("]):
+        return query
+
+    # Replace SELECT ... FROM with SELECT * FROM
+    select_pattern = re.compile(r'^select\s+.+?\s+from\s', re.IGNORECASE | re.DOTALL)
+    return select_pattern.sub('SELECT * FROM ', query)
+
+
 def parse_request_params(request) -> dict:
     """
     Parse request parameters for data tables.
@@ -547,6 +561,7 @@ def data():
                 return jsonify({"error": "Only SELECT statements allowed."}), 400
 
             base_query = ai_query.strip().rstrip(";")
+            base_query = force_select(base_query)
 
             # Optionally extract ORDER BY from request
             order_params = []
@@ -562,10 +577,20 @@ def data():
             # LIMIT + OFFSET
             limit = int(params.get("length", 10))
             offset = int(params.get("start", 0))
-            limit_offset_clause = f"LIMIT {limit} OFFSET {offset}"
+
+            # Check if LIMIT is already in the base query
+            if re.search(r'\blimit\b', base_query, re.IGNORECASE):
+                limit_offset_clause = ""
+            else:
+                limit_offset_clause = f"LIMIT {limit} OFFSET {offset}"
+
+            query = f"{base_query} {order_clause} {limit_offset_clause}"
 
             query = f"{base_query} {order_clause} {limit_offset_clause}"
             query_params = {}
+
+            logger.info("AI query: %s", query)
+            logger.info("AI query params: %s", query_params)
 
         else:
             # Default case
