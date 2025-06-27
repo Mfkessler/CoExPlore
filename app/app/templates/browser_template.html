@@ -197,12 +197,12 @@
                 </div>
             </div>
 
-            <div id="fallbackResultContainer" style="display: none; margin-top: 1rem;">
-                <label><strong>Query Result:</strong></label>
-                <div id="fallbackResultTableWrapper" style="overflow-x: auto;">
-                    <table id="fallbackResultTable" class="table table-bordered table-sm">
-                        <thead></thead>
-                        <tbody></tbody>
+            <div id="fallbackResultContainer" style="display: none; margin-top: 2rem;">
+                <h5>AI Result:</h5>
+                <div class="table-responsive">
+                    <table id="fallbackResultTable" class="table table-bordered table-hover table-sm align-middle">
+                    <thead class="table-light"></thead>
+                    <tbody></tbody>
                     </table>
                 </div>
             </div>
@@ -522,7 +522,8 @@
                         // Check if all keys are present in dtColumns
                         const dtKeys = dtColumns.map(col => col.data);
                         const rowKeys = Object.keys(json.data[0] || {});
-                        const allKeysMatch = rowKeys.every(k => dtKeys.includes(k));
+                        const allKeysMatch = rowKeys.every(k => dtKeys.includes(k)) && dtKeys.some(k => rowKeys.includes(k));
+
 
                         if (allKeysMatch) {
                             $('#fallbackResultContainer').hide();
@@ -548,8 +549,14 @@
                 const $thead = $table.find('thead').empty();
                 const $tbody = $table.find('tbody').empty();
 
-                // Header
+                if (!Array.isArray(data) || data.length === 0) {
+                    $('#fallbackResultContainer').hide();
+                    return;
+                }
+
                 const keys = Object.keys(data[0]);
+
+                // Header
                 const headerRow = $('<tr>');
                 keys.forEach(key => {
                     headerRow.append($('<th>').text(key));
@@ -560,7 +567,8 @@
                 data.forEach(row => {
                     const rowEl = $('<tr>');
                     keys.forEach(key => {
-                        rowEl.append($('<td>').text(row[key] != null ? row[key] : ''));
+                        const value = row[key] != null ? row[key] : '';
+                        rowEl.append($('<td>').text(value));
                     });
                     $tbody.append(rowEl);
                 });
@@ -766,7 +774,10 @@
                     if (initialSpeciesFilter && Array.isArray(initialSpeciesFilter)) {
                         params.species_filter = JSON.stringify(initialSpeciesFilter);
                     }
-                    console.log("Sending table params with species filter:", params);
+
+                    params.ai_query = aiQuery || null;
+
+                    console.log("Sending table params with species filter and AI query:", params);
                     event.source.postMessage({ type: 'tableParams', data: params }, event.origin);
                 }
             });
