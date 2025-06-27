@@ -536,21 +536,60 @@ def data():
         params = parse_request_params(request)
         table = params['table_name']
         select_columns = ', '.join([col['name'] for col in params['columns']])
-        query, query_params = build_sql_query(params, select_columns)
+
+        ai_query = request.json.get("ai_query")
+        order_clause = ""
+        limit_offset_clause = ""
+
+        if ai_query:
+            # Security: Only allow SELECT statements
+            if not ai_query.lower().strip().startswith("select"):
+                return jsonify({"error": "Only SELECT statements allowed."}), 400
+
+            base_query = ai_query.strip().rstrip(";")
+
+            # Optionally extract ORDER BY from request
+            order_params = []
+            for order in params.get("order", []):
+                col = params["columns"][order["column"]]
+                if col.get("orderable", True):
+                    col_name = col["name"]
+                    dir_sql = "ASC" if order["dir"].lower() == "asc" else "DESC"
+                    order_params.append(f"{col_name} {dir_sql}")
+            if order_params:
+                order_clause = "ORDER BY " + ", ".join(order_params)
+
+            # LIMIT + OFFSET
+            limit = int(params.get("length", 10))
+            offset = int(params.get("start", 0))
+            limit_offset_clause = f"LIMIT {limit} OFFSET {offset}"
+
+            query = f"{base_query} {order_clause} {limit_offset_clause}"
+            query_params = {}
+
+        else:
+            # Default case
+            query, query_params = build_sql_query(params, select_columns)
+
         logger.info("Received transcript_filter: %s", params.get('transcript_filter'))
         logger.info("Received transcript_filter_column: %s", params.get('transcript_filter_column'))
         logger.info("Columns in request: %s", [col['name'] for col in params['columns']])
 
-        # Count total records
-        with engine.connect() as conn:
-            total_records = pd.read_sql(text(f"SELECT COUNT(*) FROM {table}"), conn).iloc[0, 0]
+        # --- total_records + total_filtered_records ---
+        if ai_query:
+            # AI queries: count via subquery
+            count_query = f"SELECT COUNT(*) FROM ({base_query}) AS subquery"
+            with engine.connect() as conn:
+                total_filtered_records = pd.read_sql(text(count_query), conn).iloc[0, 0]
+                total_records = total_filtered_records
+        else:
+            with engine.connect() as conn:
+                total_records = pd.read_sql(text(f"SELECT COUNT(*) FROM {table}"), conn).iloc[0, 0]
+            count_query = f"SELECT COUNT(*) FROM {table} {query.partition(f'FROM {table}')[2].partition('ORDER BY')[0]}"
+            with engine.connect() as conn:
+                total_filtered_records = pd.read_sql(text(count_query), conn, params=query_params).iloc[0, 0]
 
-        # Count filtered records
-        count_query = f"SELECT COUNT(*) FROM {table} {query.partition(f'FROM {table}')[2].partition('ORDER BY')[0]}"
-        with engine.connect() as conn:
-            total_filtered_records = pd.read_sql(text(count_query), conn, params=query_params).iloc[0, 0]
-
-        # Fetch data
+        # --- Fetch data ---
         df = execute_sql_query(query, query_params)
         data = df.replace({np.nan: None}).to_dict(orient='records')
 
@@ -560,10 +599,9 @@ def data():
             'recordsFiltered': int(total_filtered_records),
             'data': data
         })
-    
+
     except Exception as e:
         print(f"Error: {e}")
-
         return jsonify({"error": "Server Error"}), 500
 
 

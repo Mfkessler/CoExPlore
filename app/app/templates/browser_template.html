@@ -186,6 +186,17 @@
             </div>
             <br>
 
+            <!-- AI Search -->
+            <div class="row mb-3">
+                <label for="aiSearchInput" class="col-sm-2 col-form-label">AI Search</label>
+                <div class="col-sm-8">
+                    <textarea class="form-control" id="aiSearchInput" name="aiSearchInput" rows="3" placeholder="How many modules per species?">{{ question }}</textarea>
+                </div>
+                <div class="col-sm-2">
+                    <button id="aiSearchBtn" class="btn btn-success w-100">Run AI Search</button>
+                </div>
+            </div>
+
             <!-- DataTables table -->
             <table id="browserRes" class="display responsive nowrap no-border" style="width:100%; display:none;">
                 <thead>
@@ -268,8 +279,10 @@
 
     <script>
         const BASE_URL = "{{ BASE_URL }}";
-        var table;
-        var orthogroupTokens = "";
+        let table;
+        let aiActive = false;
+        let aiQuery = null;
+        let orthogroupTokens = "";
 
         // Dynamically generated DataTables columns based on METADATA_DICT
         var dtColumns = [
@@ -285,7 +298,7 @@
                 },
                 autoToggle: false
             }{% else %}
-            { "data": "{{ key }}", autoToggle: false }{% endif %}{% if not loop.last %},{% endif %}
+            { "data": "{{ key }}", "defaultContent": "", autoToggle: false }{% endif %}{% if not loop.last %},{% endif %}
           {% endfor %}
         ];
 
@@ -369,7 +382,8 @@
                             body: JSON.stringify({
                                 ...data,
                                 species_filter: JSON.stringify(initialSpeciesFilter),
-                                table_name: "{{ BROWSER_DB }}"
+                                table_name: "{{ BROWSER_DB }}",
+                                ai_query: aiQuery || null
                             })
                         });
                         if (!response.ok) {
@@ -461,6 +475,32 @@
                     $('#browserRes').on('responsive-display.dt', function(e, datatable, row, showHide) {
                         sendHeight();
                     });
+                }
+            });
+
+            $('#aiSearchBtn').on('click', async function () {
+                const question = $('#aiSearchInput').val().trim();
+                if (!question) {
+                    alert("Please enter a question.");
+                    return;
+                }
+
+                try {
+                    const res = await fetch('http://127.0.0.1:5004/api/transcripts', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ question: question, backend: "sql" })
+                    });
+                    const result = await res.json();
+                    if (!result.query) throw new Error("No SQL returned.");
+
+                    aiQuery = result.query;
+                    aiActive = true;
+                    table.ajax.reload();
+
+                } catch (err) {
+                    console.error("AI Search failed:", err);
+                    alert("AI Search failed: " + err.message);
                 }
             });
 
