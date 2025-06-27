@@ -199,7 +199,12 @@
 
             <div id="fallbackResultContainer" style="display: none; margin-top: 1rem;">
                 <label><strong>Query Result:</strong></label>
-                <textarea id="fallbackResultText" class="form-control" rows="10" readonly></textarea>
+                <div id="fallbackResultTableWrapper" style="overflow-x: auto;">
+                    <table id="fallbackResultTable" class="table table-bordered table-sm">
+                        <thead></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
             </div>
 
             <!-- DataTables table -->
@@ -524,9 +529,7 @@
                             table.ajax.reload();
                         } else {
                             // Result is not compatible with DataTable
-                            const formatted = JSON.stringify(json.data, null, 2);
-                            $('#fallbackResultText').val(formatted);
-                            $('#fallbackResultContainer').show();
+                            renderFallbackTable(json.data);
                         }
                     } else {
                         $('#fallbackResultText').val("No results.");
@@ -538,6 +541,32 @@
                     alert("AI Search failed: " + err.message);
                 }
             });
+
+            // Fallback result rendering
+            function renderFallbackTable(data) {
+                const $table = $('#fallbackResultTable');
+                const $thead = $table.find('thead').empty();
+                const $tbody = $table.find('tbody').empty();
+
+                // Header
+                const keys = Object.keys(data[0]);
+                const headerRow = $('<tr>');
+                keys.forEach(key => {
+                    headerRow.append($('<th>').text(key));
+                });
+                $thead.append(headerRow);
+
+                // Rows
+                data.forEach(row => {
+                    const rowEl = $('<tr>');
+                    keys.forEach(key => {
+                        rowEl.append($('<td>').text(row[key] != null ? row[key] : ''));
+                    });
+                    $tbody.append(rowEl);
+                });
+
+                $('#fallbackResultContainer').show();
+            }
 
             // Copy column entries to clipboard handling
             $('#copyEntriesBtn').on('click', async function () {
