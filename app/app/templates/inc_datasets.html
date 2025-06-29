@@ -1,0 +1,36 @@
+<div class="container py-4">
+  <div class="card mx-auto" style="max-width: 700px;">
+    <div class="card-header d-flex align-items-center justify-content-between">
+      <span class="fw-bold fs-5"><i class="bi bi-database me-2"></i>Datasets</span>
+      <!-- Help Icon Dataset Description -->
+      <button class="btn btn-link" id="helpIconDataset" style="font-size: 24px;">
+        <i class="bi bi-question-circle"></i>
+      </button>
+    </div>
+    <div class="card-body">
+      <form id="analysisForm">
+        <label for="plant" class="form-label">Select species</label>
+        <select class="selectpicker w-100" id="plant" multiple data-actions-box="true" data-live-search="true" data-style="btn-primary">
+          {% for code, name in species %}
+            <option value="{{ code }}" {% if loop.first %}selected{% endif %}>{{ name }}</option>
+          {% endfor %}
+        </select>
+      </form>
+      <!-- Dataset Description (toggled by help icon) -->
+      <div id="userGuideCardDataset" class="analysis-description mt-3" style="display: none;">
+        <p>
+          The datasets have been processed using <a href="https://github.com/Mfkessler/PyWGCNA" target="_blank"><strong>PyWGCNA</strong></a>
+          with the following default parameters:
+        </p>
+        <ul>
+          <li>Minimum Module Size: <strong>50</strong></li>
+          <li>Dissimilarity Threshold: <strong>0.2</strong></li>
+          <li>Network Type: <strong>signed hybrid</strong></li>
+          <li>Power: <strong>between 9 and 19</strong> to achieve a <strong>scale‑free network</strong></li>
+          <li>R² Cut: <strong>0.9</strong></li>
+          <li>Mean Connectivity: <strong>100</strong></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
