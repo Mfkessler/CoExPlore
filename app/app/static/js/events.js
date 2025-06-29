@@ -19,12 +19,19 @@ import {
  */
 export function bindEvents(baseUrl, sessionId) {
     // Help icon toggles
-    document.getElementById("helpIconBrowser").addEventListener("click", () => {
-        $("#userGuideCardBrowser").toggle();
-    });
-    document.getElementById("helpIconDataset").addEventListener("click", () => {
-        $("#userGuideCardDataset").toggle();
-    });
+    const helpIconBrowser = document.getElementById("helpIconBrowser");
+    if (helpIconBrowser) {
+        helpIconBrowser.addEventListener("click", () => {
+            $("#userGuideCardBrowser").toggle();
+        });
+    }
+
+    const helpIconDataset = document.getElementById("helpIconDataset");
+    if (helpIconDataset) {
+        helpIconDataset.addEventListener("click", () => {
+            $("#userGuideCardDataset").toggle();
+        });
+    }
 
     // File type dropdown change
     const fileTypeSelect = document.getElementById("fileTypeSelect");
