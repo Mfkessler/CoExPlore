@@ -14,7 +14,7 @@ from goatools.obo_parser import GODag
 from goatools.goea.go_enrichment_ns import GOEnrichmentStudyNS
 from goatools.godag_plot import plot_gos
 from contextlib import redirect_stdout, redirect_stderr
-from typing import List, Dict, Tuple, Union, Callable
+from typing import List, Dict, Tuple, Union, Callable, Set
 from anndata import AnnData
 from sklearn.impute import KNNImputer
 from sklearn.preprocessing import scale
@@ -1324,6 +1324,68 @@ def save_matrix_to_hdf5(table: pd.DataFrame, filename: str, save_sym_only: bool 
             f.create_dataset('data', data=data, chunks=chunk_size)
             f.attrs['save_sym_only'] = False
             f.attrs['include_diagonal'] = True
+
+
+def load_subset_from_parquet(
+    filename: str,
+    transcripts: List[str],
+    threshold: float = 0.36,
+    include_neighbours: bool = False,
+    max_neighbors: int = 10
+) -> Tuple[pd.DataFrame, Set[str]]:
+    """
+    Loads a subset of a TOM stored as a Parquet edge list into a pandas DataFrame.
+    Optionally, if include_neighbours is True, for each transcript in transcripts the function
+    adds neighbors with connection value >= threshold (up to max_neighbors).
+
+    Parameters:
+    - filename (str): Parquet file name containing the edge list (columns: source, target, weight).
+    - transcripts (list): List of transcript labels (for both rows and columns).
+    - threshold (float): Only edges with value >= threshold are considered.
+    - include_neighbours (bool): If True, for each transcript, add up to max_neighbors neighbors
+      with edge weight >= threshold.
+    - max_neighbors (int): Maximum number of neighbors to add per transcript (if include_neighbours=True).
+
+    Returns:
+    - pd.DataFrame: The filtered TOM subset (sparse, transcripts × transcripts).
+    - set: Set of neighbor transcripts added (if include_neighbours is True), else empty set.
+    """
+    
+    # Load edge list and filter by threshold
+    df = pd.read_parquet(filename)
+    df = df[df['weight'] >= threshold]
+
+    original_set = set(transcripts)
+    if include_neighbours:
+        extra_neighbors = set()
+        for gene in transcripts:
+            out_edges = df[df['source'] == gene].sort_values('weight', ascending=False)
+            in_edges  = df[df['target'] == gene].sort_values('weight', ascending=False)
+            neighbors = list(out_edges['target']) + list(in_edges['source'])
+            neighbors = [n for n in neighbors if n != gene][:max_neighbors]
+            extra_neighbors.update(neighbors)
+        transcripts = list(set(transcripts).union(extra_neighbors))
+        neighbor_set = extra_neighbors - original_set
+    else:
+        neighbor_set = set()
+
+    # Build sparse DataFrame (transcripts × transcripts)
+    subset = df[
+        df['source'].isin(transcripts) & df['target'].isin(transcripts)
+    ]
+    mat = pd.DataFrame(index=transcripts, columns=transcripts, dtype=float)
+    for _, edge in subset.iterrows():
+        mat.at[edge['source'], edge['target']] = edge['weight']
+
+    # Set diagonal to NaN
+    for gene in transcripts:
+        if gene in mat.index and gene in mat.columns:
+            mat.at[gene, gene] = float('nan')
+
+    # Remove empty rows/columns
+    mat = mat.dropna(how='all', axis=0).dropna(how='all', axis=1)
+
+    return mat, neighbor_set
 
 
 def load_subset_from_hdf5(filename: str, rows: list, cols: list = None, threshold: float = None,
