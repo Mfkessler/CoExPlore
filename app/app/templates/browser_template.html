@@ -495,6 +495,8 @@
             });
 
             $('#aiSearchBtn').on('click', async function () {
+                resetAiSearch();
+
                 const question = $('#aiSearchInput').val().trim();
                 if (!question) {
                     alert("Please enter a question.");
@@ -589,6 +591,20 @@
 
                 $('#fallbackResultContainer').show();
             }
+
+            function resetAiSearch() {
+                aiQuery = null;
+                aiActive = false;
+                $('#fallbackResultContainer').hide();
+                table.ajax.reload();
+            }
+
+            // Reset AI state on "normal" input change
+            $('#transcriptSearch, #columnSelect, #orthogroupSearch').on('input change', function() {
+                aiQuery = null;
+                aiActive = false;
+                table.ajax.reload();
+            });
 
             // Copy column entries to clipboard handling
             $('#copyEntriesBtn').on('click', async function () {
