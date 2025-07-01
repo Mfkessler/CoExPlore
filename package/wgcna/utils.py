@@ -1329,59 +1329,57 @@ def save_matrix_to_hdf5(table: pd.DataFrame, filename: str, save_sym_only: bool 
 
 def load_subset_from_parquet(
     filename: str,
-    transcripts: List[str],
+    transcripts: list,
     threshold: float = 0.36,
     include_neighbours: bool = False,
     max_neighbors: int = 10
-) -> Tuple[pd.DataFrame, Set[str]]:
-    """
-    Loads a subset of a TOM stored as a Parquet edge list using Polars.
-    Optionally, if include_neighbours is True, for each transcript in transcripts the function
-    adds neighbors with connection value >= threshold (up to max_neighbors).
-
-    Parameters:
-    - filename (str): Parquet file name containing the edge list (columns: source, target, weight).
-    - transcripts (list): List of transcript labels (for both rows and columns).
-    - threshold (float): Only edges with value >= threshold are considered.
-    - include_neighbours (bool): If True, for each transcript, add up to max_neighbors neighbors
-      with edge weight >= threshold.
-    - max_neighbors (int): Maximum number of neighbors to add per transcript (if include_neighbours=True).
-
-    Returns:
-    - pd.DataFrame: The filtered TOM subset (sparse, transcripts × transcripts).
-    - set: Set of neighbor transcripts added (if include_neighbours is True), else empty set.
-    """
-
+):
+    # Polars filter
     df = pl.read_parquet(
         filename,
         columns=["source", "target", "weight"]
     ).filter(
         (pl.col("weight") >= threshold) &
         (pl.col("source").is_in(transcripts) | pl.col("target").is_in(transcripts))
-    ).to_pandas()
+    )
 
     original_set = set(transcripts)
-    if include_neighbours:
-        extra_neighbors = set()
-        for gene in transcripts:
-            out_edges = df[df['source'] == gene].sort_values('weight', ascending=False)
-            in_edges  = df[df['target'] == gene].sort_values('weight', ascending=False)
-            neighbors = list(out_edges['target']) + list(in_edges['source'])
-            neighbors = [n for n in neighbors if n != gene][:max_neighbors]
-            extra_neighbors.update(neighbors)
-        transcripts = list(set(transcripts).union(extra_neighbors))
-        neighbor_set = extra_neighbors - original_set
 
-        df = df[
-            df['source'].isin(transcripts) & df['target'].isin(transcripts)
-        ]
+    if include_neighbours:
+        # Polars groupby and aggregation
+        out_neighs = (
+            df.filter(pl.col("source").is_in(transcripts))
+            .sort(["source", "weight"], descending=[False, True])
+            .group_by("source")
+            .agg(pl.col("target").head(max_neighbors))
+        )
+        in_neighs = (
+            df.filter(pl.col("target").is_in(transcripts))
+            .sort(["target", "weight"], descending=[False, True])
+            .group_by("target")
+            .agg(pl.col("source").head(max_neighbors))
+        )
+
+        # Extract neighbors
+        neighbors = set()
+        for sublist in out_neighs["target"].to_list():
+            neighbors.update(sublist)
+        for sublist in in_neighs["source"].to_list():
+            neighbors.update(sublist)
+        neighbors -= original_set
+        transcripts = list(original_set.union(neighbors))
+        neighbor_set = neighbors
+        # Re-filter
+        df = df.filter(
+            pl.col("source").is_in(transcripts) & pl.col("target").is_in(transcripts)
+        )
     else:
         neighbor_set = set()
-        df = df[
-            df['source'].isin(transcripts) & df['target'].isin(transcripts)
-        ]
+        df = df.filter(
+            pl.col("source").is_in(transcripts) & pl.col("target").is_in(transcripts)
+        )
 
-    mat = df.pivot(index="source", columns="target", values="weight")
+    mat = df.to_pandas().pivot(index="source", columns="target", values="weight")
 
     for gene in transcripts:
         if gene in mat.index and gene in mat.columns:

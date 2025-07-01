@@ -1341,7 +1341,7 @@ def _generate_heatmap(df_filtered: pd.DataFrame, title: str, file_suffix: str,
     """
 
     # Pivot: rows = Cluster, columns = Tissue; value = median(Expression)
-    pivot_table = df_filtered.pivot_table(index='Cluster', columns='Tissue',
+    pivot_table = df_filtered.pivot_table(index='Cluster', columns='Tissue', observed=True,
                                           values='Expression', aggfunc="median")
 
     # Exclude specified columns
