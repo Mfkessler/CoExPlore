@@ -192,8 +192,14 @@
                 <div class="col-sm-8">
                     <textarea class="form-control" id="aiSearchInput" name="aiSearchInput" rows="3" placeholder="How many modules per species?">{{ question }}</textarea>
                 </div>
-                <div class="col-sm-2">
-                    <button id="aiSearchBtn" class="btn btn-success w-100">Run AI Search</button>
+
+                <div class="col-sm-2 d-flex flex-column align-items-stretch">
+                    <button id="aiSearchBtn" class="btn btn-success w-100 mb-2">
+                        <span id="aiBtnText">Run AI Search</span>
+                    </button>
+                    <div id="aiSpinner" class="w-100 text-center" style="display: none;">
+                        <div class="spinner-border text-success" role="status" aria-hidden="true"></div>
+                    </div>
                 </div>
             </div>
 
@@ -495,7 +501,12 @@
                     return;
                 }
 
+                // --- UI: Disable button, show spinner below, change button text ---
+                $('#aiSearchBtn').prop('disabled', true);
+                $('#aiSpinner').show();
+
                 try {
+                    // Request SQL from AI backend
                     const res = await fetch('http://127.0.0.1:5004/api/transcripts', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -507,7 +518,7 @@
                     aiQuery = result.query;
                     aiActive = true;
 
-                    // Send test query directly to backend
+                    // Now send the generated query to backend and load result
                     const response = await fetch(BASE_URL + "/api/data", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
@@ -524,22 +535,25 @@
                         const rowKeys = Object.keys(json.data[0] || {});
                         const allKeysMatch = rowKeys.every(k => dtKeys.includes(k)) && dtKeys.some(k => rowKeys.includes(k));
 
-
                         if (allKeysMatch) {
                             $('#fallbackResultContainer').hide();
                             table.ajax.reload();
                         } else {
-                            // Result is not compatible with DataTable
                             renderFallbackTable(json.data);
                         }
                     } else {
                         $('#fallbackResultText').val("No results.");
                         $('#fallbackResultContainer').show();
                     }
-
                 } catch (err) {
+                    // --- Error handling: Show alert for user ---
                     console.error("AI Search failed:", err);
                     alert("AI Search failed: " + err.message);
+                } finally {
+                    // --- Always re-enable button and hide spinner (after success OR error) ---
+                    $('#aiSearchBtn').prop('disabled', false);
+                    $('#aiBtnText').text('Run AI Search');
+                    $('#aiSpinner').hide();
                 }
             });
 
