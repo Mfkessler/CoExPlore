@@ -8,7 +8,8 @@ from .utils import (load_subset_from_hdf5,
                     identify_network_clusters_from_json,
                     identify_network_clusters_tree_cut,
                     combine_cluster_maps,
-                    get_node_table)
+                    get_node_table, 
+                    load_subset_from_parquet)
 from .plotting import (PlotConfig,
                        plot_co_expression_network,
                        plot_module_trait_relationships_heatmap,
@@ -272,74 +273,96 @@ def analyze_co_expression_network(adata: Union[AnnData, List[AnnData]], config: 
         return "Not implemented"
 
 
-def get_tom_data(tom_path: Union[str, List[str]], adata: Union[AnnData, List[AnnData]], transcripts: Dict[str, List[str]] = None, query: str = "GO:0009908",
-                 threshold: float = 0.2, tom_prefix: str = "/vol/share/ranomics_app/data/tom", use_symmetry: bool = False, index_map: dict = None,
-                 columns_map: dict = None, progress_callback: Callable[[str], None] = None,
-                 include_neighbours: bool = False, max_neighbors: int = 10) -> Union[Tuple[pd.DataFrame, set], Tuple[List[pd.DataFrame], List[AnnData], List[set]]]:
+def detect_tom_format(tom_path: str) -> str:
+    """
+    Detects TOM format based on file extension.
+    Returns "parquet" for .parquet, else "h5" for .h5.
+    """
+    if tom_path.endswith(".parquet"):
+        return "parquet"
+    elif tom_path.endswith(".h5"):
+        return "h5"
+    else:
+        raise ValueError(f"Unknown TOM file format: {tom_path}")
+
+
+def get_default_tom_path(adata, tom_prefix):
+    # Try Parquet first
+    parquet_path = f"{tom_prefix}/{adata.uns['name']}.parquet"
+    h5_path = f"{tom_prefix}/tom_matrix_{adata.uns['name']}.h5"
+    if os.path.exists(parquet_path):
+        return parquet_path
+    elif os.path.exists(h5_path):
+        return h5_path
+    else:
+        raise FileNotFoundError(f"No TOM found for {adata.uns['name']}: {parquet_path} or {h5_path}")
+
+def get_tom_data(
+    tom_path: Union[str, List[str]],
+    adata: Union[AnnData, List[AnnData]],
+    transcripts: Dict[str, List[str]] = None,
+    query: str = "GO:0009908",
+    threshold: float = 0.2,
+    tom_prefix: str = "/vol/share/ranomics_app/data/tom",
+    progress_callback: Callable[[str], None] = None,
+    include_neighbours: bool = False,
+    max_neighbors: int = 10,
+    **kwargs
+) -> Union[Tuple[pd.DataFrame, set], Tuple[List[pd.DataFrame], List[AnnData], List[set]]]:
     """
     Loads the TOM for one or multiple AnnData objects.
-
-    Parameters:
-    - tom_path (str or List[str]): Path(s) to the TOM file(s).
-    - adata (AnnData or List[AnnData]): The AnnData object(s).
-    - transcripts (Dict[str, List[str]]): Transcripts to subset.
-    - query (str): Query for filtering transcripts.
-    - threshold (float): Threshold for TOM filtering.
-    - tom_prefix (str): Prefix for TOM file if tom_path is not provided.
-    - use_symmetry (bool): Whether to use symmetry.
-    - index_map (dict): Optional index mapping.
-    - columns_map (dict): Optional columns mapping.
-    - progress_callback (Callable): Progress callback.
-    - include_neighbours (bool): If True, include neighbor transcripts.
-    - max_neighbors (int): Maximum neighbors per transcript.
-
-    Returns:
-    - (pd.DataFrame, set): TOM matrix and neighbor set for a single AnnData.
-    - (List[pd.DataFrame], List[AnnData], List[set]): Lists for multiple objects.
+    Automatically detects Parquet (edge list) or HDF5 (matrix) format.
+    [docstring wie gehabt, gekürzt für Platz]
     """
-
     valid_adatas = []
     if isinstance(adata, list):
         toms = []
         neighbor_info_list = []
         for idx, ad in enumerate(adata):
-            current_tom_path = tom_path[idx] if isinstance(
-                tom_path, list) else f"{tom_prefix}/tom_matrix_{ad.uns['name']}.h5"
+            current_tom_path = tom_path[idx] if isinstance(tom_path, list) else f"{tom_prefix}/tom_matrix_{ad.uns['name']}.h5"
             if not os.path.exists(current_tom_path):
                 print(f"File not found: {current_tom_path}")
                 continue
+
+            # Ermittlung Transkripte wie gehabt...
             if not transcripts:
-                current_transcripts = [t[1] for t in list(
-                    transcript_ortho_browser(query, ad).index)]
+                current_transcripts = [t[1] for t in list(transcript_ortho_browser(query, ad).index)]
             else:
                 current_species = ad.uns['species']
                 if current_species in transcripts:
-                    current_transcripts = [
-                        t for t in transcripts[current_species] if t in ad.var_names]
+                    current_transcripts = [t for t in transcripts[current_species] if t in ad.var_names]
                 else:
-                    print(
-                        f"No transcripts found for species {current_species} in dataset {ad.uns['name']}")
+                    print(f"No transcripts found for species {current_species} in dataset {ad.uns['name']}")
                     continue
             if not current_transcripts:
-                print(
-                    f"No transcripts found for the query in dataset {ad.uns['name']}")
+                print(f"No transcripts found for the query in dataset {ad.uns['name']}")
                 continue
-            print(
-                f"Loading {len(current_transcripts)} transcripts from {current_tom_path}")
+
+            print(f"Loading {len(current_transcripts)} transcripts from {current_tom_path}")
             if progress_callback:
-                progress_callback(
-                    f"Loading {len(current_transcripts)} transcripts from TOM of dataset {ad.uns['name']}")
-            tom, neighbor_set = load_subset_from_hdf5(
-                filename=current_tom_path,
-                rows=current_transcripts,
-                cols=current_transcripts,
-                threshold=threshold,
-                use_symmetry=use_symmetry,
-                index_map=index_map,
-                columns_map=columns_map,
-                include_neighbours=include_neighbours,
-                max_neighbors=max_neighbors
-            )
+                progress_callback(f"Loading {len(current_transcripts)} transcripts from TOM of dataset {ad.uns['name']}")
+
+            # AUTOMATISCHES FORMAT-DETECTION!
+            tom_format = detect_tom_format(current_tom_path)
+            if tom_format == "parquet":
+                tom, neighbor_set = load_subset_from_parquet(
+                    filename=current_tom_path,
+                    transcripts=current_transcripts,
+                    threshold=threshold,
+                    include_neighbours=include_neighbours,
+                    max_neighbors=max_neighbors
+                )
+            elif tom_format == "h5":
+                tom, neighbor_set = load_subset_from_hdf5(
+                    filename=current_tom_path,
+                    rows=current_transcripts,
+                    cols=current_transcripts,
+                    threshold=threshold,
+                    include_neighbours=include_neighbours,
+                    max_neighbors=max_neighbors
+                )
+            else:
+                raise ValueError(f"Unsupported TOM file format for {current_tom_path}")
             print(f"Transcripts after filtering: {tom.shape[0]}")
             toms.append(tom.astype("float64"))
             neighbor_info_list.append(neighbor_set)
@@ -347,37 +370,47 @@ def get_tom_data(tom_path: Union[str, List[str]], adata: Union[AnnData, List[Ann
         for idx, t in enumerate(toms):
             toms[idx] = t.astype("float64")
         return toms, valid_adatas, neighbor_info_list
+
     else:
+        # Einzelnes AnnData-Objekt
         if not tom_path:
-            tom_path = f"{tom_prefix}/tom_matrix_{adata.uns['name']}.h5"
+            tom_path = get_default_tom_path(adata, tom_prefix)
         if not os.path.exists(tom_path):
             print(f"File not found: {tom_path}")
             return None
         if transcripts:
-            transcripts = [
-                t for t in transcripts[adata.uns['species']] if t in adata.var_names]
+            transcripts = [t for t in transcripts[adata.uns['species']] if t in adata.var_names]
         else:
-            transcripts = [t[1] for t in list(
-                transcript_ortho_browser(query, adata).index)]
+            transcripts = [t[1] for t in list(transcript_ortho_browser(query, adata).index)]
         if not transcripts:
-            print(
-                f"No transcripts found for the query in dataset {adata.uns['name']}")
+            print(f"No transcripts found for the query in dataset {adata.uns['name']}")
             return None
         print(f"Loading {len(transcripts)} transcripts from {tom_path}")
         if progress_callback:
-            progress_callback(
-                f"Loading {len(transcripts)} transcripts from TOM of dataset {adata.uns['name']}")
-        tom, neighbor_set = load_subset_from_hdf5(
-            filename=tom_path,
-            rows=transcripts,
-            cols=transcripts,
-            threshold=threshold,
-            use_symmetry=use_symmetry,
-            include_neighbours=include_neighbours,
-            max_neighbors=max_neighbors
-        )
+            progress_callback(f"Loading {len(transcripts)} transcripts from TOM of dataset {adata.uns['name']}")
+        tom_format = detect_tom_format(tom_path)
+        if tom_format == "parquet":
+            tom, neighbor_set = load_subset_from_parquet(
+                filename=tom_path,
+                transcripts=transcripts,
+                threshold=threshold,
+                include_neighbours=include_neighbours,
+                max_neighbors=max_neighbors
+            )
+        elif tom_format == "h5":
+            tom, neighbor_set = load_subset_from_hdf5(
+                filename=tom_path,
+                rows=transcripts,
+                cols=transcripts,
+                threshold=threshold,
+                include_neighbours=include_neighbours,
+                max_neighbors=max_neighbors
+            )
+        else:
+            raise ValueError(f"Unsupported TOM file format for {tom_path}")
         print(f"Transcripts after filtering: {tom.shape[0]}")
         tom = tom.astype("float64")
+
         return tom, neighbor_set
 
 
