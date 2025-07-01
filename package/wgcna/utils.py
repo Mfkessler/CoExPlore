@@ -8,6 +8,7 @@ import numpy as np
 import scanpy as sc
 import scipy.sparse as sp
 import networkx as nx
+import polars as pl
 from .ortho import add_ortho_count, update_ortho_ID
 from matplotlib import cm, colors
 from goatools.obo_parser import GODag
@@ -1334,7 +1335,7 @@ def load_subset_from_parquet(
     max_neighbors: int = 10
 ) -> Tuple[pd.DataFrame, Set[str]]:
     """
-    Loads a subset of a TOM stored as a Parquet edge list into a pandas DataFrame.
+    Loads a subset of a TOM stored as a Parquet edge list using Polars.
     Optionally, if include_neighbours is True, for each transcript in transcripts the function
     adds neighbors with connection value >= threshold (up to max_neighbors).
 
@@ -1350,10 +1351,14 @@ def load_subset_from_parquet(
     - pd.DataFrame: The filtered TOM subset (sparse, transcripts × transcripts).
     - set: Set of neighbor transcripts added (if include_neighbours is True), else empty set.
     """
-    
-    # Load edge list and filter by threshold
-    df = pd.read_parquet(filename)
-    df = df[df['weight'] >= threshold]
+
+    df = pl.read_parquet(
+        filename,
+        columns=["source", "target", "weight"]
+    ).filter(
+        (pl.col("weight") >= threshold) &
+        (pl.col("source").is_in(transcripts) | pl.col("target").is_in(transcripts))
+    ).to_pandas()
 
     original_set = set(transcripts)
     if include_neighbours:
@@ -1366,23 +1371,21 @@ def load_subset_from_parquet(
             extra_neighbors.update(neighbors)
         transcripts = list(set(transcripts).union(extra_neighbors))
         neighbor_set = extra_neighbors - original_set
+
+        df = df[
+            df['source'].isin(transcripts) & df['target'].isin(transcripts)
+        ]
     else:
         neighbor_set = set()
+        df = df[
+            df['source'].isin(transcripts) & df['target'].isin(transcripts)
+        ]
 
-    # Build sparse DataFrame (transcripts × transcripts)
-    subset = df[
-        df['source'].isin(transcripts) & df['target'].isin(transcripts)
-    ]
-    mat = pd.DataFrame(index=transcripts, columns=transcripts, dtype=float)
-    for _, edge in subset.iterrows():
-        mat.at[edge['source'], edge['target']] = edge['weight']
+    mat = df.pivot(index="source", columns="target", values="weight")
 
-    # Set diagonal to NaN
     for gene in transcripts:
         if gene in mat.index and gene in mat.columns:
             mat.at[gene, gene] = float('nan')
-
-    # Remove empty rows/columns
     mat = mat.dropna(how='all', axis=0).dropna(how='all', axis=1)
 
     return mat, neighbor_set
