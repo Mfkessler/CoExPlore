@@ -9,6 +9,7 @@ import scanpy as sc
 import scipy.sparse as sp
 import networkx as nx
 import polars as pl
+import anndata as ad
 from .ortho import add_ortho_count, update_ortho_ID
 from matplotlib import cm, colors
 from goatools.obo_parser import GODag
@@ -24,6 +25,9 @@ from jinja2 import Environment, FileSystemLoader
 from collections import defaultdict
 from scipy.cluster.hierarchy import linkage, fcluster
 from scipy.spatial.distance import squareform
+from kneed import KneeLocator
+from scipy.stats import median_abs_deviation
+import matplotlib.pyplot as plt
 from .config import METADATA_DICT
 
 
@@ -42,31 +46,51 @@ def create_dir(path: str) -> None:
         print(f"Directory already exists at: {path}")
 
 
-def find_species_by_initials(species: str, file_path: str = "../info/species") -> str:
+def find_species_by_initials(species: str, file_path: str = "../info/species", fallback: str = None) -> str:
     """
     Finds and returns the full name of a species based on the initial letters of its name provided in a single string.
 
     Parameters:
     - species (str): A string containing the initial letters of the first and second word of the species name.
-    - file_path (str): The path to the file containing the species names.
+    - file_path (str): The path to the file containing the species names (one per line, e.g. 'Papaver somniferum').
+    - fallback (str): Optional, content to use if file_path does not exist (one species per line).
 
     Returns:
     - str: The full name of the species that matches the given initials. If no match is found, returns None.
     """
-
+    
+    # If not exactly 2 letters, return unchanged
     if len(species) != 2:
         return species
 
     first_letter, second_letter = species[0].upper(), species[1].upper()
 
-    with open(file_path, 'r') as file:
-        for line in file:
-            words = line.strip().split()
-            if len(words) >= 2 and words[0][0].upper() == first_letter and words[1][0].upper() == second_letter:
-                return line.strip()
+    # Determine data source: file or string
+    if os.path.exists(file_path):
+        with open(file_path, 'r') as file:
+            lines = file.readlines()
+    elif fallback is not None:
+        lines = fallback.strip().splitlines()
+    else:
+        # Default fallback if no string is provided
+        lines = [
+            "Papaver somniferum",
+            "Thalictrum thalictroides",
+            "Aquilegia caerulea",
+            "Staphisagria picta",
+            "Capnoides sempervirens",
+            "Hydrastis canadensis",
+            "Eschscholzia californica",
+            "Epimedium grandiflorum"
+        ]
 
-    raise ValueError(
-        f"No species found with the provided initials. Please check the species file: {os.path.abspath(file_path)}")
+    # Matching
+    for line in lines:
+        words = line.strip().split()
+        if len(words) >= 2 and words[0][0].upper() == first_letter and words[1][0].upper() == second_letter:
+            return line.strip()
+
+    return None
 
 
 def remove_column_if_exists(df: pd.DataFrame, column_name: str) -> None:
@@ -356,6 +380,47 @@ def generate_stage_color_dict(custom_stages: List[str] = None) -> Dict[str, str]
 
     # Create the color dictionary
     color_dict = dict(zip(stages, hex_colors))
+
+    return color_dict
+
+
+def generate_ranomics_color_dict(obs_stages) -> Dict[str, str]:
+    """
+    Returns a fixed color dictionary for all predefined stages,
+    but only includes stages that are present in obs_stages.
+
+    Parameters:
+    obs_stages : Iterable[str]
+        Stages actually present in adata.obs["tissue"] (e.g., from .unique())
+
+    Returns:
+    Dict[str, str]
+        Mapping stage -> color (as hex string), only for present stages,
+        but with fixed colors per stage.
+    """
+    
+    stages = [
+        "Bud stage 1", "Bud stage 2", "Bud stage 3", "Bud stage 4",
+        "Sepals at anthesis", "Petals at anthesis", "Stamens at anthesis",
+        "Gynoecia at anthesis", "Shoot apex", "Petal early stage",
+        "Petal mid stage", "Petal late stage", "Young fruits",
+        "Mid-stage fruit", "Seeds 5 dap", "Root", "Young leaf",
+        "Mature leaf", "Seedling", "Mature petal nectary part",
+        "Mature petal no nectary part", "Non-spurred Petal", "Unknown"
+    ]
+
+    # Assign up to 32 distinct colors
+    colors_tab20 = cm.tab20(np.linspace(0, 1, 20))
+    colors_set3 = cm.Set3(np.linspace(0, 1, 12))
+    all_colors = np.vstack((colors_tab20, colors_set3))[:len(stages)]
+    hex_colors = [colors.to_hex(color) for color in all_colors]
+
+    # Full mapping for ALL stages (always same colors)
+    full_color_dict = dict(zip(stages, hex_colors))
+
+    # Return only those present in obs_stages, but with their fixed color
+    present_stages = set(str(s) for s in obs_stages)  # Convert to str to avoid issues
+    color_dict = {stage: full_color_dict[stage] for stage in stages if stage in present_stages}
 
     return color_dict
 
@@ -2821,7 +2886,7 @@ def add_metadata_columns(adata: AnnData, mapping_file: str, columns: Dict[str, s
     return adata
 
 
-def add_metadata_uniprot(adata: AnnData, up_file: str, selected_columns: List[str] = None) -> AnnData:
+def add_metadata_uniprot(adata: AnnData, up_file: str, selected_columns: List[str] = None, warn: bool = False) -> AnnData:
     """
     Parses a Uniprot annotation file and annotates the adata.var DataFrame of an AnnData object with selected columns.
 
@@ -2829,6 +2894,7 @@ def add_metadata_uniprot(adata: AnnData, up_file: str, selected_columns: List[st
     - adata (AnnData): The AnnData object to annotate.
     - up_file (str): Path to the Uniprot annotation file.
     - selected_columns (List[str]): List of column names from the Uniprot file to add to adata.var.
+    - warn (bool): If True, prints warnings for missing IDs in the Uniprot file.
 
     Returns:
     - AnnData: The updated AnnData object with adata.var annotated.
@@ -2875,7 +2941,219 @@ def add_metadata_uniprot(adata: AnnData, up_file: str, selected_columns: List[st
     adata.var = pd.concat([adata.var, df_annot], axis=1)
 
     # Display differences between IDs in adata.var and IDs in the Uniprot file
-    missing_in_uniprot = adata.var.index.difference(df_up.index)
-    print("IDs in adata.var that are missing in the Uniprot file:", missing_in_uniprot)
+    if warn:
+        missing_in_uniprot = adata.var.index.difference(df_up.index)
+        if missing_in_uniprot.any():
+            print(
+                f"WARNING: The following IDs in adata.var are not found in the Uniprot file: {', '.join(missing_in_uniprot)}")
 
     return adata
+
+
+def detect_tom_threshold_from_array(
+    tom: 'np.ndarray | pd.DataFrame',
+    plot_path: str = None
+) -> float:
+    """
+    Detect optimal TOM threshold using knee-detection.
+
+    Parameters:
+    tom : np.ndarray or pd.DataFrame
+        Topological overlap matrix (square matrix).
+    plot_path : str or None
+        If set, path to save the threshold plot.
+
+    Returns:
+    float or None
+        Detected threshold (knee) or None.
+    """
+
+    arr = tom.values if isinstance(tom, pd.DataFrame) else tom
+    thresholds = np.arange(0.1, 1.01, 0.01)
+    edge_counts = [(arr >= t).sum() for t in thresholds]
+    knee_locator = KneeLocator(thresholds, edge_counts, curve="convex", direction="decreasing")
+    knee = round(knee_locator.knee, 2) if knee_locator.knee else None
+
+    if plot_path:
+        plt.figure(figsize=(7, 4))
+        plt.plot(thresholds, edge_counts, label="Number of edges")
+        if knee:
+            plt.axvline(knee, color="red", linestyle="--", label=f"Knee: {knee}")
+            plt.scatter([knee], [edge_counts[int((knee-0.1)/0.01)]], color="red")
+        plt.title("Edges vs. Threshold")
+        plt.xlabel("Threshold")
+        plt.ylabel("Number of edges")
+        plt.legend()
+        plt.tight_layout()
+        plt.savefig(plot_path)
+        plt.close()
+
+    return knee
+
+
+def export_tom_edges_to_parquet(
+    tom: 'pd.DataFrame | np.ndarray',
+    threshold: float,
+    out_parquet: str
+) -> int:
+    """
+    Export all edges above a threshold from TOM to Parquet.
+
+    Parameters:
+    tom : pd.DataFrame or np.ndarray
+        TOM similarity matrix (square, symmetrical).
+    threshold : float
+        Edge threshold.
+    out_parquet : str
+        Output parquet file path.
+
+    Returns:
+    int
+        Number of edges saved.
+    """
+
+    if isinstance(tom, pd.DataFrame):
+        index = tom.index.to_numpy()
+        arr = tom.values
+    else:
+        index = np.arange(tom.shape[0])
+        arr = tom
+    edge_idx = np.where(arr > threshold)
+    sources = [index[i] for i in edge_idx[0]]
+    targets = [index[j] for j in edge_idx[1]]
+    weights = arr[edge_idx]
+    # Remove self-loops
+    df_edges = pd.DataFrame({"source": sources, "target": targets, "weight": weights})
+    df_edges = df_edges[df_edges.source != df_edges.target]
+    # If symmetric, keep only one direction:
+    # df_edges = df_edges[df_edges.source < df_edges.target]
+    df_edges.to_parquet(out_parquet, index=False)
+    print(f"{out_parquet}: {len(df_edges)} edges saved.")
+
+    return len(df_edges)
+
+
+def filter_genes_with_always_keep(
+    adata: ad.AnnData,
+    prop: float = 0.2,
+    min_mean: float = 1,
+    min_samples: int = 3,
+    min_genes: int = 5000,
+    max_genes: int = 20000,
+    always_keep_column: str = "tf_family"
+) -> ad.AnnData:
+    """
+    Efficiently filter genes in AnnData by proportion of highest variance, but always keep genes where `always_keep_column` is not null.
+
+    Returns
+    -------
+    ad.AnnData
+        Filtered AnnData object.
+    """
+
+    arr = adata.X
+    if not isinstance(arr, np.ndarray):
+        arr = arr.toarray() if hasattr(arr, 'toarray') else np.asarray(arr)
+    arr = arr.astype(np.float32)
+    
+    # Expression filter
+    mean_keep = arr.mean(axis=0) > min_mean
+    sample_keep = (arr > 1).sum(axis=0) >= min_samples
+    gene_mask = mean_keep & sample_keep
+    
+    # Variance filter
+    arr_filt = arr[:, gene_mask]
+    n = arr_filt.shape[1]
+    n_keep = min(max(int(n * prop), min_genes), max_genes)
+    vars = arr_filt.var(axis=0)
+    top_idx = np.argsort(vars)[-n_keep:] if n_keep < n else np.arange(n)
+    filtered_var = adata.var[gene_mask]
+    top_gene_names = filtered_var.index[top_idx]
+    
+    # Always-keep
+    if always_keep_column and always_keep_column in adata.var.columns:
+        always_keep_genes = set(
+            adata.var.index[
+                (~adata.var[always_keep_column].isnull()) & (adata.var[always_keep_column] != "")
+            ]
+        )
+        top_gene_names = set(top_gene_names)
+        all_genes_to_keep = list(top_gene_names | always_keep_genes)
+        # Restore original order
+        all_genes_to_keep = [g for g in adata.var_names if g in all_genes_to_keep]
+    else:
+        all_genes_to_keep = list(top_gene_names)
+    
+    # Subset AnnData
+    adata_filtered = adata[:, adata.var_names.isin(all_genes_to_keep)].copy()
+    
+    return adata_filtered
+
+
+def create_anndata(name: str) -> ad.AnnData:
+    """
+    Create an AnnData object for a given dataset name, including filtering genes by MAD knee and adding metadata.
+
+    Parameters:
+    name : str
+        Dataset name (species or project ID, e.g. "AC", "PS", ...).
+
+    Returns:
+    ad.AnnData
+        Filtered AnnData object with metadata and annotation columns in .var.
+    """
+
+    # Paths to annotation/metadata files (adjust to your environment)
+    go_path = f"/vol/share/ranomics_app/uniprot/{name}.uniprot.goslim_plant.gaf"
+    ortho_path = "/vol/share/ranomics_app/Ortho_Outgroup/N0.tsv"
+    ipr_path = f"/vol/share/ranomics_app/interpro/{name}.iprid.tsv"
+    pfam_path = f"/vol/share/ranomics_app/pfam/{name}.pfam.tsv"
+    tf_path = f"/vol/share/ranomics_app/TFs/{name}.TF.csv"
+    up_path = f"/vol/share/ranomics_app/uniprot/{name}.faa.annotation.csv"
+
+    if name == 'EC':
+        input_matrix = f"/vol/share/ranomics_app/count_matrices2/{name}.isoform.TMM.EXPR.matrix.updated"
+    else:
+        input_matrix = f"/vol/share/ranomics_app/count_matrices2/{name}.isoform.TMM.EXPR.matrix"
+        
+    # Load count and metadata tables
+    count_df = transform_count_matrix(input_matrix)
+    metadata_df = map_tissue_types(count_df)
+    
+    count_df = count_df.set_index('sample')
+    metadata_df = metadata_df.set_index('sample')
+    metadata_df = metadata_df.loc[count_df.index]
+    
+    # Create initial AnnData (no I/O, all in memory)
+    adata = ad.AnnData(
+        X=count_df.values.astype(float),
+        obs=metadata_df,
+        var=pd.DataFrame(index=count_df.columns)
+    )
+
+    # Add gene annotation columns to .var
+    add_go_terms_to_anndata(adata, go_path)
+    add_ortho_id_to_anndata(adata, ortho_path, name)
+    add_ipr_columns(adata, ipr_path)
+    add_pfam_columns(adata, pfam_path)
+    add_tf_columns(adata, tf_path)
+    add_metadata_uniprot(adata, up_path)
+
+    print("AnnData:", adata)
+
+    # Filter transcripts based on variance and always keep TF families
+    adata_filtered = filter_genes_with_always_keep(
+        adata,
+        prop=0.2,
+        min_mean=1,
+        min_samples=3,
+        min_genes=5000,
+        max_genes=20000,
+        always_keep_column="tf_family"
+    )
+
+    print("Filtered AnnData:", adata_filtered)
+
+    print("Final AnnData shape:", adata_filtered.shape)
+
+    return adata_filtered
