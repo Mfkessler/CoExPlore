@@ -3090,31 +3090,52 @@ def filter_genes_with_always_keep(
     return adata_filtered
 
 
-def create_anndata(name: str) -> ad.AnnData:
+def create_anndata(
+    name: str,
+    base_uniprot: str,
+    base_ortho: str,
+    base_interpro: str,
+    base_pfam: str,
+    base_tfs: str,
+    base_counts: str
+) -> ad.AnnData:
     """
-    Create an AnnData object for a given dataset name, including filtering genes by MAD knee and adding metadata.
+    Create an AnnData object for a given dataset name, including filtering genes and adding metadata.
 
-    Parameters:
+    Parameters
+    ----------
     name : str
         Dataset name (species or project ID, e.g. "AC", "PS", ...).
+    base_uniprot : str
+        Base folder for UniProt annotation files.
+    base_ortho : str
+        Base folder for Ortho annotation files.
+    base_interpro : str
+        Base folder for InterPro annotation files.
+    base_pfam : str
+        Base folder for Pfam annotation files.
+    base_tfs : str
+        Base folder for TF annotation files.
+    base_counts : str
+        Base folder for count matrix files.
 
-    Returns:
+    Returns
+    -------
     ad.AnnData
         Filtered AnnData object with metadata and annotation columns in .var.
     """
 
-    # Paths to annotation/metadata files (adjust to your environment)
-    go_path = f"/vol/share/ranomics_app/uniprot/{name}.uniprot.goslim_plant.gaf"
-    ortho_path = "/vol/share/ranomics_app/Ortho_Outgroup/N0.tsv"
-    ipr_path = f"/vol/share/ranomics_app/interpro/{name}.iprid.tsv"
-    pfam_path = f"/vol/share/ranomics_app/pfam/{name}.pfam.tsv"
-    tf_path = f"/vol/share/ranomics_app/TFs/{name}.TF.csv"
-    up_path = f"/vol/share/ranomics_app/uniprot/{name}.faa.annotation.csv"
+    go_path   = f"{base_uniprot}/{name}.uniprot.goslim_plant.gaf"
+    ortho_path= f"{base_ortho}/N0.tsv"
+    ipr_path  = f"{base_interpro}/{name}.iprid.tsv"
+    pfam_path = f"{base_pfam}/{name}.pfam.tsv"
+    tf_path   = f"{base_tfs}/{name}.TF.csv"
+    up_path   = f"{base_uniprot}/{name}.faa.annotation.csv"
 
     if name == 'EC':
-        input_matrix = f"/vol/share/ranomics_app/count_matrices2/{name}.isoform.TMM.EXPR.matrix.updated"
+        input_matrix = f"{base_counts}/{name}.isoform.TMM.EXPR.matrix.updated"
     else:
-        input_matrix = f"/vol/share/ranomics_app/count_matrices2/{name}.isoform.TMM.EXPR.matrix"
+        input_matrix = f"{base_counts}/{name}.isoform.TMM.EXPR.matrix"
         
     # Load count and metadata tables
     count_df = transform_count_matrix(input_matrix)
@@ -3153,7 +3174,6 @@ def create_anndata(name: str) -> ad.AnnData:
     )
 
     print("Filtered AnnData:", adata_filtered)
-
     print("Final AnnData shape:", adata_filtered.shape)
 
     return adata_filtered
