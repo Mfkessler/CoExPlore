@@ -16,7 +16,7 @@ from goatools.obo_parser import GODag
 from goatools.goea.go_enrichment_ns import GOEnrichmentStudyNS
 from goatools.godag_plot import plot_gos
 from contextlib import redirect_stdout, redirect_stderr
-from typing import List, Dict, Tuple, Union, Callable, Set
+from typing import List, Dict, Tuple, Union, Callable, Set, Any
 from anndata import AnnData
 from sklearn.impute import KNNImputer
 from sklearn.preprocessing import scale
@@ -398,7 +398,7 @@ def generate_ranomics_color_dict(obs_stages) -> Dict[str, str]:
         Mapping stage -> color (as hex string), only for present stages,
         but with fixed colors per stage.
     """
-    
+
     stages = [
         "Bud stage 1", "Bud stage 2", "Bud stage 3", "Bud stage 4",
         "Sepals at anthesis", "Petals at anthesis", "Stamens at anthesis",
@@ -3157,3 +3157,79 @@ def create_anndata(name: str) -> ad.AnnData:
     print("Final AnnData shape:", adata_filtered.shape)
 
     return adata_filtered
+
+
+def calculate_qc_metrics(adata: ad.AnnData, mt_prefix="MT-", inplace=True) -> pd.DataFrame:
+    """
+    Calculates QC metrics for AnnData object (analogous to scanpy's sc.pp.calculate_qc_metrics).
+    Adds results to adata.obs and adata.var if inplace=True.
+
+    Parameters:
+    adata : AnnData
+        AnnData object (cells x genes, or samples x genes for bulk).
+    mt_prefix : str
+        Prefix for mitochondrial genes (default: "MT-").
+    inplace : bool
+        If True, adds metrics to adata.obs and adata.var.
+
+    Returns:
+    pd.DataFrame
+        DataFrame with QC metrics (if inplace=False).
+    """
+
+    X = np.asarray(adata.X)
+
+    # "Cells" = rows, "Genes" = columns (bulk: cells=samples)
+    total_counts = X.sum(axis=1)
+    n_genes_by_counts = (X > 0).sum(axis=1)
+    total_counts_per_gene = X.sum(axis=0)
+    n_cells_by_counts = (X > 0).sum(axis=0)
+
+    # Detect mitochondrial genes by var_names prefix (case-insensitive)
+    var_names = adata.var_names.str.upper()
+    mt_genes = var_names.str.startswith(mt_prefix.upper())
+    pct_counts_mt = X[:, mt_genes].sum(axis=1) / total_counts * 100 if mt_genes.any() else np.zeros_like(total_counts)
+
+    # Add to AnnData
+    if inplace:
+        adata.obs["total_counts"] = total_counts
+        adata.obs["n_genes_by_counts"] = n_genes_by_counts
+        adata.obs["pct_counts_mt"] = pct_counts_mt
+        adata.var["total_counts"] = total_counts_per_gene
+        adata.var["n_cells_by_counts"] = n_cells_by_counts
+
+    # Optional: return as DataFrame
+    qc = pd.DataFrame({
+        "total_counts": total_counts,
+        "n_genes_by_counts": n_genes_by_counts,
+        "pct_counts_mt": pct_counts_mt
+    }, index=adata.obs_names)
+
+    return qc
+
+
+def make_df_records_hdf5_safe(df: pd.DataFrame) -> List[Dict[str, Any]]:
+    """
+    Ensures all columns in the DataFrame are HDF5-safe (convert lists, sets, tuples to comma-joined strings).
+    Returns a list of dicts (orient='records'), ready for AnnData.uns.
+
+    Parameters:
+    df : pd.DataFrame
+        DataFrame to convert.
+
+    Returns:
+    List[Dict[str, Any]]
+        List of dictionaries with HDF5-safe values.
+    """
+
+    df_copy = df.copy()
+    for col in df_copy.columns:
+        if df_copy[col].dtype == "object":
+            if any(isinstance(x, (list, set, tuple, dict)) for x in df_copy[col].dropna()):
+                df_copy[col] = df_copy[col].apply(
+                    lambda x: ",".join(map(str, x)) if isinstance(x, (list, set, tuple)) else str(x) if pd.notnull(x) else ""
+                )
+            else:
+                df_copy[col] = df_copy[col].astype(str)
+
+    return df_copy.to_dict(orient="records")
