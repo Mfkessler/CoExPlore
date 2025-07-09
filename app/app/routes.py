@@ -1,6 +1,7 @@
 # routes.py
 
 from flask import Blueprint, make_response, request, jsonify, send_from_directory, Response, current_app, render_template
+import requests
 import os
 import uuid
 import glob
@@ -270,15 +271,30 @@ def load_image_data():
                     img.thumbnail((500, 500))
                     img.save(thumbnail_path, "PNG", quality=300)
 
-            thumbnail_url = f"http://{request.host}{Config.BASE_URL}/static/images/{plant}/thumbnails/{original_filename}"
-            original_url = f"http://{request.host}{Config.BASE_URL}/static/images/{plant}/{original_filename}"
+            thumbnail_url = f"{Config.BASE_URL}/static/images/{plant}/thumbnails/{original_filename}"
+            original_url = f"{Config.BASE_URL}/static/images/{plant}/{original_filename}"
 
             figure_urls.append({"thumbnail": thumbnail_url, "original": original_url})
 
         return jsonify({"status": "success", "figures": figure_urls})
     else:
         return jsonify({"status": "error", "message": "No images found"}), 404
-    
+
+
+"""
+AI Search
+"""
+
+CYFISH_API_URL = os.environ.get("CYFISH_API_URL", "http://172.17.0.1:5004/api/transcripts")
+logger.info(f"Using CyFISH API URL: {CYFISH_API_URL}")
+
+@api_bp.route('/ai-search', methods=['POST'])
+def ai_search():
+    data = request.json
+    res = requests.post(CYFISH_API_URL, json=data)
+
+    return jsonify(res.json())
+
 """
 Start table and plot tasks
 """

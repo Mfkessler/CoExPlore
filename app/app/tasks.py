@@ -55,7 +55,6 @@ def plot_co_expression_network_task(self, data):
     prefix = data.get('prefix', '')
 
     plant = data['plant']
-    tom_path = f"{Config.DATA_DIR}/tom/tom_matrix_{plant}.h5"
 
     transcripts = data.get('transcripts')
     total_transcripts = sum(len(t_list) for t_list in transcripts.values())  # Sum of all transcript lists

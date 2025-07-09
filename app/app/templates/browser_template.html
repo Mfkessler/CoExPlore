@@ -509,7 +509,7 @@
 
                 try {
                     // Request SQL from AI backend
-                    const res = await fetch('http://127.0.0.1:5004/api/transcripts', {
+                    const res = await fetch(BASE_URL + '/ai-search', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ question: question, backend: "sql" })
