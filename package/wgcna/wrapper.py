@@ -319,7 +319,7 @@ def get_tom_data(
         toms = []
         neighbor_info_list = []
         for idx, ad in enumerate(adata):
-            current_tom_path = tom_path[idx] if isinstance(tom_path, list) else f"{tom_prefix}/tom_matrix_{ad.uns['name']}.h5"
+            current_tom_path = tom_path[idx] if isinstance(tom_path, list) else get_default_tom_path(ad, tom_prefix)
             if not os.path.exists(current_tom_path):
                 print(f"File not found: {current_tom_path}")
                 continue

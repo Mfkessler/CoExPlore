@@ -649,6 +649,16 @@ def add_goea_to_anndata(adata: AnnData, obo_path: str = "../go-basic.obo", resul
         top_percentage = 1
         print("Top percentage set to 1 to ensure at least one transcript is selected.")
 
+    if "mean_counts" not in adata.var.columns:
+        # Calculate mean counts for each transcript
+        if adata.X.shape[0] == adata.var.shape[0]:
+            mean_counts = np.asarray(adata.X).mean(axis=1)
+        elif adata.X.shape[1] == adata.var.shape[0]:
+            mean_counts = np.asarray(adata.X).mean(axis=0)
+        else:
+            raise ValueError(f"Shape mismatch: adata.X {adata.X.shape} vs adata.var {adata.var.shape}")
+        adata.var["mean_counts"] = mean_counts
+
     # Prepare a dummy file to capture all outputs
     with open(os.devnull, 'w') as fnull:
         with redirect_stdout(fnull), redirect_stderr(fnull):
