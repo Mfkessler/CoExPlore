@@ -3045,58 +3045,103 @@ def export_tom_edges_to_parquet(
 
 def filter_genes_with_always_keep(
     adata: ad.AnnData,
-    prop: float = 0.2,
-    min_mean: float = 1,
-    min_samples: int = 3,
-    min_genes: int = 5000,
-    max_genes: int = 20000,
+    prop: float = 0.3,
+    min_mean: float = 1.0,
+    min_samples_prop: float = 0.15,
+    min_genes_prop: float = 0.10,
+    max_genes_prop: float = 0.70,
     always_keep_column: str = "tf_family"
 ) -> ad.AnnData:
     """
-    Efficiently filter genes in AnnData by proportion of highest variance, but always keep genes where `always_keep_column` is not null.
+    Efficiently filter genes in AnnData using relative thresholds for variance and expression,
+    but always keep genes where `always_keep_column` is not null or empty.
+
+    Parameters
+    ----------
+    adata : ad.AnnData
+        AnnData object containing the count matrix (.X) and gene metadata (.var).
+    prop : float
+        Proportion (0–1) of highest variance genes to keep (e.g., 0.3 for 30%).
+    min_mean : float
+        Minimum mean expression across samples required for a gene to pass the filter.
+    min_samples_prop : float
+        Minimum proportion (0–1) of samples in which a gene must be expressed (expression > 1).
+        (e.g., 0.15 means gene must be expressed in at least 15% of samples)
+    min_genes_prop : float
+        Minimum proportion (0–1) of genes to keep after filtering.
+    max_genes_prop : float
+        Maximum proportion (0–1) of genes to keep after filtering.
+    always_keep_column : str
+        Column in adata.var indicating genes that must always be kept (e.g., "tf_family").
 
     Returns
     -------
     ad.AnnData
-        Filtered AnnData object.
+        Filtered AnnData object containing only the selected genes.
     """
 
     arr = adata.X
+    # Convert sparse matrices or other formats to dense numpy array
     if not isinstance(arr, np.ndarray):
         arr = arr.toarray() if hasattr(arr, 'toarray') else np.asarray(arr)
     arr = arr.astype(np.float32)
-    
-    # Expression filter
+
+    n_samples = arr.shape[0]
+    n_genes = arr.shape[1]
+
+    # --- Relative calculation of thresholds ---
+    # Minimum number of samples required for a gene (at least 3, or min_samples_prop * n_samples)
+    min_samples = max(3, int(min_samples_prop * n_samples))
+    # Minimum and maximum number of genes to keep (relative to n_genes)
+    min_genes = max(1000, int(min_genes_prop * n_genes))
+    max_genes = min(n_genes, int(max_genes_prop * n_genes))
+
+    # --- Expression filter: remove genes with low mean or in too few samples ---
     mean_keep = arr.mean(axis=0) > min_mean
     sample_keep = (arr > 1).sum(axis=0) >= min_samples
     gene_mask = mean_keep & sample_keep
-    
-    # Variance filter
+
+    # --- Variance filter: select top 'prop' most variable genes after expression filtering ---
     arr_filt = arr[:, gene_mask]
-    n = arr_filt.shape[1]
-    n_keep = min(max(int(n * prop), min_genes), max_genes)
+    n_filt_genes = arr_filt.shape[1]
+    n_keep = min(max(int(n_filt_genes * prop), min_genes), max_genes)
     vars = arr_filt.var(axis=0)
-    top_idx = np.argsort(vars)[-n_keep:] if n_keep < n else np.arange(n)
+    # Take the indices of the top n_keep variable genes
+    if n_keep < n_filt_genes:
+        top_idx = np.argsort(vars)[-n_keep:]
+    else:
+        top_idx = np.arange(n_filt_genes)
     filtered_var = adata.var[gene_mask]
     top_gene_names = filtered_var.index[top_idx]
-    
-    # Always-keep
+
+    # --- Always-keep logic: include all genes where always_keep_column is not null or empty ---
     if always_keep_column and always_keep_column in adata.var.columns:
         always_keep_genes = set(
             adata.var.index[
-                (~adata.var[always_keep_column].isnull()) & (adata.var[always_keep_column] != "")
+                (~adata.var[always_keep_column].isnull()) &
+                (adata.var[always_keep_column] != "")
             ]
         )
-        top_gene_names = set(top_gene_names)
-        all_genes_to_keep = list(top_gene_names | always_keep_genes)
-        # Restore original order
+        # Combine always-keep genes with high-variance genes, keeping original AnnData order
+        all_genes_to_keep = set(top_gene_names) | always_keep_genes
         all_genes_to_keep = [g for g in adata.var_names if g in all_genes_to_keep]
     else:
         all_genes_to_keep = list(top_gene_names)
-    
-    # Subset AnnData
+
+    # --- Subset the AnnData object with the filtered genes ---
     adata_filtered = adata[:, adata.var_names.isin(all_genes_to_keep)].copy()
-    
+
+    # Optional: Add summary info as AnnData attribute for reproducibility
+    adata_filtered.uns["filter_params"] = {
+        "prop": prop,
+        "min_mean": min_mean,
+        "min_samples_prop": min_samples_prop,
+        "min_genes_prop": min_genes_prop,
+        "max_genes_prop": max_genes_prop,
+        "always_keep_column": always_keep_column,
+        "n_genes_final": adata_filtered.n_vars
+    }
+
     return adata_filtered
 
 
@@ -3112,8 +3157,7 @@ def create_anndata(
     """
     Create an AnnData object for a given dataset name, including filtering genes and adding metadata.
 
-    Parameters
-    ----------
+    Parameters:
     name : str
         Dataset name (species or project ID, e.g. "AC", "PS", ...).
     base_uniprot : str
@@ -3129,8 +3173,7 @@ def create_anndata(
     base_counts : str
         Base folder for count matrix files.
 
-    Returns
-    -------
+    Returns:
     ad.AnnData
         Filtered AnnData object with metadata and annotation columns in .var.
     """
@@ -3172,21 +3215,7 @@ def create_anndata(
 
     print("AnnData:", adata)
 
-    # Filter transcripts based on variance and always keep TF families
-    adata_filtered = filter_genes_with_always_keep(
-        adata,
-        prop=0.2,
-        min_mean=1,
-        min_samples=3,
-        min_genes=5000,
-        max_genes=20000,
-        always_keep_column="tf_family"
-    )
-
-    print("Filtered AnnData:", adata_filtered)
-    print("Final AnnData shape:", adata_filtered.shape)
-
-    return adata_filtered
+    return adata
 
 
 def calculate_qc_metrics(adata: ad.AnnData, mt_prefix="MT-", inplace=True) -> pd.DataFrame:
@@ -3236,30 +3265,3 @@ def calculate_qc_metrics(adata: ad.AnnData, mt_prefix="MT-", inplace=True) -> pd
     }, index=adata.obs_names)
 
     return qc
-
-
-def make_df_records_hdf5_safe(df: pd.DataFrame) -> List[Dict[str, Any]]:
-    """
-    Ensures all columns in the DataFrame are HDF5-safe (convert lists, sets, tuples to comma-joined strings).
-    Returns a list of dicts (orient='records'), ready for AnnData.uns.
-
-    Parameters:
-    df : pd.DataFrame
-        DataFrame to convert.
-
-    Returns:
-    List[Dict[str, Any]]
-        List of dictionaries with HDF5-safe values.
-    """
-
-    df_copy = df.copy()
-    for col in df_copy.columns:
-        if df_copy[col].dtype == "object":
-            if any(isinstance(x, (list, set, tuple, dict)) for x in df_copy[col].dropna()):
-                df_copy[col] = df_copy[col].apply(
-                    lambda x: ",".join(map(str, x)) if isinstance(x, (list, set, tuple)) else str(x) if pd.notnull(x) else ""
-                )
-            else:
-                df_copy[col] = df_copy[col].astype(str)
-
-    return df_copy.to_dict(orient="records")
