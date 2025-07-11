@@ -44,6 +44,24 @@ $(document).ready(function () {
 
     handleSelectionChange(BASE_URL, sessionId);
 
+    $("input[name='analysisMode']").on("change", function() {
+      if ($("#analysis-whole").is(":checked")) {
+        $("#wholeAnalysisSection").show();
+        $("#browserAnalysisSection").hide();
+      } else if ($("#analysis-browser").is(":checked")) {
+        $("#wholeAnalysisSection").hide();
+        $("#browserAnalysisSection").show();
+      }
+    });
+
+    if ($("#analysis-whole").is(":checked")) {
+      $("#wholeAnalysisSection").show();
+      $("#browserAnalysisSection").hide();
+    } else if ($("#analysis-browser").is(":checked")) {
+      $("#wholeAnalysisSection").hide();
+      $("#browserAnalysisSection").show();
+    }
+
     // Ensure the correct fields are displayed based on the initial selection when the page loads
     $("#analysisType").trigger("change");
     $("#browserAnalysisType").trigger("change");
