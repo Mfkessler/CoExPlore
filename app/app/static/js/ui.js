@@ -578,6 +578,9 @@ export function displayResultUI(result, type, text) {
     if (sessionStorage.getItem("session_id")) {
         populateFileTypeDropdown(BASE_URL);
         updateFileListBasedOnExtension(BASE_URL);
+        $("#filesDiv").show();
+        $("#downloadResultsButton").prop("disabled", false);
+        $("#clearFilesButton").prop("disabled", false);
     }
 
     $(loadingBar).hide();

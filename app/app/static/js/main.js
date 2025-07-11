@@ -67,10 +67,10 @@ $(document).ready(function () {
     $("#browserAnalysisType").trigger("change");
     
     // Show relevant cards, disable buttons, and hide the spinner
-    $("#selectPlantsCard, #infoDivCard, #settingsCard, #finishedCard").fadeIn();
+    $("#selectPlantsCard, #infoDivCard, #settingsCard, #finishedCard", ).fadeIn();
     $("#downloadResultsButton, #clearFilesButton").prop("disabled", true);
     $("#loadingSpinner").hide();
-    $(".container").fadeIn();
+    $(".container").show();
 });
 
 /**
@@ -86,33 +86,32 @@ export function sendGoTermToIframe(goTerm) {
 
 window.sendGoTermToIframe = sendGoTermToIframe;
 
-// Sidebar navigation and tab switching
-document.querySelectorAll('.sidebar .nav-link').forEach(link => {
-  link.addEventListener('click', function(e) {
-    e.preventDefault();
-    // Sidebar highlight
-    document.querySelectorAll('.sidebar .nav-link').forEach(l => l.classList.remove('active'));
-    this.classList.add('active');
-    // Tabs content
-    const tabId = this.getAttribute('data-tab');
-    document.querySelectorAll('.tab-pane').forEach(pane => pane.classList.remove('show', 'active'));
-    const tabPane = document.querySelector(tabId);
-    if(tabPane) {
-      tabPane.classList.add('show', 'active');
-    }
-    // Main tabs highlight
-    document.querySelectorAll('.nav-tabs .nav-link').forEach(l => l.classList.remove('active'));
-    const mainTab = document.querySelector('.nav-tabs .nav-link[data-bs-target="'+tabId+'"]');
-    if(mainTab) mainTab.classList.add('active');
-  });
+// Sidebar klickt einfach den richtigen Tab-Button an:
+document.getElementById('sidebar-datasets').addEventListener('click', function() {
+  document.getElementById('tabbtn-datasets').click();
+});
+document.getElementById('sidebar-info').addEventListener('click', function() {
+  document.getElementById('tabbtn-info').click();
+});
+document.getElementById('sidebar-browser').addEventListener('click', function() {
+  document.getElementById('tabbtn-browser').click();
+});
+document.getElementById('sidebar-analysis').addEventListener('click', function() {
+  document.getElementById('tabbtn-analysis').click();
+});
+document.getElementById('sidebar-files').addEventListener('click', function() {
+  document.getElementById('tabbtn-files').click();
 });
 
-// Synchronize sidebar links with main tabs
+// Sidebar-Highlight synchronisieren mit aktivem Tab:
 document.querySelectorAll('.nav-tabs .nav-link').forEach(tabLink => {
-  tabLink.addEventListener('click', function() {
+  tabLink.addEventListener('shown.bs.tab', function() {
     const tabId = this.getAttribute('data-bs-target');
-    document.querySelectorAll('.sidebar .nav-link').forEach(l => l.classList.remove('active'));
-    const sidebarLink = document.querySelector('.sidebar .nav-link[data-tab="'+tabId+'"]');
-    if(sidebarLink) sidebarLink.classList.add('active');
+    document.querySelectorAll('.sidebar .sidebar-icon').forEach(sideIcon => {
+      sideIcon.classList.remove('active');
+    });
+    const sideId = 'sidebar-' + tabId.replace('#tab-', '');
+    const sideIcon = document.getElementById(sideId);
+    if(sideIcon) sideIcon.classList.add('active');
   });
 });

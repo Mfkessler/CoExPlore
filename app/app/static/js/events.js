@@ -83,6 +83,10 @@ export function bindEvents(baseUrl, sessionId) {
     // Clear files button
     $("#clearFilesButton").click(function () {
         clearSessionFiles(baseUrl, sessionId);
+        $("#filesDiv").hide();
+        $("#downloadResultsButton").prop("disabled", true);
+        $("#clearFilesButton").prop("disabled", true);
+        
     });
 
     // Toggle button text on collapse
