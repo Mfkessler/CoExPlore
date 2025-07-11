@@ -32,21 +32,6 @@ $(document).ready(function () {
     // Bind all events
     bindEvents(BASE_URL, sessionId);
 
-    // Initialize selectpicker for plant selection
-    $("#plant").selectpicker({
-        selectedTextFormat: "count > 1",
-        countSelectedText: function (numSelected, numTotal) {
-            if (numSelected === 1) {
-                const selectedOption = this.$element.find("option:selected").text();
-                return selectedOption;
-            }
-            return numSelected + " of " + numTotal + " selected";
-        },
-        selectAllText: "Select All",
-        deselectAllText: "Deselect All",
-        showTick: true,
-    });
-
     // Initialize toggle button text (excluding Navbar)
     $(".toggle-button")
         .not(".navbar-toggler")

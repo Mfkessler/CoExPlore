@@ -44,7 +44,9 @@ export function bindEvents(baseUrl, sessionId) {
     // Image category change event
     $("#imageCategory").change(function () {
         const selectedCategory = $(this).val();
-        let selectedPlant = $("#plant").val();
+        let selectedPlant = $("input[name='plant']:checked").map(function() {
+            return this.value;
+        }).get();
         if (selectedPlant.length === 1) {
             selectedPlant = selectedPlant[0];
         }
@@ -113,9 +115,9 @@ export function bindEvents(baseUrl, sessionId) {
         );
     });
 
-    // Plant selection (selectpicker)
-    $("#plant").on("hidden.bs.select", function () {
-        $("#plant").prop("disabled", true);
+    // Plant selection (Card Multi-Select)
+    $("input[name='plant']").on("change", function () {
+        $("#analysisForm").prop("disabled", true); // Optional, wenn du es brauchst
         handleSelectionChange(baseUrl, sessionId);
     });
 

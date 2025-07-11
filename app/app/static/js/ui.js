@@ -175,11 +175,9 @@ export function adjustThumbnailSizeUI() {
  * @param {string} baseUrl The base URL.
  */
 export function startBrowserUI(baseUrl) {
-    const initialSpeciesFilter = $("#plant option:selected")
-        .map(function () {
-            return $(this).text();
-        })
-        .get();
+    const initialSpeciesFilter = $("input[name='plant']:checked").map(function () {
+        return $(this).next("label").find(".fw-bold").text();
+    }).get();
     $("#loadingBarBrowser").show();
     $("#browserResults").hide();
     $("#startBrowser").prop("disabled", true);
@@ -203,12 +201,12 @@ export function startBrowserUI(baseUrl) {
  * @param {string} baseUrl The base URL.
  */
 export function startInfoUI(baseUrl) {
-    const selectedPlant = $("#plant").val();
-    const initialSpeciesFilter = $("#plant option:selected")
-        .map(function () {
-            return $(this).text();
-        })
-        .get();
+    const selectedPlant = $("input[name='plant']:checked").map(function() {
+        return this.value;
+    }).get();
+    const initialSpeciesFilter = $("input[name='plant']:checked").map(function () {
+        return $(this).next("label").find(".fw-bold").text();
+    }).get();
     $("#loadingBarInfo").show();
     $("#infoDiv").hide();
     const speciesFilterParam = encodeURIComponent(
@@ -230,11 +228,9 @@ export function startInfoUI(baseUrl) {
  */
 export function handleSelectionChange(baseUrl, sessionId) {
     // Get the current selection as an array of selected values
-    const currentSelection = $("#plant option:selected")
-        .map(function () {
-            return $(this).val();
-        })
-        .get();
+    const currentSelection = $("input[name='plant']:checked").map(function () {
+        return this.value;
+    }).get();
 
     // Compare with the previous selection
     if (
@@ -242,7 +238,6 @@ export function handleSelectionChange(baseUrl, sessionId) {
         previousPlantSelection.join(",") === currentSelection.join(",")
     ) {
         // The same selection was made – no action needed.
-        $("#plant").prop("disabled", false);
         return;
     }
     // Save the current selection as the new reference
@@ -266,7 +261,6 @@ export function handleSelectionChange(baseUrl, sessionId) {
         $("#plotTypePlotly").prop("disabled", false);
     }
 
-    $("#plant").prop("disabled", false);
     updatePlantSelection();
 }
 
@@ -274,7 +268,9 @@ export function handleSelectionChange(baseUrl, sessionId) {
  * Update plant selection and load images if only one plant is selected.
  */
 export function updatePlantSelection() {
-    let selectedPlant = $("#plant").val();
+    let selectedPlant = $("input[name='plant']:checked").map(function() {
+        return this.value;
+    }).get();
     const gallery = $("#results");
     if (typeof selectedPlant === "string") {
         selectedPlant = [selectedPlant];
@@ -594,9 +590,9 @@ export function displayResultUI(result, type, text) {
  * Handle plant selection: show/hide sections and update options.
  */
 export function selectPlants() {
-    let plant = Array.from(
-        document.querySelectorAll("#plant option:checked")
-    ).map((option) => option.value);
+    let plant = $("input[name='plant']:checked").map(function() {
+        return this.value;
+    }).get();
     console.log("Plant:", plant);
     const singlePlantSelected = plant.length === 1;
     if (singlePlantSelected) {
@@ -660,7 +656,10 @@ export function adjustBrowserOptions(single, plants) {
  * @param {string} sessionId The session ID.
  */
 export function runBrowserAnalysisHandler(baseUrl, sessionId) {
-    let plant = $("#plant").val();
+    let plant = $("input[name='plant']:checked").map(function() {
+        return this.value;
+    }).get();
+
     let analysisType = getBrowserAnalysisTypeWithoutSuffix(
         document.getElementById("browserAnalysisType").value
     );
@@ -839,7 +838,10 @@ export function runBrowserAnalysisHandler(baseUrl, sessionId) {
  * @param {string} sessionId The session ID.
  */
 export function runGeneralAnalysisHandler(baseUrl, sessionId) {
-    let plant = $("#plant").val();
+    let plant = $("input[name='plant']:checked").map(function() {
+        return this.value;
+    }).get();
+
     let analysisType = getAnalysisTypeWithoutSuffix(
         document.getElementById("analysisType").value
     );

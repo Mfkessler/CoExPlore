@@ -8,18 +8,30 @@
       </button>
     </div>
     <div class="card-body">
+      <!-- Datasets -->
       <form id="analysisForm">
-        <label for="plant" class="form-label">Select species</label>
-        <select class="selectpicker w-100" id="plant" multiple data-actions-box="true" data-live-search="true" data-style="btn-primary">
+        <div class="row g-2 mb-3">
           {% for code, name in species %}
-            <option value="{{ code }}" {% if loop.first %}selected{% endif %}>{{ name }}</option>
+          <div class="col-6 col-md-4 col-lg-3">
+            <input type="checkbox" class="btn-check" id="species-card-{{ code }}" name="plant" value="{{ code }}"
+              autocomplete="off" {% if loop.first %}checked{% endif %}>
+            <label class="card h-100 btn btn-outline-primary" for="species-card-{{ code }}" style="cursor:pointer;">
+              <div class="card-body p-3 text-center">
+                <div class="mb-2" style="font-size:2rem;">
+                  <i class="bi bi-flower1"></i>
+                </div>
+                <div class="fw-bold">{{ name }}</div>
+              </div>
+            </label>
+          </div>
           {% endfor %}
-        </select>
+        </div>
       </form>
       <!-- Dataset Description (toggled by help icon) -->
       <div id="userGuideCardDataset" class="analysis-description mt-3" style="display: none;">
         <p>
-          The datasets have been processed using <a href="https://github.com/Mfkessler/PyWGCNA" target="_blank"><strong>PyWGCNA</strong></a>
+          The datasets have been processed using <a href="https://github.com/Mfkessler/PyWGCNA"
+            target="_blank"><strong>PyWGCNA</strong></a>
           with the following default parameters:
         </p>
         <ul>
