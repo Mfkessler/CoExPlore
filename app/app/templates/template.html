@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <title>CoExPlore</title>
@@ -10,24 +11,53 @@
   <!-- DataTables, Bootstrap Select, Fancybox, PapaParse -->
   <link rel="stylesheet" href="https://cdn.datatables.net/1.11.3/css/jquery.dataTables.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fancyapps/ui/dist/fancybox.css" />
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-select@1.14.0-beta3/dist/css/bootstrap-select.min.css">
+  <link rel="stylesheet"
+    href="https://cdn.jsdelivr.net/npm/bootstrap-select@1.14.0-beta3/dist/css/bootstrap-select.min.css">
   <link rel="icon" href="{{ BASE_URL }}/static/favicon.ico" type="image/x-icon">
   <!-- Your custom CSS -->
   <link href="static/styles.css" rel="stylesheet">
   <style>
-    body { background: #f6f8fa; }
-    .main-content { min-height: 100vh; padding-top: 0; background: #f6f8fa; }
+    body {
+      background: #f6f8fa;
+    }
+
+    .main-content {
+      min-height: 100vh;
+      padding-top: 0;
+      background: #f6f8fa;
+    }
+
     .topbar {
       height: 58px;
       background: #fff;
       border-bottom: 1px solid #e2e4e8;
-      display: flex; align-items: center; justify-content: space-between;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
       padding: 0 1.5rem;
-      position: sticky; top: 0; z-index: 1020;
+      position: sticky;
+      top: 0;
+      z-index: 1020;
     }
-    .brand { color: #222; font-weight: bold; font-size: 1.3rem; letter-spacing: 1px; }
-    .brand .highlight { color: #46b9ef; }
-    .help-btn { background: none; border: none; color: #1d6fa5; font-size: 2rem; }
+
+    .brand {
+      color: #222;
+      font-weight: bold;
+      font-size: 1.3rem;
+      letter-spacing: 1px;
+    }
+
+    .brand .highlight {
+      color: #46b9ef;
+    }
+
+    .help-btn {
+      background: none;
+      border: none;
+      color: #1d6fa5;
+      font-size: 2rem;
+    }
+
     .mobile-cex-title {
       color: #000000;
       font-weight: 500;
@@ -40,28 +70,68 @@
       white-space: nowrap;
       z-index: 10;
     }
+
     @media (min-width: 768px) {
-      .mobile-cex-title { display: none !important; }
+      .mobile-cex-title {
+        display: none !important;
+      }
     }
+
     @media (max-width: 991.98px) {
-      .coexplore-subtitle { display: none !important; }
-      #mainHelpBtn { display: none !important; }
-      .topbar { position: relative; }
+      .coexplore-subtitle {
+        display: none !important;
+      }
+
+      #mainHelpBtn {
+        display: none !important;
+      }
+
+      .topbar {
+        position: relative;
+      }
     }
+
     @media (min-width: 992px) {
-      #mainHelpBtn { display: flex !important; }
+      #mainHelpBtn {
+        display: flex !important;
+      }
     }
-    .expert-section { display: none; }
-    .show-expert .expert-section { display: block; }
+
+    .expert-section {
+      display: none;
+    }
+
+    .show-expert .expert-section {
+      display: block;
+    }
+
     .floating-help {
-      position: fixed; bottom: 18px; right: 30px; z-index: 3000;
-      background: #fff; border-radius: 50%; box-shadow: 0 2px 8px rgba(0,0,0,0.11);
-      width: 52px; height: 52px; display: flex; align-items: center; justify-content: center;
-      font-size: 2rem; color: #1d6fa5; border: 1.5px solid #e3e4e8;
+      position: fixed;
+      bottom: 18px;
+      right: 30px;
+      z-index: 3000;
+      background: #fff;
+      border-radius: 50%;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.11);
+      width: 52px;
+      height: 52px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2rem;
+      color: #1d6fa5;
+      border: 1.5px solid #e3e4e8;
       transition: background 0.18s;
     }
-    .floating-help:hover { background: #eef5fa; }
-    .help-modal .modal-content { border-radius: 1.2rem; }
+
+    .floating-help:hover {
+      background: #eef5fa;
+    }
+
+    .help-modal .modal-content {
+      border-radius: 1.2rem;
+    }
+
     /* Sidebar Styles */
     .sidebar {
       position: fixed;
@@ -78,6 +148,7 @@
       z-index: 1030;
       transition: width 0.2s;
     }
+
     .sidebar .sidebar-icon {
       color: #7a8a99;
       font-size: 1.75rem;
@@ -94,13 +165,17 @@
       border: none;
       outline: none;
     }
-    .sidebar .sidebar-icon.active, .sidebar .sidebar-icon:hover {
+
+    .sidebar .sidebar-icon.active,
+    .sidebar .sidebar-icon:hover {
       color: #1d6fa5;
       background: #e6f3fb;
     }
+
     .sidebar .sidebar-icon[title] {
       position: relative;
     }
+
     .sidebar .sidebar-icon[title]:hover::after {
       content: attr(title);
       position: absolute;
@@ -117,27 +192,33 @@
       opacity: 0.95;
       pointer-events: none;
     }
+
     @media (max-width: 991.98px) {
       .sidebar {
         position: fixed;
         left: -68px;
         transition: left 0.22s;
       }
+
       .sidebar.show {
         left: 0;
       }
+
       .main-content {
         padding-left: 0 !important;
       }
     }
+
     @media (min-width: 992px) {
       .main-content {
         padding-left: 68px;
       }
+
       .sidebar {
         left: 0 !important;
       }
     }
+
     /* Toggle button for mobile sidebar */
     .sidebar-toggle {
       display: none;
@@ -147,6 +228,7 @@
       color: #1d6fa5;
       margin-right: 1.1rem;
     }
+
     @media (max-width: 991.98px) {
       .sidebar-toggle {
         display: none;
@@ -154,6 +236,7 @@
     }
   </style>
 </head>
+
 <body>
   <div id="loadingSpinner">
     <div class="spinner-border text-primary" role="status">
@@ -167,7 +250,8 @@
       <button class="sidebar-toggle d-lg-none" id="sidebarToggle" title="Menu"><i class="bi bi-list"></i></button>
       <span class="brand fw-bold fs-4">C<span class="highlight">E</span>X</span>
       <span class="ms-3 text-muted fs-6 coexplore-title d-none d-md-inline">CoExPlore</span>
-      <span class="ms-3 text-muted fs-6 coexplore-subtitle d-none d-md-inline">| Comparative Co-Expression Explorer</span>
+      <span class="ms-3 text-muted fs-6 coexplore-subtitle d-none d-md-inline">| Comparative Co-Expression
+        Explorer</span>
     </div>
     <button class="help-btn" id="mainHelpBtn" title="Show Help"><i class="bi bi-question-circle"></i></button>
     <span class="mobile-cex-title d-block d-md-none">Comparative Co-Expression Explorer</span>
@@ -175,21 +259,30 @@
 
   <!-- Left Sidebar (Icon-Only Navbar, alternative tab navigation) -->
   <nav class="sidebar d-flex flex-column" id="sidebar" aria-label="Sidebar">
-    <button class="sidebar-icon active" id="sidebar-datasets"      title="Datasets"         tabindex="0"><i class="bi bi-database"></i></button>
-    <button class="sidebar-icon"        id="sidebar-info"          title="Info & Settings"  tabindex="0"><i class="bi bi-gear"></i></button>
-    <button class="sidebar-icon"        id="sidebar-browser"       title="Browser"          tabindex="0"><i class="bi bi-search"></i></button>
-    <button class="sidebar-icon"        id="sidebar-analysis"      title="Analysis"         tabindex="0"><i class="bi bi-graph-up-arrow"></i></button>
-    <button class="sidebar-icon"        id="sidebar-files"         title="Files"            tabindex="0"><i class="bi bi-folder2-open"></i></button>
+    <button class="sidebar-icon active" id="sidebar-datasets" title="Datasets" tabindex="0"><i
+        class="bi bi-database"></i></button>
+    <button class="sidebar-icon" id="sidebar-info" title="Info & Settings" tabindex="0"><i
+        class="bi bi-gear"></i></button>
+    <button class="sidebar-icon" id="sidebar-browser" title="Browser" tabindex="0"><i class="bi bi-search"></i></button>
+    <button class="sidebar-icon" id="sidebar-analysis" title="Analysis" tabindex="0"><i
+        class="bi bi-graph-up-arrow"></i></button>
+    <button class="sidebar-icon" id="sidebar-files" title="Files" tabindex="0"><i
+        class="bi bi-folder2-open"></i></button>
   </nav>
 
   <main class="main-content">
     <!-- Original Top Tab Nav bleibt erhalten -->
     <ul class="nav nav-tabs justify-content-center" id="mainTabs" role="tablist">
-      <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-datasets" type="button" role="tab" id="tabbtn-datasets"><i class="bi bi-database me-1"></i>Datasets</button></li>
-      <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-info" type="button" role="tab" id="tabbtn-info"><i class="bi bi-gear me-1"></i>Info & Settings</button></li>
-      <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-browser" type="button" role="tab" id="tabbtn-browser"><i class="bi bi-search me-1"></i>Browser</button></li>
-      <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-analysis" type="button" role="tab" id="tabbtn-analysis"><i class="bi bi-graph-up-arrow me-1"></i>Analysis</button></li>
-      <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-files" type="button" role="tab" id="tabbtn-files"><i class="bi bi-folder2-open me-1"></i>Files</button></li>
+      <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-datasets"
+          type="button" role="tab" id="tabbtn-datasets"><i class="bi bi-database me-1"></i>Datasets</button></li>
+      <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-info" type="button"
+          role="tab" id="tabbtn-info"><i class="bi bi-gear me-1"></i>Info & Settings</button></li>
+      <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-browser" type="button"
+          role="tab" id="tabbtn-browser"><i class="bi bi-search me-1"></i>Browser</button></li>
+      <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-analysis" type="button"
+          role="tab" id="tabbtn-analysis"><i class="bi bi-graph-up-arrow me-1"></i>Analysis</button></li>
+      <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-files" type="button"
+          role="tab" id="tabbtn-files"><i class="bi bi-folder2-open me-1"></i>Files</button></li>
     </ul>
     <div class="tab-content">
       <!-- Datasets -->
@@ -263,29 +356,29 @@
 
     // Sidebar <-> TopTab Sync
     const sidebarMap = [
-      { sidebar: 'sidebar-datasets',  tabbtn: 'tabbtn-datasets'  },
-      { sidebar: 'sidebar-info',      tabbtn: 'tabbtn-info'      },
-      { sidebar: 'sidebar-browser',   tabbtn: 'tabbtn-browser'   },
-      { sidebar: 'sidebar-analysis',  tabbtn: 'tabbtn-analysis'  },
-      { sidebar: 'sidebar-files',     tabbtn: 'tabbtn-files'     },
+      { sidebar: 'sidebar-datasets', tabbtn: 'tabbtn-datasets' },
+      { sidebar: 'sidebar-info', tabbtn: 'tabbtn-info' },
+      { sidebar: 'sidebar-browser', tabbtn: 'tabbtn-browser' },
+      { sidebar: 'sidebar-analysis', tabbtn: 'tabbtn-analysis' },
+      { sidebar: 'sidebar-files', tabbtn: 'tabbtn-files' },
     ];
-    sidebarMap.forEach(({sidebar, tabbtn}) => {
-      document.getElementById(sidebar).addEventListener('click', function() {
+    sidebarMap.forEach(({ sidebar, tabbtn }) => {
+      document.getElementById(sidebar).addEventListener('click', function () {
         // Mark Sidebar Active
-        sidebarMap.forEach(({sidebar: sid}) => {
+        sidebarMap.forEach(({ sidebar: sid }) => {
           document.getElementById(sid).classList.remove('active');
         });
         this.classList.add('active');
         // Simulate click on corresponding TopTab
         document.getElementById(tabbtn).click();
         // On mobile: sidebar ausblenden
-        if(window.innerWidth < 992) {
+        if (window.innerWidth < 992) {
           document.getElementById('sidebar').classList.remove('show');
         }
       });
       // Aktivität der Tabs mit Sidebar synchronisieren:
-      document.getElementById(tabbtn).addEventListener('click', function() {
-        sidebarMap.forEach(({sidebar: sid, tabbtn: tid}) => {
+      document.getElementById(tabbtn).addEventListener('click', function () {
+        sidebarMap.forEach(({ sidebar: sid, tabbtn: tid }) => {
           if (tid === this.id) {
             document.getElementById(sid).classList.add('active');
           } else {
@@ -299,21 +392,20 @@
     const sidebar = document.getElementById('sidebar');
     const sidebarToggle = document.getElementById('sidebarToggle');
     if (sidebarToggle) {
-      sidebarToggle.addEventListener('click', function(e) {
+      sidebarToggle.addEventListener('click', function (e) {
         e.stopPropagation();
         sidebar.classList.toggle('show');
       });
     }
     // Optional: Hide sidebar when clicking outside on mobile
-    document.addEventListener('click', function(event) {
-      if(window.innerWidth < 992 && sidebar.classList.contains('show')) {
+    document.addEventListener('click', function (event) {
+      if (window.innerWidth < 992 && sidebar.classList.contains('show')) {
         if (!sidebar.contains(event.target) && !sidebarToggle.contains(event.target)) {
           sidebar.classList.remove('show');
         }
       }
     });
   </script>
-  <!-- Your app’s JS entrypoint (uses ES6 modules and your full codebase) -->
   <script type="module" src="static/js/main.js"></script>
   <script>
     // Expose for Jinja2 includes
@@ -321,4 +413,5 @@
     const OUTPUT_DIR = "{{ OUTPUT_DIR }}";
   </script>
 </body>
+
 </html>
