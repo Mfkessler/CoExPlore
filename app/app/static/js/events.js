@@ -121,6 +121,13 @@ export function bindEvents(baseUrl, sessionId) {
         handleSelectionChange(baseUrl, sessionId);
     });
 
+    $("#selectAllSpecies").on("click", function() {
+        $("input[name='plant']").prop("checked", true).trigger("change");
+    });
+    $("#deselectAllSpecies").on("click", function() {
+        $("input[name='plant']").prop("checked", false).trigger("change");
+    });
+
     // Window resize: adjust thumbnails
     $(window).on("resize", function () {
         adjustThumbnailSizeUI();
