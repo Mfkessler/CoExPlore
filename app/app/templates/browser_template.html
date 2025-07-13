@@ -195,7 +195,7 @@
 
                 <div class="col-sm-2 d-flex flex-column align-items-stretch">
                     <button id="aiSearchBtn" class="btn btn-success w-100 mb-2">
-                        <span id="aiBtnText">Run AI Search</span>
+                        <span id="aiBtnText">Run</span>
                     </button>
                     <div id="aiSpinner" class="w-100 text-center" style="display: none;">
                         <div class="spinner-border text-success" role="status" aria-hidden="true"></div>
@@ -554,7 +554,7 @@
                 } finally {
                     // --- Always re-enable button and hide spinner (after success OR error) ---
                     $('#aiSearchBtn').prop('disabled', false);
-                    $('#aiBtnText').text('Run AI Search');
+                    $('#aiBtnText').text('Run');
                     $('#aiSpinner').hide();
                 }
             });

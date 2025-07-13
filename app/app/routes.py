@@ -646,6 +646,23 @@ def data():
         return jsonify({"error": "Server Error"}), 500
 
 
+@api_bp.route('/api/general-ai', methods=['POST'])
+def api_general_ai():
+    data = request.json
+    sql_query = data.get("ai_query")
+    if not sql_query:
+        return jsonify({"error": "No SQL query provided."}), 400
+
+    try:
+        with engine.connect() as conn:
+            result = conn.execute(text(sql_query))
+            columns = result.keys()
+            rows = [dict(zip(columns, row)) for row in result.fetchall()]
+        return jsonify({"data": rows})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @api_bp.route('/api/get_transcripts', methods=['POST'])
 def get_transcripts():
     try:
