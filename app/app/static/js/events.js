@@ -36,15 +36,15 @@ export function bindEvents(baseUrl, sessionId) {
     // File type dropdown change
     const fileTypeSelect = document.getElementById("fileTypeSelect");
     if (fileTypeSelect) {
-      fileTypeSelect.addEventListener("change", () => {
-        updateFileListBasedOnExtension(baseUrl);
-      });
+        fileTypeSelect.addEventListener("change", () => {
+            updateFileListBasedOnExtension(baseUrl);
+        });
     }
 
     // Image category change event
     $("#imageCategory").change(function () {
         const selectedCategory = $(this).val();
-        let selectedPlant = $("input[name='plant']:checked").map(function() {
+        let selectedPlant = $("input[name='plant']:checked").map(function () {
             return this.value;
         }).get();
         if (selectedPlant.length === 1) {
@@ -86,7 +86,7 @@ export function bindEvents(baseUrl, sessionId) {
         $("#filesDiv").hide();
         $("#downloadResultsButton").prop("disabled", true);
         $("#clearFilesButton").prop("disabled", true);
-        
+
     });
 
     // Toggle button text on collapse
@@ -125,10 +125,10 @@ export function bindEvents(baseUrl, sessionId) {
         handleSelectionChange(baseUrl, sessionId);
     });
 
-    $("#selectAllSpecies").on("click", function() {
+    $("#selectAllSpecies").on("click", function () {
         $("input[name='plant']").prop("checked", true).trigger("change");
     });
-    $("#deselectAllSpecies").on("click", function() {
+    $("#deselectAllSpecies").on("click", function () {
         $("input[name='plant']").prop("checked", false).trigger("change");
     });
 
@@ -150,10 +150,10 @@ export function bindEvents(baseUrl, sessionId) {
         navigator.sendBeacon(`${baseUrl}/api/cleanup`, blob);
     });
 
+    let generalAiDataTable = null;
+
     $(document).on('click', '#generalAiBtn', async function () {
         $('#generalAiTextResult').text('');
-        $('#generalAiFallbackTable thead').empty();
-        $('#generalAiFallbackTable tbody').empty();
         $('#generalAiResultContainer').hide();
 
         const question = $('#generalAiInput').val().trim();
@@ -166,20 +166,16 @@ export function bindEvents(baseUrl, sessionId) {
         $('#generalAiSpinner').show();
 
         try {
-            // 1. Get SQL query from AI (CyFISH) prompt
+            // 1. Get query from AI
             const res = await fetch(BASE_URL + '/ai-search', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    question: question,
-                    backend: "sql",
-                    type: "general"
-                })
+                body: JSON.stringify({ question: question, backend: "sql", type: "general" })
             });
             const aiResult = await res.json();
 
             if (!aiResult.query) {
-                // If only text is returned (no SQL, e.g. "Result not displayable as table"), show the text
+                // No SQL query received → maybe just text
                 if (aiResult.text) {
                     $('#generalAiTextResult').text(aiResult.text);
                     $('#generalAiResultContainer').show();
@@ -187,10 +183,19 @@ export function bindEvents(baseUrl, sessionId) {
                     $('#generalAiTextResult').text('No results.');
                     $('#generalAiResultContainer').show();
                 }
+                // Hide/reset table
+                if (generalAiDataTable) {
+                    generalAiDataTable.clear().draw();
+                    generalAiDataTable.destroy();
+                    generalAiDataTable = null;
+                }
+                $('#generalAiResultTable').hide();
                 return;
             }
 
-            // 2. Execute query (on any table, no restriction)
+            console.log("AI Query:", aiResult.query);
+
+            // 2. Execute query against DB (arbitrary SQL)
             const dbRes = await fetch(BASE_URL + '/api/general-ai', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -198,50 +203,101 @@ export function bindEvents(baseUrl, sessionId) {
             });
             const dbResult = await dbRes.json();
 
-            // If backend returns an error
+            // Backend error?
             if (dbResult.error) {
                 $('#generalAiTextResult').text('Error: ' + dbResult.error);
                 $('#generalAiResultContainer').show();
+                if (generalAiDataTable) {
+                    generalAiDataTable.clear().draw();
+                    generalAiDataTable.destroy();
+                    generalAiDataTable = null;
+                }
+                $('#generalAiResultTable').hide();
                 return;
             }
 
-            // Display data
+            // Show table (DataTables.js)
             if (dbResult.data && Array.isArray(dbResult.data) && dbResult.data.length > 0) {
-                const keys = Object.keys(dbResult.data[0]);
-                const headerRow = $('<tr>');
-                keys.forEach(key => headerRow.append($('<th>').text(key)));
-                $('#generalAiFallbackTable thead').empty().append(headerRow);
-                $('#generalAiFallbackTable tbody').empty();
-                dbResult.data.forEach(row => {
-                    const rowEl = $('<tr>');
-                    keys.forEach(key => {
-                        const value = row[key] != null ? row[key] : '';
-                        rowEl.append($('<td>').text(value));
-                    });
-                    $('#generalAiFallbackTable tbody').append(rowEl);
+                const data = dbResult.data;
+                const keys = Object.keys(data[0]);
+
+                // Generate header
+                let thead = '<tr>' + keys.map(k => `<th>${k}</th>`).join('') + '</tr>';
+                $('#generalAiResultTable thead').html(thead);
+                $('#generalAiResultTable tbody').empty(); // Leave body empty, DataTable will handle it
+
+                // If DataTable already exists, destroy it!
+                if (generalAiDataTable) {
+                    generalAiDataTable.clear().draw();
+                    generalAiDataTable.destroy();
+                    generalAiDataTable = null;
+                }
+
+                // Initialize DataTable
+                generalAiDataTable = $('#generalAiResultTable').DataTable({
+                    data: data,
+                    columns: keys.map(k => ({ data: k })),
+                    responsive: true,
+                    dom: 'Bfrtip',
+                    pageLength: 10,
+                    lengthMenu: [[10, 25, 50, -1], [10, 25, 50, "All"]],
+                    buttons: [
+                        {
+                            extend: 'colvis',
+                            text: 'Column Visibility'
+                        },
+                        {
+                            extend: 'csvHtml5',
+                            text: 'Download CSV',
+                            filename: 'ai_general_result'
+                        }
+                    ],
+                    language: {
+                        search: "Search:",
+                        lengthMenu: "Show _MENU_ entries",
+                        info: "Showing _START_ to _END_ of _TOTAL_ entries",
+                        paginate: { previous: "Prev", next: "Next" }
+                    },
+                    // Remove all borders (like in your browser layout)
+                    "createdRow": function (row, data, dataIndex) {
+                        $(row).find('td,th').css('border', 'none');
+                    },
+                    "initComplete": function () {
+                        $('#generalAiResultTable').show();
+                    }
                 });
-                $('#generalAiFallbackTable').show();
+
+                $('#generalAiResultTable').show();
                 $('#generalAiResultContainer').show();
-                // Optionally: also display/log the SQL query
-                console.log("AI Query:", aiResult.query);
+                $('#generalAiTextResult').text(''); // Only show table, reset text
             } else {
-                // If no table result, but maybe a text
+                // No table result, maybe just text
                 if (dbResult.text) {
                     $('#generalAiTextResult').text(dbResult.text);
                 } else {
                     $('#generalAiTextResult').text('No results.');
                 }
-                $('#generalAiFallbackTable').hide();
+                if (generalAiDataTable) {
+                    generalAiDataTable.clear().draw();
+                    generalAiDataTable.destroy();
+                    generalAiDataTable = null;
+                }
+                $('#generalAiResultTable').hide();
                 $('#generalAiResultContainer').show();
             }
         } catch (err) {
             console.error("General AI Search failed:", err);
             alert("AI Search failed: " + err.message);
+            if (generalAiDataTable) {
+                generalAiDataTable.clear().draw();
+                generalAiDataTable.destroy();
+                generalAiDataTable = null;
+            }
+            $('#generalAiResultTable').hide();
         } finally {
             $('#generalAiBtn').prop('disabled', false);
             $('#generalAiBtnText').text('Run');
             $('#generalAiSpinner').hide();
         }
     });
-
 }
