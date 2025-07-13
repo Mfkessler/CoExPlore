@@ -259,6 +259,8 @@
         class="bi bi-database"></i></button>
     <button class="sidebar-icon" id="sidebar-info" title="Info & Settings" tabindex="0"><i
         class="bi bi-gear"></i></button>
+    <button class="sidebar-icon" id="sidebar-ai" title="AI Search" tabindex="0"><i
+        class="bi bi-robot"></i></button>
     <button class="sidebar-icon" id="sidebar-browser" title="Browser" tabindex="0"><i class="bi bi-search"></i></button>
     <button class="sidebar-icon" id="sidebar-analysis" title="Analysis" tabindex="0"><i
         class="bi bi-graph-up-arrow"></i></button>
@@ -269,10 +271,12 @@
   <main class="main-content">
     <!-- Original Top Tab Nav bleibt erhalten -->
     <ul class="nav nav-tabs justify-content-center" id="mainTabs" role="tablist">
-      <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-datasets"
-          type="button" role="tab" id="tabbtn-datasets"><i class="bi bi-database me-1"></i>Datasets</button></li>
-      <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-info" type="button"
-          role="tab" id="tabbtn-info"><i class="bi bi-gear me-1"></i>Info & Settings</button></li>
+      <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-datasets" type="button"
+          role="tab" id="tabbtn-datasets"><i class="bi bi-database me-1"></i>Datasets</button></li>
+      <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-info" type="button" role="tab"
+          id="tabbtn-info"><i class="bi bi-gear me-1"></i>Info & Settings</button></li>
+      <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-ai" type="button" role="tab" 
+          id="tabbtn-ai"><i class="bi bi-robot me-1"></i>AI Search</button></li>
       <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-browser" type="button"
           role="tab" id="tabbtn-browser"><i class="bi bi-search me-1"></i>Browser</button></li>
       <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-analysis" type="button"
@@ -288,6 +292,10 @@
       <!-- Info & Settings -->
       <div class="tab-pane fade" id="tab-info" role="tabpanel">
         {% include "inc_info.html" %}
+      </div>
+      <!-- AI General Search -->
+      <div class="tab-pane fade" id="tab-ai" role="tabpanel">
+        {% include "inc_ai.html" %}
       </div>
       <!-- Browser -->
       <div class="tab-pane fade" id="tab-browser" role="tabpanel">
@@ -354,6 +362,7 @@
     const sidebarMap = [
       { sidebar: 'sidebar-datasets', tabbtn: 'tabbtn-datasets' },
       { sidebar: 'sidebar-info', tabbtn: 'tabbtn-info' },
+      { sidebar: 'sidebar-ai', tabbtn: 'tabbtn-ai' },
       { sidebar: 'sidebar-browser', tabbtn: 'tabbtn-browser' },
       { sidebar: 'sidebar-analysis', tabbtn: 'tabbtn-analysis' },
       { sidebar: 'sidebar-files', tabbtn: 'tabbtn-files' },

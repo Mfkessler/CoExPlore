@@ -149,4 +149,99 @@ export function bindEvents(baseUrl, sessionId) {
         const blob = new Blob([data], { type: "application/json" });
         navigator.sendBeacon(`${baseUrl}/api/cleanup`, blob);
     });
+
+    $(document).on('click', '#generalAiBtn', async function () {
+        $('#generalAiTextResult').text('');
+        $('#generalAiFallbackTable thead').empty();
+        $('#generalAiFallbackTable tbody').empty();
+        $('#generalAiResultContainer').hide();
+
+        const question = $('#generalAiInput').val().trim();
+        if (!question) {
+            alert("Please enter a question.");
+            return;
+        }
+
+        $('#generalAiBtn').prop('disabled', true);
+        $('#generalAiSpinner').show();
+
+        try {
+            // 1. Get SQL query from AI (CyFISH) prompt
+            const res = await fetch(BASE_URL + '/ai-search', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    question: question,
+                    backend: "sql",
+                    type: "general"
+                })
+            });
+            const aiResult = await res.json();
+
+            if (!aiResult.query) {
+                // If only text is returned (no SQL, e.g. "Result not displayable as table"), show the text
+                if (aiResult.text) {
+                    $('#generalAiTextResult').text(aiResult.text);
+                    $('#generalAiResultContainer').show();
+                } else {
+                    $('#generalAiTextResult').text('No results.');
+                    $('#generalAiResultContainer').show();
+                }
+                return;
+            }
+
+            // 2. Execute query (on any table, no restriction)
+            const dbRes = await fetch(BASE_URL + '/api/general-ai', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ai_query: aiResult.query })
+            });
+            const dbResult = await dbRes.json();
+
+            // If backend returns an error
+            if (dbResult.error) {
+                $('#generalAiTextResult').text('Error: ' + dbResult.error);
+                $('#generalAiResultContainer').show();
+                return;
+            }
+
+            // Display data
+            if (dbResult.data && Array.isArray(dbResult.data) && dbResult.data.length > 0) {
+                const keys = Object.keys(dbResult.data[0]);
+                const headerRow = $('<tr>');
+                keys.forEach(key => headerRow.append($('<th>').text(key)));
+                $('#generalAiFallbackTable thead').empty().append(headerRow);
+                $('#generalAiFallbackTable tbody').empty();
+                dbResult.data.forEach(row => {
+                    const rowEl = $('<tr>');
+                    keys.forEach(key => {
+                        const value = row[key] != null ? row[key] : '';
+                        rowEl.append($('<td>').text(value));
+                    });
+                    $('#generalAiFallbackTable tbody').append(rowEl);
+                });
+                $('#generalAiFallbackTable').show();
+                $('#generalAiResultContainer').show();
+                // Optionally: also display/log the SQL query
+                console.log("AI Query:", aiResult.query);
+            } else {
+                // If no table result, but maybe a text
+                if (dbResult.text) {
+                    $('#generalAiTextResult').text(dbResult.text);
+                } else {
+                    $('#generalAiTextResult').text('No results.');
+                }
+                $('#generalAiFallbackTable').hide();
+                $('#generalAiResultContainer').show();
+            }
+        } catch (err) {
+            console.error("General AI Search failed:", err);
+            alert("AI Search failed: " + err.message);
+        } finally {
+            $('#generalAiBtn').prop('disabled', false);
+            $('#generalAiBtnText').text('Run');
+            $('#generalAiSpinner').hide();
+        }
+    });
+
 }
