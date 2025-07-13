@@ -170,7 +170,7 @@ export function bindEvents(baseUrl, sessionId) {
             const res = await fetch(BASE_URL + '/ai-search', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ question: question, backend: "sql", type: "general" })
+                body: JSON.stringify({ question: question, backend: "sql", mode: "general" })
             });
             const aiResult = await res.json();
 

@@ -512,7 +512,7 @@
                     const res = await fetch(BASE_URL + '/ai-search', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ question: question, backend: "sql" })
+                        body: JSON.stringify({ question: question, backend: "sql", mode: "browser" })
                     });
                     const result = await res.json();
                     if (!result.query) throw new Error("No SQL returned.");
