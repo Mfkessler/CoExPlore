@@ -292,10 +292,6 @@ export function bindEvents(baseUrl, sessionId) {
                         info: "Showing _START_ to _END_ of _TOTAL_ entries",
                         paginate: { previous: "Prev", next: "Next" }
                     },
-                    // Remove all borders (like in your browser layout)
-                    "createdRow": function (row, data, dataIndex) {
-                        $(row).find('td,th').css('border', 'none');
-                    },
                     "initComplete": function () {
                         $('#generalAiResultTable').show();
                     }
