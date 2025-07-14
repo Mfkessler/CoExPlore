@@ -314,6 +314,7 @@ def get_tom_data(
     Automatically detects Parquet (edge list) or HDF5 (matrix) format.
     [docstring wie gehabt, gekürzt für Platz]
     """
+    
     valid_adatas = []
     if isinstance(adata, list):
         toms = []
@@ -324,7 +325,6 @@ def get_tom_data(
                 print(f"File not found: {current_tom_path}")
                 continue
 
-            # Ermittlung Transkripte wie gehabt...
             if not transcripts:
                 current_transcripts = [t[1] for t in list(transcript_ortho_browser(query, ad).index)]
             else:
@@ -342,7 +342,6 @@ def get_tom_data(
             if progress_callback:
                 progress_callback(f"Loading {len(current_transcripts)} transcripts from TOM of dataset {ad.uns['name']}")
 
-            # AUTOMATISCHES FORMAT-DETECTION!
             tom_format = detect_tom_format(current_tom_path)
             if tom_format == "parquet":
                 tom, neighbor_set = load_subset_from_parquet(
@@ -372,7 +371,7 @@ def get_tom_data(
         return toms, valid_adatas, neighbor_info_list
 
     else:
-        # Einzelnes AnnData-Objekt
+
         if not tom_path:
             tom_path = get_default_tom_path(adata, tom_prefix)
         if not os.path.exists(tom_path):

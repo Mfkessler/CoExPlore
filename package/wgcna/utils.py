@@ -1407,13 +1407,24 @@ def load_subset_from_parquet(
     transcripts: list,
     threshold: float = 0.36,
     include_neighbours: bool = False,
-    max_neighbors: int = 10
+    max_neighbors: int = 10,
+    edge_type: str = "TOM"
 ):
+    
+    columns = ["source", "target", "weight"]
+    try:
+        sample = pl.read_parquet(filename, n_rows=1)
+        if "edge_type" in sample.columns:
+            columns.append("edge_type")
+    except Exception:
+        pass
+
+    df = pl.read_parquet(filename, columns=columns)
+
+    if "edge_type" in df.columns:
+        df = df.filter(pl.col("edge_type") == edge_type)
     # Polars filter
-    df = pl.read_parquet(
-        filename,
-        columns=["source", "target", "weight"]
-    ).filter(
+    df = df.filter(
         (pl.col("weight") >= threshold) &
         (pl.col("source").is_in(transcripts) | pl.col("target").is_in(transcripts))
     )
