@@ -1,7 +1,7 @@
 <div class="container py-4">
     <div class="card mx-auto" style="max-width: 1000px;">
         <div class="card-header d-flex align-items-center justify-content-between">
-            <span class="fw-bold fs-5"><i class="bi bi-robot me-2"></i>General AI Search</span>
+            <span class="fw-bold fs-5"><i class="bi bi-robot me-2"></i>AI Search</span>
             <button class="btn btn-link" id="helpIconGeneralAI" style="font-size: 24px;">
                 <i class="bi bi-question-circle"></i>
             </button>
@@ -9,15 +9,9 @@
         <div class="card-body">
             <!-- Prompt & Run Button -->
             <div class="row mb-3">
-                <label for="generalAiInput" class="col-sm-2 col-form-label">AI Prompt</label>
-                <div class="col-sm-8">
+                <div class="col-sm-10">
                     <textarea class="form-control" id="generalAiInput" name="generalAiInput" rows="3"
                         placeholder="Ask any data-related question..."></textarea>
-                    <div class="form-text text-muted mt-1">
-                        Examples: <span class="fst-italic">How many modules per species?</span>,
-                        <span class="fst-italic">Show top 10 orthogroups with most transcripts.</span>,
-                        <span class="fst-italic">How many samples were analyzed in total?</span>
-                    </div>
                 </div>
                 <div class="col-sm-2 d-flex flex-column align-items-stretch">
                     <button id="generalAiBtn" class="btn btn-success w-100 mb-2">
@@ -31,7 +25,6 @@
 
             <!-- Results Container: Text and Table -->
             <div id="generalAiResultContainer" style="display:none; margin-top:2rem;">
-                <h5>AI Result:</h5>
                 <div class="table-responsive">
                     <table id="generalAiResultTable" class="display responsive nowrap no-border" style="width:100%;">
                         <thead></thead>

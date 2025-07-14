@@ -186,12 +186,6 @@ h6 {
   align-items: center;
 }
 
-.btn {
-  margin: 0;
-  padding: 10px 20px;
-  border-radius: 8px;
-}
-
 /* Form and control styling */
 .form-group .col-form-label {
   padding-right: 0;
