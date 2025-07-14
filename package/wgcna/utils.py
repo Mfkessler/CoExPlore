@@ -2071,13 +2071,11 @@ def generate_html_from_df(df: pd.DataFrame, title: str = "Data table", table_id:
 
 
 def export_co_expression_network_to_cytoscape(
-    tom: Union[pd.DataFrame, List[pd.DataFrame], None],
-    adata: Union[AnnData, List[AnnData], None],
-    genie3: Union[pd.DataFrame, List[pd.DataFrame], None] = None,
+    tom: Union[pd.DataFrame, List[pd.DataFrame]],
+    adata: Union[AnnData, List[AnnData]],
     selected_module_colors: List[str] = None,
     threshold: float = 0.5,
-    genie3_threshold: float = 0.0,
-    neighbor_info: Union[set, List[set], None] = None,
+    neighbor_info: Union[set, List[set]] = None,
     id_key: str = 'id',
     source_key: str = 'source',
     target_key: str = 'target',
@@ -2086,158 +2084,123 @@ def export_co_expression_network_to_cytoscape(
     remove_single_nodes: bool = True
 ) -> dict:
     """
-    Exports the co-expression and/or regulatory network(s) in a format compatible with Cytoscape.js.
+    Exports the co-expression network(s) in a format compatible with Cytoscape.js.
 
-    Optionally integrates GENIE3 edges (directed, with 'is_genie3' and 'directed' flags).
-    Works with TOM only, GENIE3 only, or both (edges merged, with marking).
+    This function dynamically assigns all metadata from a loaded JSON dictionary.
+    It iterates over all keys in METADATA_DICT and for each gene node:
+      - If the key is "transcript", the gene identifier (i.e. the index) is used.
+      - Otherwise, the corresponding value is retrieved from adata.var for that gene.
+
+    All metadata is assumed to be stored in adata.var under the keys specified in METADATA_DICT.
 
     Parameters:
-    - tom (pd.DataFrame or List[pd.DataFrame] or None): The TOM matrix/matrices (can be None if only GENIE3 is provided).
-    - adata (AnnData or List[AnnData] or None): AnnData object(s) (needed for TOM; can be None if only GENIE3 is provided).
-    - genie3 (pd.DataFrame or List[pd.DataFrame] or None): GENIE3 edge table(s) (optional).
-    - selected_module_colors (List[str]): Filter for nodes by module color.
+    - tom (pd.DataFrame or List[pd.DataFrame]): The TOM matrix or list of TOM matrices.
+    - adata (AnnData or List[AnnData]): Annotated data object(s).
+    - selected_module_colors (List[str]): Module colors to display. If None, all modules are shown.
     - threshold (float): TOM connection threshold for edges.
-    - genie3_threshold (float): Minimum importance for GENIE3 edges (default: 0, show all).
-    - neighbor_info (set or List[set] or None): Transcripts to mark as neighbors.
-    - id_key, source_key, target_key, weight_key, is_neighbor_key: Output keys.
-    - remove_single_nodes (bool): Remove nodes not present in any edge.
+    - neighbor_info (set or List[set]): Neighbor transcripts for the corresponding TOM(s).
+    - id_key (str): Key for node ID in the output dictionary.
+    - source_key (str): Key for edge source in the output dictionary.
+    - target_key (str): Key for edge target in the output dictionary.
+    - weight_key (str): Key for edge weight in the output dictionary.
+    - is_neighbor_key (str): Key for neighbor flag in the output dictionary.
+    - remove_single_nodes (bool): If True, nodes without any connections are removed.
 
     Returns:
-    - dict: Dictionary with nodes, edges, and neighbor info.
+    - dict: Dictionary with nodes, edges, and neighbors for each TOM.
     """
+
+    print(METADATA_DICT)
+
+    # Ensure the inputs are either both lists or both single objects
+    if isinstance(tom, list) and isinstance(adata, list):
+        if len(tom) != len(adata):
+            raise ValueError(
+                "The number of TOMs and AnnData objects must be the same.")
+        tom_adata_pairs = list(zip(tom, adata))
+        neighbor_list = neighbor_info if isinstance(neighbor_info, list) else [
+            neighbor_info] * len(tom)
+    elif isinstance(tom, pd.DataFrame) and isinstance(adata, AnnData):
+        tom_adata_pairs = [(tom, adata)]
+        neighbor_list = [
+            neighbor_info] if neighbor_info is not None else [set()]
+    else:
+        raise TypeError(
+            "Both tom and adata must be either lists or single objects of their respective types.")
+
     nodes = []
     edges = []
     neighbors_output = []
 
-    # --- TOM/AnnData handling ---
-    tom_edges = set()
-    node_ids = set()
+    for idx, (current_tom, current_adata) in enumerate(tom_adata_pairs):
+        gene_metadata = current_adata.var
 
-    # Handle single/multiple TOM + AnnData
-    if tom is not None and adata is not None:
-        if isinstance(tom, list) and isinstance(adata, list):
-            if len(tom) != len(adata):
-                raise ValueError("Number of TOMs and AnnDatas must match.")
-            tom_adata_pairs = list(zip(tom, adata))
-            neighbor_list = neighbor_info if isinstance(neighbor_info, list) else [neighbor_info] * len(tom)
-        elif isinstance(tom, pd.DataFrame) and isinstance(adata, AnnData):
-            tom_adata_pairs = [(tom, adata)]
-            neighbor_list = [neighbor_info] if neighbor_info is not None else [set()]
+        # Filter genes based on selected module colors if provided (not used, ignore for now)
+        if selected_module_colors:
+            mod_genes = gene_metadata[gene_metadata["module_colors"].isin(
+                selected_module_colors)].index
         else:
-            raise TypeError("TOM and AnnData must both be lists or single objects.")
-        
-        # For each dataset: build nodes and TOM-edges
-        for idx, (current_tom, current_adata) in enumerate(tom_adata_pairs):
-            gene_metadata = current_adata.var
-            species_value = current_adata.uns['species']
-            species_key = METADATA_DICT.get("species", "Species")
-            current_neighbors = neighbor_list[idx] if neighbor_list[idx] is not None else set()
-            neighbors_output.append({species_key: species_value, 'neighbors': list(current_neighbors)})
+            mod_genes = gene_metadata.index
 
-            # --- Select module genes, filter by TOM presence
-            if selected_module_colors:
-                mod_genes = gene_metadata[gene_metadata["module_colors"].isin(selected_module_colors)].index
-            else:
-                mod_genes = gene_metadata.index
-            mod_genes = [gene for gene in mod_genes if gene in current_tom.index]
-            
-            # --- Add nodes
-            for gene in mod_genes:
-                node_id = f"{species_value}_{gene}"
-                node_data = {'data': {id_key: node_id}}
-                for meta_key, output_key in METADATA_DICT.items():
-                    if meta_key == "transcript":
-                        value = gene
-                    elif meta_key == "species":
-                        value = species_value
-                    else:
-                        value = gene_metadata.loc[gene, meta_key] if meta_key in gene_metadata.columns else ""
-                    if pd.isna(value):
-                        value = ""
-                    node_data['data'][meta_key] = str(value)
-                if gene in current_neighbors:
-                    node_data['data'][is_neighbor_key] = True
-                node_data['data']['name'] = current_adata.uns['name']
-                nodes.append(node_data)
-                node_ids.add(node_id)
-            
-            # --- Build TOM edges (always undirected)
-            for i in range(len(mod_genes)):
-                for j in range(i + 1, len(mod_genes)):
-                    gene_i = mod_genes[i]
-                    gene_j = mod_genes[j]
-                    if current_tom.loc[gene_i, gene_j] > threshold:
-                        src = f"{species_value}_{gene_i}"
-                        tgt = f"{species_value}_{gene_j}"
-                        edge_id = f"{src}_{tgt}_TOM"
-                        edge_tuple = tuple(sorted([src, tgt]))  # For TOM undirected edges
-                        tom_edges.add(edge_tuple)
-                        edge_data = {
-                            'data': {
-                                'id': edge_id,
-                                source_key: src,
-                                target_key: tgt,
-                                weight_key: current_tom.loc[gene_i, gene_j],
-                                'is_genie3': False,
-                                'directed': False,
-                                'both': False,  # Will be set True if also in GENIE3
-                            }
+        # Keep only genes that are present in the TOM matrix
+        mod_genes = [gene for gene in mod_genes if gene in current_tom.index]
+
+        species_value = current_adata.uns['species']
+        species_key = METADATA_DICT.get("species", "Species")
+
+        # Prepare neighbor output using species information
+        current_neighbors = neighbor_list[idx] if neighbor_list[idx] is not None else set()
+        neighbors_output.append(
+            {species_key: species_value, 'neighbors': list(current_neighbors)})
+
+        # Build nodes with dynamic metadata from METADATA_DICT
+        for gene in mod_genes:
+            node_data = {'data': {}}
+            # Set the node ID
+            node_data['data'][id_key] = f"{species_value}_{gene}"
+            # Iterate over all keys in METADATA_DICT to add metadata dynamically
+            for meta_key, output_key in METADATA_DICT.items():
+                if meta_key == "transcript":
+                    value = gene
+                    meta_key = "gene"
+                elif meta_key == "species":
+                    value = species_value
+                else:
+                    value = gene_metadata.loc[gene, meta_key] if meta_key in gene_metadata.columns else ""
+                # Replace NaN values with empty string
+                if pd.isna(value):
+                    value = ""
+                else:
+                    value = str(value)
+
+                node_data['data'][meta_key] = value
+            # Mark as neighbor if the gene is in the neighbor set
+            if gene in current_neighbors:
+                node_data['data'][is_neighbor_key] = True
+
+            # Add the dataset name
+            node_data['data']['name'] = current_adata.uns['name']
+            nodes.append(node_data)
+
+        # Build edges based on TOM threshold
+        for i in range(len(mod_genes)):
+            for j in range(i + 1, len(mod_genes)):
+                gene_i = mod_genes[i]
+                gene_j = mod_genes[j]
+                if current_tom.loc[gene_i, gene_j] > threshold:
+                    # Create a unique edge ID (for instance, by concatenating source and target)
+                    edge_id = f"{species_value}_{gene_i}_{gene_j}"
+                    edge_data = {
+                        'data': {
+                            'id': edge_id,
+                            source_key: f"{species_value}_{gene_i}",
+                            target_key: f"{species_value}_{gene_j}",
+                            weight_key: current_tom.loc[gene_i, gene_j]
                         }
-                        edges.append(edge_data)
+                    }
+                    edges.append(edge_data)
 
-    # --- GENIE3 handling ---
-    genie3_edges = set()
-    genie3_nodes = set()
-    if genie3 is not None:
-        # Single or multiple tables
-        genie3_tables = genie3 if isinstance(genie3, list) else [genie3]
-        for genie3_df in genie3_tables:
-            for _, row in genie3_df.iterrows():
-                if row['importance'] < genie3_threshold:
-                    continue
-                src = row['regulator']
-                tgt = row['target']
-                # Optional: species_prefix, or keep IDs as in file (adapt as needed!)
-                src_id = src if '_' in src else src  # Edit here if you want species prefix
-                tgt_id = tgt if '_' in tgt else tgt
-                genie3_edges.add((src_id, tgt_id))
-                genie3_nodes.update([src_id, tgt_id])
-    # --- Add/merge Genie3 edges ---
-    if genie3 is not None:
-        # Find matching TOM edges for "both" flag
-        tom_edges_set = set(tom_edges)
-        for (src, tgt) in genie3_edges:
-            # Check: if TOM is loaded, maybe edge is already there (in both)
-            edge_tuple_undirected = tuple(sorted([src, tgt]))
-            already_in_tom = edge_tuple_undirected in tom_edges_set
-            # Look for importance in Genie3 table
-            imp = None
-            for genie3_df in (genie3 if isinstance(genie3, list) else [genie3]):
-                found = genie3_df[(genie3_df['regulator'] == src) & (genie3_df['target'] == tgt)]
-                if not found.empty:
-                    imp = found.iloc[0]['importance']
-                    break
-            edge_id = f"{src}_{tgt}_GENIE3"
-            edge_data = {
-                'data': {
-                    'id': edge_id,
-                    source_key: src,
-                    target_key: tgt,
-                    weight_key: imp if imp is not None else 1.0,
-                    'is_genie3': True,
-                    'directed': True,
-                    'both': already_in_tom
-                }
-            }
-            edges.append(edge_data)
-            node_ids.add(src)
-            node_ids.add(tgt)
-        # Add missing Genie3-only nodes if TOM is not present
-        for node in genie3_nodes:
-            if node not in {n['data'][id_key] for n in nodes}:
-                nodes.append({'data': {id_key: node, 'name': node}})
-
-    # --- Remove single nodes if requested ---
+    # Remove single nodes if specified
     if remove_single_nodes:
         connected_ids = set()
         for edge in edges:
