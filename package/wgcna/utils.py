@@ -2459,96 +2459,101 @@ def combine_cluster_maps(
 
 def get_node_table(
     tom: Union[pd.DataFrame, List[pd.DataFrame]],
-    adata: Union[AnnData, List[AnnData]],
-    cluster_info: Dict[str, str],
+    adata: Union[ad.AnnData, List[ad.AnnData]],
+    cluster_info: dict,
     tool: str,
     progress_callback: Callable[[str], None] = None
 ) -> pd.DataFrame:
     """
-    Combines TOM-based degree metrics with cluster assignments and metadata from adata.var.
+    Combines TOM-based or edge-list-based node metrics with cluster assignments and metadata from adata.var.
     
-    This function calculates only the necessary metrics:
-    - Node: Gene/transcript identifier.
-    - Species: Species name from adata.uns.
-    - Degree: Number of non-zero connections in the TOM matrix.
-    - Orthogroup: Orthogroup assignment from adata.var (if available, otherwise 'No orthogroup').
-    - Cluster: Cluster assignment from the provided cluster_info.
-    
-    Additional metadata columns are added from adata.var based on the global METADATA_DICT mapping.
-    METADATA_DICT keys correspond to adata.var column names and their values are the desired DataFrame column names.
-    The keys 'transcript', 'species', and 'ortho_id' are excluded from additional metadata.
-    
+    Supports both symmetric TOM matrices (co-expression networks, unweighted/undirected)
+    and directed edge lists (e.g. GENIE3, regulatory networks).
+    TOM matrices are handled as before; edge lists use in-degree + out-degree per node.
+
     Parameters:
-    - tom (pd.DataFrame or List[pd.DataFrame]): TOM matrix or list of matrices.
-    - adata (AnnData or List[AnnData]): AnnData object(s) containing gene metadata in .var and species info in .uns.
-    - cluster_info (dict): Dictionary mapping node identifiers to cluster assignments.
-    - tool (str): Tool used to generate cluster assignments (e.g., "cytoscape").
-    - progress_callback (Callable[[str], None]): Callback for reporting progress.
-    
+    - tom (pd.DataFrame or List[pd.DataFrame]): TOM matrix, list of TOMs, or edge-list DataFrame.
+    - adata (AnnData or List[AnnData]): AnnData object(s) with gene metadata.
+    - cluster_info (dict): Node-to-cluster assignments.
+    - tool (str): Tool used (e.g. 'cytoscape').
+    - progress_callback (Callable, optional): Progress callback.
+
     Returns:
-    - pd.DataFrame: Combined DataFrame with columns "Node", "Species", "Degree", "Orthogroup", "Cluster"
-      and additional metadata columns from adata.var.
+    - pd.DataFrame: Node table with Degree, Cluster, Orthogroup, and extra metadata.
     """
-    
-    def process_single_tom(tom_single: pd.DataFrame, adata_obj: AnnData, cluster_info_local: Dict[str, str]) -> pd.DataFrame:
-        # Fill missing values in the TOM matrix
-        tom_filled = tom_single.fillna(0)
-        
-        # Raw node identifiers (assumed to match adata.var index)
-        raw_nodes = tom_filled.index
-        
-        # Get species name from adata.uns (default 'Unknown' if not provided)
+
+    def process_single_tom(tom_single: pd.DataFrame, adata_obj, cluster_info_local: dict) -> pd.DataFrame:
+        # Check if DataFrame is an edge list (GENIE3): has source/target/weight columns
+        is_edgelist = set(['source', 'target', 'weight']).issubset(tom_single.columns)
         species = adata_obj.uns.get('species', 'Unknown')
-        
-        # Compute degree: count of non-zero connections per row
-        degree = (tom_filled > 0).sum(axis=1)
-        
-        # Create base DataFrame with required columns
-        df_metrics = pd.DataFrame({
-            'Node': raw_nodes,
-            'Species': species,
-            'Degree': degree
-        }, index=raw_nodes)
-        
-        # Add Orthogroup from adata.var; if missing, assign 'No orthogroup'
+
+        if is_edgelist:
+            # Edge-list: calculate degree (sum of in- and out-degree)
+            sources = tom_single['source']
+            targets = tom_single['target']
+            all_nodes = pd.Index(sources.tolist() + targets.tolist()).unique()
+            degree_out = sources.value_counts().reindex(all_nodes, fill_value=0)
+            degree_in = targets.value_counts().reindex(all_nodes, fill_value=0)
+            degree = degree_in + degree_out
+            raw_nodes = all_nodes
+
+            # Create basic DataFrame
+            df_metrics = pd.DataFrame({
+                'Node': raw_nodes,
+                'Species': species,
+                'Degree': degree
+            }, index=raw_nodes)
+
+        else:
+            # TOM-matrix
+            tom_filled = tom_single.fillna(0)
+            raw_nodes = tom_filled.index
+            degree = (tom_filled > 0).sum(axis=1)
+            df_metrics = pd.DataFrame({
+                'Node': raw_nodes,
+                'Species': species,
+                'Degree': degree
+            }, index=raw_nodes)
+
+        # Add Orthogroup
         if 'ortho_id' in adata_obj.var.columns:
             ortho_series = adata_obj.var['ortho_id']
         else:
             ortho_series = pd.Series('No orthogroup', index=adata_obj.var.index)
         df_metrics = df_metrics.join(ortho_series.rename('Orthogroup'), how='left')
-        
-        # Falls Orthogroup als Categorical vorliegt, fehlende Kategorie hinzufügen
         if pd.api.types.is_categorical_dtype(df_metrics['Orthogroup']):
             if 'No orthogroup' not in df_metrics['Orthogroup'].cat.categories:
                 df_metrics['Orthogroup'] = df_metrics['Orthogroup'].cat.add_categories('No orthogroup')
         df_metrics['Orthogroup'] = df_metrics['Orthogroup'].fillna('No orthogroup')
-        
-        # Determine Cluster assignment.
-        # For "cytoscape", adjust keys by removing species prefix if present.
+
+        # Cluster assignment
         if tool == "cytoscape":
             adjusted_cluster_info = {"_".join(key.split("_")[1:]): val for key, val in cluster_info_local.items()}
             clusters = [adjusted_cluster_info.get(node, None) for node in raw_nodes]
         else:
-            # For non-cytoscape, try both raw and species-prefixed node names.
             species_prefixed = [f"{species}_{node}" for node in raw_nodes]
             clusters = []
             for raw, pref in zip(raw_nodes, species_prefixed):
                 clusters.append(cluster_info_local.get(raw, cluster_info_local.get(pref, None)))
         df_metrics['Cluster'] = clusters
-        
-        # Add additional metadata from adata.var based on METADATA_DICT (excluding specified keys)
+
+        # Add additional metadata from adata.var using METADATA_DICT (excluding certain keys)
         extra_keys = [k for k in METADATA_DICT.keys() if k not in ['transcript', 'species', 'ortho_id']]
         available_keys = [k for k in extra_keys if k in adata_obj.var.columns]
+        # For edge-list: Only keep extra metadata for nodes present in adata
         if available_keys:
-            extra_metadata = adata_obj.var.loc[raw_nodes, available_keys]
-            extra_metadata = extra_metadata.rename(columns={k: METADATA_DICT[k] for k in available_keys})
+            extra_metadata = adata_obj.var.loc[
+                adata_obj.var.index.intersection(raw_nodes), available_keys]
+            extra_metadata = extra_metadata.rename(
+                columns={k: METADATA_DICT[k] for k in available_keys})
+            # Use reindex to keep only valid nodes and align index
+            extra_metadata = extra_metadata.reindex(raw_nodes)
             df_metrics = df_metrics.join(extra_metadata, how='left')
-        
-        # Set 'Node' as index and remove duplicate Index-Spalte
+
         df_metrics = df_metrics.set_index('Node', drop=True)
         return df_metrics
 
-    # Process multiple TOM matrices if provided
+    # Multi-dataset support
     if isinstance(tom, list):
         if not isinstance(adata, list):
             raise ValueError("When 'tom' is a list, 'adata' must be a list of AnnData objects.")
@@ -2558,23 +2563,19 @@ def get_node_table(
         for i, tom_single in enumerate(tom):
             if tom_single.empty:
                 continue
-            # For multiple TOMs, assume cluster_info keys are species-prefixed.
             species = adata[i].uns.get('species', 'Unknown')
-            raw_nodes = tom_single.index
+            raw_nodes = tom_single.index if not set(['source','target','weight']).issubset(tom_single.columns) else \
+                        pd.Index(tom_single['source'].tolist() + tom_single['target'].tolist()).unique()
             prefixed_nodes = [f"{species}_{node}" for node in raw_nodes]
-            # Filter cluster_info for nodes in the current dataset
             cluster_info_single = {node: cluster_info[node] for node in prefixed_nodes if node in cluster_info}
-            
             if progress_callback:
                 progress_callback(f"Processing dataset: {adata[i].uns.get('name', 'Unnamed')}")
-            
             df_single = process_single_tom(tom_single, adata[i], cluster_info_single)
             df_list.append(df_single)
         return pd.concat(df_list)
-    
+
     elif isinstance(tom, pd.DataFrame):
         return process_single_tom(tom, adata, cluster_info)
-    
     else:
         raise TypeError("'tom' must be a pandas DataFrame or a list of DataFrames.")
 
