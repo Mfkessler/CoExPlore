@@ -14,11 +14,11 @@
                         placeholder="Ask any data-related question..."></textarea>
                 </div>
                 <div class="col-sm-2 d-flex flex-column align-items-stretch">
-                    <button id="generalAiBtn" class="btn btn-success w-100 mb-2">
-                        <span id="generalAiBtnText">Run</span>
+                    <button id="generalAiBtn" class="btn btn-success w-100 mb-2" title="Run">
+                        <i class="bi bi-play-fill"></i>
                     </button>
-                    <button id="generalAiRandomBtn" class="btn btn-secondary w-100 mb-2">
-                        <span id="generalAiRandomBtnText">Random</span>
+                    <button id="generalAiRandomBtn" class="btn btn-secondary w-100 mb-2" title="Random">
+                        🎲
                     </button>
                 </div>
             </div>
@@ -28,11 +28,13 @@
             <!-- Results Container: Text and Table -->
             <div id="generalAiResultContainer" style="display:none; margin-top:2rem;">
                 <div id="generalAiTextResult" style="color: rgb(0, 0, 0); margin-bottom: 1em;"></div>
-                <div class="table-responsive">
-                    <table id="generalAiResultTable" class="display responsive nowrap" style="width:100%;">
-                        <thead></thead>
-                        <tbody></tbody>
-                    </table>
+                <div id="generalAiTableWrapper">
+                    <div class="table-responsive">
+                        <table id="generalAiResultTable" class="display responsive nowrap" style="width:100%;">
+                            <thead></thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
