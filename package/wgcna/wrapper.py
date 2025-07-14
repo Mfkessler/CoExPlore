@@ -38,7 +38,8 @@ def analyze_co_expression_network(adata: Union[AnnData, List[AnnData]], config: 
                                   use_colors: bool = False, use_shapes: bool = False,
                                   node_size: int = 10, use_symmetry: bool = False, progress_callback: Callable[[str], None] = None,
                                   trait: str = "tissue", filter_edges: bool = True, include_neighbors: bool = False,
-                                  max_neighbors: int = 10, detail_only_nodes: int = 500, cluster_method: str = "threshold") -> dict:
+                                  max_neighbors: int = 10, detail_only_nodes: int = 500, cluster_method: str = "threshold",
+                                  edge_type: str = "TOM") -> dict:
     """
     Analyze co-expression network for a given topic:
     - Plot the co-expression network and identify clusters.
@@ -84,6 +85,7 @@ def analyze_co_expression_network(adata: Union[AnnData, List[AnnData]], config: 
     - cluster_method (str): Clustering method to use; either "threshold" or "tree_cut". 
                             "tree_cut" applies a dynamic tree cut on the complete TOM
                             while "threshold" uses the TOM value threshold to identify clusters.
+    - edge_type (str): Type of edges to use in the co-expression network, either "TOM" or "GENIE3".
 
     Returns:
     - dict: Eigengenes for clusters if out is not "html".
@@ -117,11 +119,11 @@ def analyze_co_expression_network(adata: Union[AnnData, List[AnnData]], config: 
     if isinstance(adata, list):
         tom, adata, neighbor_info = get_tom_data(tom_path, adata, transcripts=transcripts, query=query, threshold=tom_threshold, tom_prefix=tom_prefix,
                                                  use_symmetry=use_symmetry, progress_callback=progress_callback, include_neighbours=include_neighbors,
-                                                 max_neighbors=max_neighbors)
+                                                 max_neighbors=max_neighbors, edge_type=edge_type)
     else:
         tom, neighbor_info = get_tom_data(tom_path, adata, transcripts=transcripts, query=query, threshold=tom_threshold, tom_prefix=tom_prefix,
                                           use_symmetry=use_symmetry, progress_callback=progress_callback, include_neighbours=include_neighbors,
-                                          max_neighbors=max_neighbors)
+                                          max_neighbors=max_neighbors, edge_type=edge_type)
 
     # Check, if ALL TOM matrices are empty
     if isinstance(tom, list):
@@ -307,14 +309,29 @@ def get_tom_data(
     progress_callback: Callable[[str], None] = None,
     include_neighbours: bool = False,
     max_neighbors: int = 10,
+    edge_type: str = "TOM",
     **kwargs
 ) -> Union[Tuple[pd.DataFrame, set], Tuple[List[pd.DataFrame], List[AnnData], List[set]]]:
     """
-    Loads the TOM for one or multiple AnnData objects.
-    Automatically detects Parquet (edge list) or HDF5 (matrix) format.
-    [docstring wie gehabt, gekürzt für Platz]
+    Load TOM data for one or multiple AnnData objects.
+
+    Parameters:
+    - tom_path (Union[str, List[str]]): Path to the TOM file(s) or a list of paths.
+    - adata (Union[AnnData, List[AnnData]]): AnnData object(s) to analyze.
+    - transcripts (Dict[str, List[str]]): Dictionary of species and their transcripts.
+    - query (str): Query to search for transcripts.
+    - threshold (float): Threshold for the TOM matrix.
+    - tom_prefix (str): Prefix for the TOM path.
+    - progress_callback (Callable[[str], None]): Callback function to report progress.
+    - include_neighbours (bool): If True, for each transcript in rows, check for neighbours with value >= threshold and include them.
+    - max_neighbors (int): Maximum number of neighbours to include.
+    - edge_type (str): Type of edges to use in the co-expression network, either "TOM" or "GENIE3".
+
+    Returns:
+    - Tuple[pd.DataFrame, set]: TOM matrix and neighbor set for a single AnnData object.
+    - Tuple[List[pd.DataFrame], List[AnnData], List[set]]: List of TOM matrices, AnnData objects, and neighbor sets for multiple AnnData objects.
     """
-    
+
     valid_adatas = []
     if isinstance(adata, list):
         toms = []
@@ -349,7 +366,8 @@ def get_tom_data(
                     transcripts=current_transcripts,
                     threshold=threshold,
                     include_neighbours=include_neighbours,
-                    max_neighbors=max_neighbors
+                    max_neighbors=max_neighbors,
+                    edge_type=edge_type
                 )
             elif tom_format == "h5":
                 tom, neighbor_set = load_subset_from_hdf5(
@@ -367,7 +385,8 @@ def get_tom_data(
             neighbor_info_list.append(neighbor_set)
             valid_adatas.append(ad)
         for idx, t in enumerate(toms):
-            toms[idx] = t.astype("float64")
+            if not (isinstance(t, pd.DataFrame) and set(['source', 'target', 'weight']).issubset(t.columns)):
+                toms[idx] = t.astype("float64")
         return toms, valid_adatas, neighbor_info_list
 
     else:
@@ -394,7 +413,8 @@ def get_tom_data(
                 transcripts=transcripts,
                 threshold=threshold,
                 include_neighbours=include_neighbours,
-                max_neighbors=max_neighbors
+                max_neighbors=max_neighbors,
+                edge_type=edge_type
             )
         elif tom_format == "h5":
             tom, neighbor_set = load_subset_from_hdf5(
@@ -408,7 +428,8 @@ def get_tom_data(
         else:
             raise ValueError(f"Unsupported TOM file format for {tom_path}")
         print(f"Transcripts after filtering: {tom.shape[0]}")
-        tom = tom.astype("float64")
+        if not (isinstance(tom, pd.DataFrame) and set(['source','target','weight']).issubset(tom.columns)):
+            tom = tom.astype("float64")
 
         return tom, neighbor_set
 
