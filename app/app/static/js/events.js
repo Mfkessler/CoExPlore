@@ -179,8 +179,10 @@ export function bindEvents(baseUrl, sessionId) {
     });
 
     $(document).on('click', '#generalAiBtn', async function () {
-        $('#generalAiTextResult').text('');
+        // Hide result container and table before query (show only spinner)
         $('#generalAiResultContainer').hide();
+        $('#generalAiTextResult').text('');
+        $('#generalAiTableWrapper').hide(); // Always hide table at start
 
         const question = $('#generalAiInput').val().trim();
         if (!question) {
@@ -192,7 +194,7 @@ export function bindEvents(baseUrl, sessionId) {
         $('#generalAiSpinner').show();
 
         try {
-            // 1. Get query from AI
+            // Step 1: Get SQL query from AI
             const res = await fetch(BASE_URL + '/ai-search', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -201,33 +203,30 @@ export function bindEvents(baseUrl, sessionId) {
             const aiResult = await res.json();
             console.log("AI Result:", aiResult);
 
+            // If no SQL query could be generated, show only error or info message (hide table!)
             if (!aiResult.query) {
-                // No SQL query received → maybe just text
                 showAiSqlQuery(null);
                 if (aiResult.error) {
                     $('#generalAiTextResult').text('Error: ' + aiResult.error);
-                    $('#generalAiResultContainer').show();
                 } else if (aiResult.text) {
                     $('#generalAiTextResult').text(aiResult.text);
-                    $('#generalAiResultContainer').show();
                 } else {
                     $('#generalAiTextResult').text('No results.');
-                    $('#generalAiResultContainer').show();
                 }
-                // Hide/reset table
-                if (generalAiDataTable) {
-                    generalAiDataTable.clear().draw();
-                    generalAiDataTable.destroy();
-                    generalAiDataTable = null;
+                // Destroy DataTable and hide table wrapper (no table visible)
+                if ($.fn.DataTable.isDataTable('#generalAiResultTable')) {
+                    $('#generalAiResultTable').DataTable().clear().draw();
+                    $('#generalAiResultTable').DataTable().destroy();
                 }
-                $('#generalAiResultTable').hide();
+                $('#generalAiResultTable').html('<thead></thead><tbody></tbody>');
+                $('#generalAiTableWrapper').hide(); // <--- Hide whole table including DataTables UI
+                $('#generalAiResultContainer').show(); // Show section for error/info
                 return;
             }
 
-            console.log("AI Query:", aiResult.query);
-            showAiSqlQuery(aiResult.query); // Nach Empfang, immer aufrufen
+            showAiSqlQuery(aiResult.query);
 
-            // 2. Execute query against DB (arbitrary SQL)
+            // Step 2: Execute the SQL query against the DB
             const dbRes = await fetch(BASE_URL + '/api/general-ai', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -235,96 +234,88 @@ export function bindEvents(baseUrl, sessionId) {
             });
             const dbResult = await dbRes.json();
 
-            // Backend error?
+            // If DB returns error, show only error message (hide table!)
             if (dbResult.error) {
                 $('#generalAiTextResult').text('Error: ' + dbResult.error);
-                $('#generalAiResultContainer').show();
-                if (generalAiDataTable) {
-                    generalAiDataTable.clear().draw();
-                    generalAiDataTable.destroy();
-                    generalAiDataTable = null;
+                if ($.fn.DataTable.isDataTable('#generalAiResultTable')) {
+                    $('#generalAiResultTable').DataTable().clear().draw();
+                    $('#generalAiResultTable').DataTable().destroy();
                 }
-                $('#generalAiResultTable').hide();
+                $('#generalAiResultTable').html('<thead></thead><tbody></tbody>');
+                $('#generalAiTableWrapper').hide(); // <--- Hide table!
                 showAiSqlQuery(null);
-                console.error("General AI Search failed:", dbResult.error);
+                $('#generalAiResultContainer').show();
                 return;
             }
 
-            // Show table (DataTables.js)
+            // Success: Show result table if data is available
             if (dbResult.data && Array.isArray(dbResult.data) && dbResult.data.length > 0) {
                 const data = dbResult.data;
                 const keys = Object.keys(data[0]);
-
-                // Generate header
                 let thead = '<tr>' + keys.map(k => `<th>${k}</th>`).join('') + '</tr>';
-                $('#generalAiResultTable thead').html(thead);
-                $('#generalAiResultTable tbody').empty(); // Leave body empty, DataTable will handle it
 
-                // If DataTable already exists, destroy it!
-                if (generalAiDataTable) {
-                    generalAiDataTable.clear().draw();
-                    generalAiDataTable.destroy();
-                    generalAiDataTable = null;
+                if ($.fn.DataTable.isDataTable('#generalAiResultTable')) {
+                    $('#generalAiResultTable').DataTable().clear().draw();
+                    $('#generalAiResultTable').DataTable().destroy();
                 }
 
-                // Initialize DataTable
-                generalAiDataTable = $('#generalAiResultTable').DataTable({
-                    data: data,
-                    columns: keys.map(k => ({ data: k })),
-                    responsive: true,
-                    dom: 'Bfrtip',
-                    pageLength: 10,
-                    lengthMenu: [[10, 25, 50, -1], [10, 25, 50, "All"]],
-                    buttons: [
-                        {
-                            extend: 'colvis',
-                            text: 'Column Visibility'
-                        },
-                        {
-                            extend: 'csvHtml5',
-                            text: 'Download CSV',
-                            filename: 'ai_general_result'
-                        }
-                    ],
-                    language: {
-                        search: "Search:",
-                        lengthMenu: "Show _MENU_ entries",
-                        info: "Showing _START_ to _END_ of _TOTAL_ entries",
-                        paginate: { previous: "Prev", next: "Next" }
-                    },
-                    "initComplete": function () {
-                        $('#generalAiResultTable').show();
-                    }
-                });
-
-                $('#generalAiResultTable').show();
+                // Set new header/body
+                $('#generalAiResultTable').html(`<thead>${thead}</thead><tbody></tbody>`);
+                $('#generalAiTableWrapper').show(); // <--- Show table (incl. DataTables UI)
                 $('#generalAiResultContainer').show();
-                $('#generalAiTextResult').text(''); // Only show table, reset text
+
+                setTimeout(function() {
+                    generalAiDataTable = $('#generalAiResultTable').DataTable({
+                        data: data,
+                        columns: keys.map(k => ({ data: k })),
+                        responsive: true,
+                        dom: 'Bfrtip',
+                        pageLength: 10,
+                        lengthMenu: [[10, 25, 50, -1], [10, 25, 50, "All"]],
+                        buttons: [
+                            { extend: 'colvis', text: 'Column Visibility' },
+                            { extend: 'csvHtml5', text: 'Download CSV', filename: 'ai_general_result' }
+                        ],
+                        language: {
+                            search: "Search:",
+                            lengthMenu: "Show _MENU_ entries",
+                            info: "Showing _START_ to _END_ of _TOTAL_ entries",
+                            paginate: { previous: "Prev", next: "Next" }
+                        }
+                    });
+                }, 0);
+
+                $('#generalAiTextResult').text('');
             } else {
-                // No table result, maybe just text
+                // No results found: hide table and show only info
                 if (dbResult.text) {
                     $('#generalAiTextResult').text(dbResult.text);
                 } else {
                     $('#generalAiTextResult').text('No results.');
                 }
-                if (generalAiDataTable) {
-                    generalAiDataTable.clear().draw();
-                    generalAiDataTable.destroy();
-                    generalAiDataTable = null;
+                if ($.fn.DataTable.isDataTable('#generalAiResultTable')) {
+                    $('#generalAiResultTable').DataTable().clear().draw();
+                    $('#generalAiResultTable').DataTable().destroy();
                 }
-                $('#generalAiResultTable').hide();
-                $('#generalAiResultContainer').show();
+                $('#generalAiResultTable').html('<thead></thead><tbody></tbody>');
+                $('#generalAiTableWrapper').hide(); // <--- Hide table!
             }
+
+            // Always show result container for error/info/results
+            $('#generalAiResultContainer').show();
+
         } catch (err) {
+            // Fatal error: destroy table, show only error text
             console.error("General AI Search failed:", err);
             alert("AI Search failed: " + err.message);
-            if (generalAiDataTable) {
-                generalAiDataTable.clear().draw();
-                generalAiDataTable.destroy();
-                generalAiDataTable = null;
+            if ($.fn.DataTable.isDataTable('#generalAiResultTable')) {
+                $('#generalAiResultTable').DataTable().clear().draw();
+                $('#generalAiResultTable').DataTable().destroy();
             }
-            $('#generalAiResultTable').hide();
+            $('#generalAiResultTable').html('<thead></thead><tbody></tbody>');
+            $('#generalAiTableWrapper').hide(); // <--- Hide table!
             showAiSqlQuery(null);
+            $('#generalAiResultContainer').show();
         } finally {
             $('#generalAiBtn').prop('disabled', false);
             $('#generalAiBtnText').text('Run');
