@@ -1410,7 +1410,6 @@ def load_subset_from_parquet(
     max_neighbors: int = 10,
     edge_type: str = "TOM"
 ):
-    
     columns = ["source", "target", "weight"]
     try:
         sample = pl.read_parquet(filename, n_rows=1)
@@ -1423,7 +1422,7 @@ def load_subset_from_parquet(
 
     if "edge_type" in df.columns:
         df = df.filter(pl.col("edge_type") == edge_type)
-    # Polars filter
+
     df = df.filter(
         (pl.col("weight") >= threshold) &
         (pl.col("source").is_in(transcripts) | pl.col("target").is_in(transcripts))
@@ -1432,7 +1431,6 @@ def load_subset_from_parquet(
     original_set = set(transcripts)
 
     if include_neighbours:
-        # Polars groupby and aggregation
         out_neighs = (
             df.filter(pl.col("source").is_in(transcripts))
             .sort(["source", "weight"], descending=[False, True])
@@ -1445,8 +1443,6 @@ def load_subset_from_parquet(
             .group_by("target")
             .agg(pl.col("source").head(max_neighbors))
         )
-
-        # Extract neighbors
         neighbors = set()
         for sublist in out_neighs["target"].to_list():
             neighbors.update(sublist)
@@ -1455,7 +1451,7 @@ def load_subset_from_parquet(
         neighbors -= original_set
         transcripts = list(original_set.union(neighbors))
         neighbor_set = neighbors
-        # Re-filter
+
         df = df.filter(
             pl.col("source").is_in(transcripts) & pl.col("target").is_in(transcripts)
         )
@@ -1465,8 +1461,10 @@ def load_subset_from_parquet(
             pl.col("source").is_in(transcripts) & pl.col("target").is_in(transcripts)
         )
 
-    mat = df.to_pandas().pivot(index="source", columns="target", values="weight")
+    if edge_type == "GENIE3":
+        return df.to_pandas()[["source", "target", "weight"]], neighbor_set
 
+    mat = df.to_pandas().pivot(index="source", columns="target", values="weight")
     for gene in transcripts:
         if gene in mat.index and gene in mat.columns:
             mat.at[gene, gene] = float('nan')
@@ -2072,7 +2070,7 @@ def generate_html_from_df(df: pd.DataFrame, title: str = "Data table", table_id:
 
 def export_co_expression_network_to_cytoscape(
     tom: Union[pd.DataFrame, List[pd.DataFrame]],
-    adata: Union[AnnData, List[AnnData]],
+    adata: Union['AnnData', List['AnnData']],
     selected_module_colors: List[str] = None,
     threshold: float = 0.5,
     neighbor_info: Union[set, List[set]] = None,
@@ -2084,49 +2082,44 @@ def export_co_expression_network_to_cytoscape(
     remove_single_nodes: bool = True
 ) -> dict:
     """
-    Exports the co-expression network(s) in a format compatible with Cytoscape.js.
+    Exports the co-expression network(s) to a Cytoscape.js-compatible format.
 
-    This function dynamically assigns all metadata from a loaded JSON dictionary.
-    It iterates over all keys in METADATA_DICT and for each gene node:
-      - If the key is "transcript", the gene identifier (i.e. the index) is used.
-      - Otherwise, the corresponding value is retrieved from adata.var for that gene.
+    This function handles both traditional TOM (co-expression) matrices and edge-list
+    DataFrames (e.g., GENIE3 output). For TOM, undirected edges are extracted above a threshold.
+    For edge-lists (containing columns ['source', 'target', 'weight']), directed edges are exported.
 
-    All metadata is assumed to be stored in adata.var under the keys specified in METADATA_DICT.
+    All node metadata is dynamically loaded from adata.var using keys from METADATA_DICT.
 
     Parameters:
-    - tom (pd.DataFrame or List[pd.DataFrame]): The TOM matrix or list of TOM matrices.
+    - tom (pd.DataFrame or List[pd.DataFrame]): The TOM matrix or list of matrices, or an edge-list DataFrame (GENIE3).
     - adata (AnnData or List[AnnData]): Annotated data object(s).
-    - selected_module_colors (List[str]): Module colors to display. If None, all modules are shown.
-    - threshold (float): TOM connection threshold for edges.
-    - neighbor_info (set or List[set]): Neighbor transcripts for the corresponding TOM(s).
+    - selected_module_colors (List[str], optional): If provided, only these module colors are shown.
+    - threshold (float): Threshold for including edges (applies to TOM and edge-list weights).
+    - neighbor_info (set or List[set], optional): Neighbor transcripts for the corresponding TOM(s).
     - id_key (str): Key for node ID in the output dictionary.
     - source_key (str): Key for edge source in the output dictionary.
     - target_key (str): Key for edge target in the output dictionary.
     - weight_key (str): Key for edge weight in the output dictionary.
     - is_neighbor_key (str): Key for neighbor flag in the output dictionary.
-    - remove_single_nodes (bool): If True, nodes without any connections are removed.
+    - remove_single_nodes (bool): If True, nodes without any edges are removed.
 
     Returns:
-    - dict: Dictionary with nodes, edges, and neighbors for each TOM.
+    - dict: Dictionary with 'nodes', 'edges', and 'neighbors' for each TOM/network.
     """
 
-    print(METADATA_DICT)
+    print(METADATA_DICT)  # For debugging, shows what metadata is mapped
 
-    # Ensure the inputs are either both lists or both single objects
+    # Ensure both tom and adata are either lists or single objects
     if isinstance(tom, list) and isinstance(adata, list):
         if len(tom) != len(adata):
-            raise ValueError(
-                "The number of TOMs and AnnData objects must be the same.")
+            raise ValueError("The number of TOMs and AnnData objects must be the same.")
         tom_adata_pairs = list(zip(tom, adata))
-        neighbor_list = neighbor_info if isinstance(neighbor_info, list) else [
-            neighbor_info] * len(tom)
-    elif isinstance(tom, pd.DataFrame) and isinstance(adata, AnnData):
+        neighbor_list = neighbor_info if isinstance(neighbor_info, list) else [neighbor_info] * len(tom)
+    elif isinstance(tom, pd.DataFrame) and hasattr(adata, "var"):
         tom_adata_pairs = [(tom, adata)]
-        neighbor_list = [
-            neighbor_info] if neighbor_info is not None else [set()]
+        neighbor_list = [neighbor_info] if neighbor_info is not None else [set()]
     else:
-        raise TypeError(
-            "Both tom and adata must be either lists or single objects of their respective types.")
+        raise TypeError("Both tom and adata must be either lists or single objects of their respective types.")
 
     nodes = []
     edges = []
@@ -2135,30 +2128,26 @@ def export_co_expression_network_to_cytoscape(
     for idx, (current_tom, current_adata) in enumerate(tom_adata_pairs):
         gene_metadata = current_adata.var
 
-        # Filter genes based on selected module colors if provided (not used, ignore for now)
+        # Select genes based on module colors if provided
         if selected_module_colors:
-            mod_genes = gene_metadata[gene_metadata["module_colors"].isin(
-                selected_module_colors)].index
+            mod_genes = gene_metadata[gene_metadata["module_colors"].isin(selected_module_colors)].index
         else:
             mod_genes = gene_metadata.index
 
-        # Keep only genes that are present in the TOM matrix
-        mod_genes = [gene for gene in mod_genes if gene in current_tom.index]
+        # For TOM-matrix, ensure only genes present in the matrix are included
+        if not (isinstance(current_tom, pd.DataFrame) and set(['source', 'target', 'weight']).issubset(current_tom.columns)):
+            mod_genes = [gene for gene in mod_genes if gene in current_tom.index]
 
         species_value = current_adata.uns['species']
         species_key = METADATA_DICT.get("species", "Species")
 
-        # Prepare neighbor output using species information
         current_neighbors = neighbor_list[idx] if neighbor_list[idx] is not None else set()
-        neighbors_output.append(
-            {species_key: species_value, 'neighbors': list(current_neighbors)})
+        neighbors_output.append({species_key: species_value, 'neighbors': list(current_neighbors)})
 
-        # Build nodes with dynamic metadata from METADATA_DICT
+        # Build node list with dynamic metadata
         for gene in mod_genes:
             node_data = {'data': {}}
-            # Set the node ID
             node_data['data'][id_key] = f"{species_value}_{gene}"
-            # Iterate over all keys in METADATA_DICT to add metadata dynamically
             for meta_key, output_key in METADATA_DICT.items():
                 if meta_key == "transcript":
                     value = gene
@@ -2167,40 +2156,54 @@ def export_co_expression_network_to_cytoscape(
                     value = species_value
                 else:
                     value = gene_metadata.loc[gene, meta_key] if meta_key in gene_metadata.columns else ""
-                # Replace NaN values with empty string
                 if pd.isna(value):
                     value = ""
                 else:
                     value = str(value)
-
                 node_data['data'][meta_key] = value
-            # Mark as neighbor if the gene is in the neighbor set
             if gene in current_neighbors:
                 node_data['data'][is_neighbor_key] = True
-
-            # Add the dataset name
             node_data['data']['name'] = current_adata.uns['name']
             nodes.append(node_data)
 
-        # Build edges based on TOM threshold
-        for i in range(len(mod_genes)):
-            for j in range(i + 1, len(mod_genes)):
-                gene_i = mod_genes[i]
-                gene_j = mod_genes[j]
-                if current_tom.loc[gene_i, gene_j] > threshold:
-                    # Create a unique edge ID (for instance, by concatenating source and target)
-                    edge_id = f"{species_value}_{gene_i}_{gene_j}"
+        # --- EDGE CREATION (TOM or Edge-list) ---
+        # If DataFrame has source/target/weight columns: treat as edge-list (GENIE3 etc.)
+        if isinstance(current_tom, pd.DataFrame) and set(['source', 'target', 'weight']).issubset(current_tom.columns):
+            # Only use edges above threshold and with nodes present as mod_genes
+            for _, row in current_tom.iterrows():
+                if row['weight'] >= threshold and row['source'] in mod_genes and row['target'] in mod_genes:
+                    edge_id = f"{species_value}_{row['source']}_{row['target']}"
                     edge_data = {
                         'data': {
                             'id': edge_id,
-                            source_key: f"{species_value}_{gene_i}",
-                            target_key: f"{species_value}_{gene_j}",
-                            weight_key: current_tom.loc[gene_i, gene_j]
+                            source_key: f"{species_value}_{row['source']}",
+                            target_key: f"{species_value}_{row['target']}",
+                            weight_key: row['weight'],
+                            'directed': True  # Use this flag in Cytoscape.js for arrows
                         }
                     }
                     edges.append(edge_data)
+        else:
+            # TOM matrix (undirected, symmetric, only upper triangle)
+            for i in range(len(mod_genes)):
+                for j in range(i + 1, len(mod_genes)):
+                    gene_i = mod_genes[i]
+                    gene_j = mod_genes[j]
+                    # Add edge if above threshold
+                    if current_tom.loc[gene_i, gene_j] > threshold:
+                        edge_id = f"{species_value}_{gene_i}_{gene_j}"
+                        edge_data = {
+                            'data': {
+                                'id': edge_id,
+                                source_key: f"{species_value}_{gene_i}",
+                                target_key: f"{species_value}_{gene_j}",
+                                weight_key: current_tom.loc[gene_i, gene_j],
+                                'directed': False
+                            }
+                        }
+                        edges.append(edge_data)
 
-    # Remove single nodes if specified
+    # Optionally, remove single nodes (no edges)
     if remove_single_nodes:
         connected_ids = set()
         for edge in edges:
