@@ -17,20 +17,40 @@
                     <button id="generalAiBtn" class="btn btn-success w-100 mb-2">
                         <span id="generalAiBtnText">Run</span>
                     </button>
-                    <div id="generalAiSpinner" class="w-100 text-center" style="display:none;">
-                        <div class="spinner-border text-success" role="status" aria-hidden="true"></div>
-                    </div>
+                    <button id="generalAiRandomBtn" class="btn btn-secondary w-100 mb-2">
+                        <span id="generalAiRandomBtnText">Random</span>
+                    </button>
                 </div>
             </div>
-
+            <div id="generalAiSpinner" class="w-100 text-center" style="display:none;">
+                <div class="spinner-border text-success" role="status" aria-hidden="true"></div>
+            </div>
             <!-- Results Container: Text and Table -->
             <div id="generalAiResultContainer" style="display:none; margin-top:2rem;">
+                <div id="generalAiTextResult" style="color: rgb(0, 0, 0); margin-bottom: 1em;"></div>
                 <div class="table-responsive">
                     <table id="generalAiResultTable" class="display responsive nowrap no-border" style="width:100%;">
                         <thead></thead>
                         <tbody></tbody>
                     </table>
                 </div>
+            </div>
+        </div>
+
+        <!-- AI-generated SQL Query Output -->
+        <div id="generalAiSqlQueryCard" class="card mb-3 shadow-sm border-0" style="display: none;">
+            <div class="card-header bg-light d-flex align-items-center justify-content-between py-2 px-3">
+                <div>
+                    <i class="bi bi-database-check text-success me-2"></i>
+                    <span class="fw-semibold">SQL Query</span>
+                </div>
+                <button class="btn btn-sm btn-outline-secondary" id="copyAiSqlBtn" title="Copy SQL">
+                    <i class="bi bi-clipboard"></i>
+                </button>
+            </div>
+            <div class="card-body bg-light py-2 px-3">
+                <pre class="mb-0"
+                    style="white-space: pre-wrap; word-break: break-word; font-size: 1rem;"><code id="generalAiSqlQuery" class="language-sql"></code></pre>
             </div>
         </div>
     </div>

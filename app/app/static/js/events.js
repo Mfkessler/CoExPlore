@@ -152,6 +152,32 @@ export function bindEvents(baseUrl, sessionId) {
 
     let generalAiDataTable = null;
 
+    function showAiSqlQuery(query) {
+        if (query) {
+            let cleaned = query.replace(/^[\s\S]*?(?=SELECT)/i, '')
+                .trim()
+                .split('\n')
+                .map(line => line.trim())
+                .join('\n');
+            $('#generalAiSqlQuery').text(cleaned);
+            $('#generalAiSqlQueryCard').fadeIn(200);
+            Prism.highlightElement(document.getElementById('generalAiSqlQuery'));
+        } else {
+            $('#generalAiSqlQueryCard').fadeOut(100, function() {
+                $('#generalAiSqlQuery').text('');
+            });
+        }
+    }
+
+    $(document).on('click', '#copyAiSqlBtn', function () {
+        const sql = $('#generalAiSqlQuery').text();
+        if (sql) {
+            navigator.clipboard.writeText(sql);
+            $(this).tooltip({title: "Copied!", trigger: "manual"}).tooltip('show');
+            setTimeout(() => $(this).tooltip('hide'), 800);
+        }
+    });
+
     $(document).on('click', '#generalAiBtn', async function () {
         $('#generalAiTextResult').text('');
         $('#generalAiResultContainer').hide();
@@ -173,10 +199,15 @@ export function bindEvents(baseUrl, sessionId) {
                 body: JSON.stringify({ question: question, backend: "sql", mode: "general" })
             });
             const aiResult = await res.json();
+            console.log("AI Result:", aiResult);
 
             if (!aiResult.query) {
                 // No SQL query received → maybe just text
-                if (aiResult.text) {
+                showAiSqlQuery(null);
+                if (aiResult.error) {
+                    $('#generalAiTextResult').text('Error: ' + aiResult.error);
+                    $('#generalAiResultContainer').show();
+                } else if (aiResult.text) {
                     $('#generalAiTextResult').text(aiResult.text);
                     $('#generalAiResultContainer').show();
                 } else {
@@ -194,6 +225,7 @@ export function bindEvents(baseUrl, sessionId) {
             }
 
             console.log("AI Query:", aiResult.query);
+            showAiSqlQuery(aiResult.query); // Nach Empfang, immer aufrufen
 
             // 2. Execute query against DB (arbitrary SQL)
             const dbRes = await fetch(BASE_URL + '/api/general-ai', {
@@ -213,6 +245,8 @@ export function bindEvents(baseUrl, sessionId) {
                     generalAiDataTable = null;
                 }
                 $('#generalAiResultTable').hide();
+                showAiSqlQuery(null);
+                console.error("General AI Search failed:", dbResult.error);
                 return;
             }
 
@@ -294,10 +328,29 @@ export function bindEvents(baseUrl, sessionId) {
                 generalAiDataTable = null;
             }
             $('#generalAiResultTable').hide();
+            showAiSqlQuery(null);
         } finally {
             $('#generalAiBtn').prop('disabled', false);
             $('#generalAiBtnText').text('Run');
             $('#generalAiSpinner').hide();
         }
     });
+
+    $(document).on('click', '#generalAiRandomBtn', async function () {
+        $('#generalAiRandomBtn').prop('disabled', true).text('...');
+        try {
+            const res = await fetch(BASE_URL + '/api/random-example', { method: 'GET' });
+            const data = await res.json();
+            if (data && data.question) {
+                $('#generalAiInput').val(data.question);
+            } else {
+                alert("No example loaded!");
+            }
+        } catch (e) {
+            alert("Failed to load random example.");
+        } finally {
+            $('#generalAiRandomBtn').prop('disabled', false).text('Random');
+        }
+    });
+
 }

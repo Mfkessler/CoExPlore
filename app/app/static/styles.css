@@ -413,3 +413,20 @@ input[type="text"] {
     margin-left: 0;
   }
 }
+
+#generalAiSqlQueryCard {
+    border-left: 5px solid #28a745;
+    border-radius: 12px;
+    background: #f8f9fa;
+    transition: box-shadow 0.2s;
+}
+#generalAiSqlQueryCard .card-header {
+    background: #f0f5f2 !important;
+}
+#copyAiSqlBtn:active {
+    background: #e2e6ea !important;
+}
+#generalAiSqlQuery {
+    font-family: "JetBrains Mono", "Fira Mono", "Consolas", "monospace";
+    font-size: 1rem;
+}
