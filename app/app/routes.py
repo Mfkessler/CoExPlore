@@ -11,6 +11,7 @@ import json
 import logging
 import redis
 import re
+import random
 import scanpy as sc
 import pandas as pd
 import numpy as np
@@ -661,6 +662,31 @@ def api_general_ai():
         return jsonify({"data": rows})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+    
+
+@api_bp.route("/api/random-example", methods=["GET"])
+def random_example():
+    examples_path = os.getenv("RANDOM_EXAMPLES_PATH")
+    if not examples_path or not os.path.isfile(examples_path):
+        return jsonify({"error": "Examples file not found."}), 500
+
+    with open(examples_path, "r", encoding="utf-8") as f:
+        lines = f.readlines()
+
+    if not lines:
+        return jsonify({"error": "No examples in file."}), 500
+
+    example_line = random.choice(lines).strip()
+    try:
+        example = json.loads(example_line)
+    except Exception as e:
+        return jsonify({"error": "Failed to parse example."}), 500
+
+    question = example.get("question")
+    if not question:
+        return jsonify({"error": "No question field in example."}), 500
+
+    return jsonify({"question": question})
 
 
 @api_bp.route('/api/get_transcripts', methods=['POST'])
