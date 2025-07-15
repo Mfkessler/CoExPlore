@@ -1,0 +1,59 @@
+<div class="container py-4">
+    <div class="card mx-auto" style="max-width: 1000px;">
+        <div class="card-header d-flex align-items-center justify-content-between">
+            <span class="fw-bold fs-5"><i class="bi bi-search me-2"></i>Browser</span>
+            <button class="btn btn-link" id="helpIconBrowser" style="font-size: 24px;">
+                <i class="bi bi-question-circle"></i>
+            </button>
+        </div>
+        <div class="card-body">
+            <!-- Browser Description (toggle) -->
+            <div id="userGuideCardBrowser" class="analysis-description mb-3" style="display: none;">
+                <p>
+                    Explore data for selected plant species by searching for transcripts or provided metadata (e.g.
+                    Modules or GO Terms)
+                    using the global search box.
+                    For example, try searching for
+                    <a href="#" onclick="sendGoTermToIframe('GO:0009908'); event.preventDefault();">flower development
+                        (GO:0009908)</a>,
+                    <a href="#" onclick="sendGoTermToIframe('GO:0015979'); event.preventDefault();">photosynthesis
+                        (GO:0015979)</a>, or
+                    <a href="#" onclick="sendGoTermToIframe('GO:0006950'); event.preventDefault();">response to stress
+                        (GO:0006950)</a>.
+                    The global search is case-insensitive and supports partial matches.
+                </p>
+                <p>
+                    If the global search does not meet your needs, you can refine your query using the column search.
+                    Select a specific
+                    column from the drop-down menu to limit your search to that field.
+                    Enter multiple search terms separated by commas, spaces, tabs or line breaks. Column search is
+                    case-sensitive and
+                    does not support partial matches.
+                </p>
+                <p>
+                    In addition, checking the <i>Use orthogroups</i> box will redirect your search to orthogroup IDs (if
+                    this metadata is provided). This
+                    takes the orthogroups from the filtered table entries as new tokens and calculates metrics that show
+                    how many
+                    transcripts are retained, lost or added.
+                </p>
+                <p>
+                    You can also customise the table view by adjusting column visibility, downloading the filtered
+                    table, or
+                    copying selected column entries to the clipboard. When copying entries, you can choose to export
+                    only unique values
+                    and specify a custom separator (default is a new line).
+                </p>
+            </div>
+            <!-- Browser Table/Results -->
+            <div id="browserResultsContainer" style="position: relative;">
+                <div id="loadingBarBrowser" class="loading-text" style="display:none;">
+                    <span id="loadingBarBrowserStatusText">Loading...</span>
+                </div>
+                <div id="browserResults" style="display: none;">
+                    <iframe id="browserIframe" style="width:100%; border:none;" scrolling="no"></iframe>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

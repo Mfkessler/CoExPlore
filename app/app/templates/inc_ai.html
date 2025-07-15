@@ -1,0 +1,59 @@
+<div class="container py-4">
+    <div class="card mx-auto" style="max-width: 1000px;">
+        <div class="card-header d-flex align-items-center justify-content-between">
+            <span class="fw-bold fs-5"><i class="bi bi-robot me-2"></i>AI Search</span>
+            <button class="btn btn-link" id="helpIconGeneralAI" style="font-size: 24px;">
+                <i class="bi bi-question-circle"></i>
+            </button>
+        </div>
+        <div class="card-body">
+            <!-- Prompt & Run Button -->
+            <div class="row mb-3">
+                <div class="col-sm-10">
+                    <textarea class="form-control" id="generalAiInput" name="generalAiInput" rows="3"
+                        placeholder="Ask any data-related question..."></textarea>
+                </div>
+                <div class="col-sm-2 d-flex flex-column align-items-stretch">
+                    <button id="generalAiBtn" class="btn btn-success w-100 mb-2" title="Run">
+                        <i class="bi bi-play-fill"></i>
+                    </button>
+                    <button id="generalAiRandomBtn" class="btn btn-secondary w-100 mb-2" title="Random">
+                        🎲
+                    </button>
+                </div>
+            </div>
+            <div id="generalAiSpinner" class="w-100 text-center" style="display:none;">
+                <div class="spinner-border text-success" role="status" aria-hidden="true"></div>
+            </div>
+            <!-- Results Container: Text and Table -->
+            <div id="generalAiResultContainer" style="display:none; margin-top:2rem;">
+                <div id="generalAiTextResult" style="color: rgb(0, 0, 0); margin-bottom: 1em;"></div>
+                <div id="generalAiTableWrapper">
+                    <div class="table-responsive">
+                        <table id="generalAiResultTable" class="display responsive nowrap" style="width:100%;">
+                            <thead></thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- AI-generated SQL Query Output -->
+        <div id="generalAiSqlQueryCard" class="card mb-3 shadow-sm border-0" style="display: none;">
+            <div class="card-header bg-light d-flex align-items-center justify-content-between py-2 px-3">
+                <div>
+                    <i class="bi bi-database-check text-success me-2"></i>
+                    <span class="fw-semibold">SQL Query</span>
+                </div>
+                <button class="btn btn-sm btn-outline-secondary" id="copyAiSqlBtn" title="Copy SQL">
+                    <i class="bi bi-clipboard"></i>
+                </button>
+            </div>
+            <div class="card-body bg-light py-2 px-3">
+                <pre class="mb-0"
+                    style="white-space: pre-wrap; word-break: break-word; font-size: 1rem;"><code id="generalAiSqlQuery" class="language-sql"></code></pre>
+            </div>
+        </div>
+    </div>
+</div>

@@ -36,6 +36,19 @@ pfam_list = config.get("pfam", [""] * len(names_list))
 uniprot_list = config.get("uniprot", [""] * len(names_list))
 tf_family_list = config.get("tf_family", [""] * len(names_list))
 
+# WGCNA parameters 
+wgcna_params = config.get("wgcna_parameters", {})
+TPMcutoff = wgcna_params.get("TPMcutoff", 1)
+powers = wgcna_params.get("powers", None)
+RsquaredCut = wgcna_params.get("RsquaredCut", 0.9)
+MeanCut = wgcna_params.get("MeanCut", 100)
+networkType = wgcna_params.get("networkType", "signed hybrid")
+TOMType = wgcna_params.get("TOMType", "signed")
+minModuleSize = wgcna_params.get("minModuleSize", 50)
+naColor = wgcna_params.get("naColor", "grey")
+cut = float(wgcna_params.get("cut", float("inf")))
+MEDissThres = wgcna_params.get("MEDissThres", 0.2)
+
 # Boolean or single-value entries from config
 save_tom = config["save_tom"]
 save_adjacency_matrix = config["save_adjacency_matrix"]
@@ -108,16 +121,28 @@ rule wgcna_pipeline:
         MATRIX_FILE = f"{output_path}{nm}/{nm}_matrix.csv"
         count_df.to_csv(MATRIX_FILE, index=False)
 
-        # Initialize and run PyWGCNA
+        # Initialize PyWGCNA
         pyWGCNA_obj = PyWGCNA.WGCNA(
-            name=nm, 
-            species=sp, 
-            geneExpPath=MATRIX_FILE, 
+            name=nm,
+            species=sp,
+            geneExpPath=MATRIX_FILE,
             outputPath=f"{output_path}{nm}/",
             figureType=figure_type,
-            save=True
+            save=True,
+            TPMcutoff=TPMcutoff,
+            powers=powers,
+            RsquaredCut=RsquaredCut,
+            MeanCut=MeanCut,
+            networkType=networkType,
+            TOMType=TOMType,
+            minModuleSize=minModuleSize,
+            naColor=naColor,
+            cut=cut,
+            MEDissThres=MEDissThres
         )
         pyWGCNA_obj.updateSampleInfo(path=smpl_map, sep='\t')
+
+        # Run preprocessing and WGCNA
         pyWGCNA_obj.preprocess()
         pyWGCNA_obj.findModules()
 

@@ -1,7 +1,4 @@
 /* Hide container by default */
-.container {
-  display: none;
-}
 
 #loadingSpinner {
   display: flex;
@@ -189,12 +186,6 @@ h6 {
   align-items: center;
 }
 
-.btn {
-  margin: 0;
-  padding: 10px 20px;
-  border-radius: 8px;
-}
-
 /* Form and control styling */
 .form-group .col-form-label {
   padding-right: 0;
@@ -298,32 +289,6 @@ h6 {
   }
 }
 
-@media (min-width: 992px) {
-
-  .control-input input,
-  .control-input select {
-    max-width: 500px;
-  }
-
-  #sidebar {
-    display: block;
-    width: 250px;
-    background-color: #ffffff;
-    padding-top: 20px;
-    padding-left: 20px;
-    height: 100vh;
-    position: fixed;
-    top: 0;
-    left: 0;
-    flex-shrink: 0;
-    z-index: 1;
-  }
-
-  #main-content {
-    margin-left: 250px;
-  }
-}
-
 @media (min-width: 1200px) {
 
   .control-input input,
@@ -332,26 +297,14 @@ h6 {
   }
 }
 
-#sidebar {
-  display: none;
-}
-
 html,
 body {
   height: 100%;
-  margin: 0;
 }
 
 #main-container {
   display: flex;
   flex-direction: row;
-}
-
-#main-content {
-  flex: 1;
-  padding: 20px;
-  overflow-y: auto;
-  box-sizing: border-box;
 }
 
 .container-fluid.my-5 {
@@ -407,4 +360,73 @@ input[type="number"] {
 
 input[type="text"] {
   width: 20ch;
+}
+
+.sidebar {
+  display: block;
+  width: 60px;
+  background: #212529;
+  min-height: 100vh;
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 1030;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 1rem;
+}
+.main-content {
+  margin-left: 60px;
+  padding-top: 58px;
+  min-height: 100vh;
+  background: #f6f8fa;
+  flex: 1;
+  padding: 20px;
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+@media (max-width: 991.98px) {
+  .sidebar {
+    display: none !important;
+  }
+  .main-content {
+    margin-left: 0;
+  }
+}
+.topbar {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: 58px;
+  z-index: 1050;
+  background: #fff;
+  border-bottom: 1px solid #e2e4e8;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 1.5rem;
+}
+.coexplore-title {
+  letter-spacing: 1px;
+  margin-left: 60px;
+}
+@media (max-width: 991.98px) {
+  .coexplore-title {
+    margin-left: 0;
+  }
+}
+
+#generalAiSqlQueryCard {
+    border-left: 5px solid #28a745;
+    border-radius: 12px;
+    background: #f8f9fa;
+    transition: box-shadow 0.2s;
+}
+#generalAiSqlQueryCard .card-header {
+    background: #f0f5f2 !important;
+}
+#copyAiSqlBtn:active {
+    background: #e2e6ea !important;
+}
+#generalAiSqlQuery {
+    font-family: "JetBrains Mono", "Fira Mono", "Consolas", "monospace";
+    font-size: 1rem;
 }

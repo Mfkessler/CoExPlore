@@ -8,3 +8,15 @@ input/testdata_out/
 app/docker
 app/envs
 app/gunicorn
+package/notebooks/PP/PP_matrix.csv
+package/notebooks/PP/.ipynb_checkpoints/PP_matrix-checkpoint.csv
+package/notebooks/PP/figures/eigenesgenes.png
+package/notebooks/PP/figures/module_heatmap_eigengene_darkgrey.png
+package/notebooks/PP/figures/module_heatmap_eigengene_dimgrey.png
+package/notebooks/PP/figures/module-traitRelationships.png
+package/notebooks/PP/figures/sample_clustering_cleaning.png
+package/notebooks/PP/figures/summary_power.png
+input/ppatens/gene2go.tsv
+input/ppatens/gene2interpro.tsv
+input/ppatens/PPatens.PSEUDO_BULK.EXPR.matrix
+input/ppatens/sample_mapping.tsv

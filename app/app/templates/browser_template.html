@@ -8,6 +8,7 @@
     <title>CoExPlore Browser</title>
     <!-- Bootstrap CSS (Bootstrap 5.3) -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css">
     <!-- DataTables CSS -->
     <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.11.3/css/jquery.dataTables.css">
     <!-- Additional DataTables CSS files -->
@@ -16,28 +17,6 @@
 
     <!-- Custom CSS -->
     <style>
-        /* Remove all borders from the table */
-        table.display.no-border,
-        table.display.no-border thead,
-        table.display.no-border tbody,
-        table.display.no-border th,
-        table.display.no-border td,
-        table.display.no-border tr {
-            border: none !important;
-            border-collapse: collapse !important;
-        }
-        table.display.no-border th,
-        table.display.no-border td {
-            border-bottom: none !important;
-        }
-        /* Remove the default top border from DataTables */
-        table.display.no-border {
-            border-top: none !important;
-        }
-        /* Remove background colors from table headers */
-        table.display.no-border thead th {
-            background-color: transparent !important;
-        }
         /* Remove borders from the card */
         .card {
             border: none !important;
@@ -186,6 +165,33 @@
             </div>
             <br>
 
+            <!-- AI Search -->
+            <div class="row mb-3">
+                <label for="aiSearchInput" class="col-sm-2 col-form-label">AI filter</label>
+                <div class="col-sm-8">
+                    <textarea class="form-control" id="aiSearchInput" name="aiSearchInput" rows="3" placeholder="How many modules per species?">{{ question }}</textarea>
+                </div>
+
+                <div class="col-sm-2 d-flex flex-column align-items-stretch">
+                    <button id="aiSearchBtn" class="btn btn-success w-100 mb-2">
+                        <i class="bi bi-play-fill"></i>
+                    </button>
+                    <div id="aiSpinner" class="w-100 text-center" style="display: none;">
+                        <div class="spinner-border text-success" role="status" aria-hidden="true"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="fallbackResultContainer" style="display: none; margin-top: 2rem;">
+                <h5>AI Result:</h5>
+                <div class="table-responsive">
+                    <table id="fallbackResultTable" class="table table-bordered table-hover table-sm align-middle">
+                    <thead class="table-light"></thead>
+                    <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+
             <!-- DataTables table -->
             <table id="browserRes" class="display responsive nowrap no-border" style="width:100%; display:none;">
                 <thead>
@@ -268,8 +274,10 @@
 
     <script>
         const BASE_URL = "{{ BASE_URL }}";
-        var table;
-        var orthogroupTokens = "";
+        let table;
+        let aiActive = false;
+        let aiQuery = null;
+        let orthogroupTokens = "";
 
         // Dynamically generated DataTables columns based on METADATA_DICT
         var dtColumns = [
@@ -285,7 +293,7 @@
                 },
                 autoToggle: false
             }{% else %}
-            { "data": "{{ key }}", autoToggle: false }{% endif %}{% if not loop.last %},{% endif %}
+            { "data": "{{ key }}", "defaultContent": "", autoToggle: false }{% endif %}{% if not loop.last %},{% endif %}
           {% endfor %}
         ];
 
@@ -369,7 +377,8 @@
                             body: JSON.stringify({
                                 ...data,
                                 species_filter: JSON.stringify(initialSpeciesFilter),
-                                table_name: "{{ BROWSER_DB }}"
+                                table_name: "{{ BROWSER_DB }}",
+                                ai_query: aiQuery || null
                             })
                         });
                         if (!response.ok) {
@@ -462,6 +471,118 @@
                         sendHeight();
                     });
                 }
+            });
+
+            $('#aiSearchBtn').on('click', async function () {
+                resetAiSearch();
+
+                const question = $('#aiSearchInput').val().trim();
+                if (!question) {
+                    alert("Please enter a question.");
+                    return;
+                }
+
+                // --- UI: Disable button, show spinner below, change button text ---
+                $('#aiSearchBtn').prop('disabled', true);
+                $('#aiSpinner').show();
+
+                try {
+                    // Request SQL from AI backend
+                    const res = await fetch(BASE_URL + '/ai-search', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ question: question, backend: "sql", mode: "browser" })
+                    });
+                    const result = await res.json();
+                    if (!result.query) throw new Error("No SQL returned.");
+
+                    aiQuery = result.query;
+                    aiActive = true;
+
+                    // Now send the generated query to backend and load result
+                    const response = await fetch(BASE_URL + "/api/data", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            table_name: "{{ BROWSER_DB }}",
+                            ai_query: aiQuery
+                        })
+                    });
+                    const json = await response.json();
+
+                    if (json.data && Array.isArray(json.data) && json.data.length > 0) {
+                        // Check if all keys are present in dtColumns
+                        const dtKeys = dtColumns.map(col => col.data);
+                        const rowKeys = Object.keys(json.data[0] || {});
+                        const allKeysMatch = rowKeys.every(k => dtKeys.includes(k)) && dtKeys.some(k => rowKeys.includes(k));
+
+                        if (allKeysMatch) {
+                            $('#fallbackResultContainer').hide();
+                            table.ajax.reload();
+                        } else {
+                            renderFallbackTable(json.data);
+                        }
+                    } else {
+                        $('#fallbackResultText').val("No results.");
+                        $('#fallbackResultContainer').show();
+                    }
+                } catch (err) {
+                    // --- Error handling: Show alert for user ---
+                    console.error("AI Search failed:", err);
+                    alert("AI Search failed: " + err.message);
+                } finally {
+                    // --- Always re-enable button and hide spinner (after success OR error) ---
+                    $('#aiSearchBtn').prop('disabled', false);
+                    $('#aiBtnText').text('Run');
+                    $('#aiSpinner').hide();
+                }
+            });
+
+            // Fallback result rendering
+            function renderFallbackTable(data) {
+                const $table = $('#fallbackResultTable');
+                const $thead = $table.find('thead').empty();
+                const $tbody = $table.find('tbody').empty();
+
+                if (!Array.isArray(data) || data.length === 0) {
+                    $('#fallbackResultContainer').hide();
+                    return;
+                }
+
+                const keys = Object.keys(data[0]);
+
+                // Header
+                const headerRow = $('<tr>');
+                keys.forEach(key => {
+                    headerRow.append($('<th>').text(key));
+                });
+                $thead.append(headerRow);
+
+                // Rows
+                data.forEach(row => {
+                    const rowEl = $('<tr>');
+                    keys.forEach(key => {
+                        const value = row[key] != null ? row[key] : '';
+                        rowEl.append($('<td>').text(value));
+                    });
+                    $tbody.append(rowEl);
+                });
+
+                $('#fallbackResultContainer').show();
+            }
+
+            function resetAiSearch() {
+                aiQuery = null;
+                aiActive = false;
+                $('#fallbackResultContainer').hide();
+                table.ajax.reload();
+            }
+
+            // Reset AI state on "normal" input change
+            $('#transcriptSearch, #columnSelect, #orthogroupSearch').on('input change', function() {
+                aiQuery = null;
+                aiActive = false;
+                table.ajax.reload();
             });
 
             // Copy column entries to clipboard handling
@@ -662,7 +783,10 @@
                     if (initialSpeciesFilter && Array.isArray(initialSpeciesFilter)) {
                         params.species_filter = JSON.stringify(initialSpeciesFilter);
                     }
-                    console.log("Sending table params with species filter:", params);
+
+                    params.ai_query = aiQuery || null;
+
+                    console.log("Sending table params with species filter and AI query:", params);
                     event.source.postMessage({ type: 'tableParams', data: params }, event.origin);
                 }
             });

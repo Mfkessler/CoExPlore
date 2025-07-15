@@ -32,21 +32,6 @@ $(document).ready(function () {
     // Bind all events
     bindEvents(BASE_URL, sessionId);
 
-    // Initialize selectpicker for plant selection
-    $("#plant").selectpicker({
-        selectedTextFormat: "count > 1",
-        countSelectedText: function (numSelected, numTotal) {
-            if (numSelected === 1) {
-                const selectedOption = this.$element.find("option:selected").text();
-                return selectedOption;
-            }
-            return numSelected + " of " + numTotal + " selected";
-        },
-        selectAllText: "Select All",
-        deselectAllText: "Deselect All",
-        showTick: true,
-    });
-
     // Initialize toggle button text (excluding Navbar)
     $(".toggle-button")
         .not(".navbar-toggler")
@@ -59,15 +44,33 @@ $(document).ready(function () {
 
     handleSelectionChange(BASE_URL, sessionId);
 
+    $("input[name='analysisMode']").on("change", function() {
+      if ($("#analysis-whole").is(":checked")) {
+        $("#wholeAnalysisSection").show();
+        $("#browserAnalysisSection").hide();
+      } else if ($("#analysis-browser").is(":checked")) {
+        $("#wholeAnalysisSection").hide();
+        $("#browserAnalysisSection").show();
+      }
+    });
+
+    if ($("#analysis-whole").is(":checked")) {
+      $("#wholeAnalysisSection").show();
+      $("#browserAnalysisSection").hide();
+    } else if ($("#analysis-browser").is(":checked")) {
+      $("#wholeAnalysisSection").hide();
+      $("#browserAnalysisSection").show();
+    }
+
     // Ensure the correct fields are displayed based on the initial selection when the page loads
     $("#analysisType").trigger("change");
     $("#browserAnalysisType").trigger("change");
     
     // Show relevant cards, disable buttons, and hide the spinner
-    $("#selectPlantsCard, #infoDivCard, #settingsCard, #finishedCard").fadeIn();
+    $("#selectPlantsCard, #infoDivCard, #settingsCard, #finishedCard", ).fadeIn();
     $("#downloadResultsButton, #clearFilesButton").prop("disabled", true);
     $("#loadingSpinner").hide();
-    $(".container").fadeIn();
+    $(".container").show();
 });
 
 /**
@@ -82,3 +85,33 @@ export function sendGoTermToIframe(goTerm) {
 }
 
 window.sendGoTermToIframe = sendGoTermToIframe;
+
+// Sidebar klickt einfach den richtigen Tab-Button an:
+document.getElementById('sidebar-datasets').addEventListener('click', function() {
+  document.getElementById('tabbtn-datasets').click();
+});
+document.getElementById('sidebar-info').addEventListener('click', function() {
+  document.getElementById('tabbtn-info').click();
+});
+document.getElementById('sidebar-browser').addEventListener('click', function() {
+  document.getElementById('tabbtn-browser').click();
+});
+document.getElementById('sidebar-analysis').addEventListener('click', function() {
+  document.getElementById('tabbtn-analysis').click();
+});
+document.getElementById('sidebar-files').addEventListener('click', function() {
+  document.getElementById('tabbtn-files').click();
+});
+
+// Sidebar-Highlight synchronisieren mit aktivem Tab:
+document.querySelectorAll('.nav-tabs .nav-link').forEach(tabLink => {
+  tabLink.addEventListener('shown.bs.tab', function() {
+    const tabId = this.getAttribute('data-bs-target');
+    document.querySelectorAll('.sidebar .sidebar-icon').forEach(sideIcon => {
+      sideIcon.classList.remove('active');
+    });
+    const sideId = 'sidebar-' + tabId.replace('#tab-', '');
+    const sideIcon = document.getElementById(sideId);
+    if(sideIcon) sideIcon.classList.add('active');
+  });
+});

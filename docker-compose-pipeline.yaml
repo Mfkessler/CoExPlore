@@ -13,4 +13,4 @@ services:
       - ./metadata_dict.json:/metadata_dict.json
     working_dir: /CoExPlore
     command: >
-      bash -c "snakemake --cores 4 && touch /CoExPlore/output/pipeline_done.txt"
+      bash -c "snakemake --cores 4 --notemp --keep-incomplete && touch /CoExPlore/output/pipeline_done.txt"

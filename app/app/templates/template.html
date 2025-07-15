@@ -3,34 +3,238 @@
 
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="icon" href="{{ BASE_URL }}/static/favicon.ico" type="image/x-icon">
   <title>CoExPlore</title>
-  <!-- jQuery -->
-  <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
-  <!-- Bootstrap CSS (Bootstrap 5.3) -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Bootstrap 5 & Icons -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-  <!-- Bootstrap JS Bundle (includes Popper) -->
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-  <!-- Fancybox CSS -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css">
+  <!-- DataTables, Bootstrap Select, Fancybox -->
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.11.3/css/jquery.dataTables.css">
+  <link rel="stylesheet" href="https://cdn.datatables.net/responsive/2.2.9/css/responsive.dataTables.min.css">
+  <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.0.1/css/buttons.dataTables.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fancyapps/ui/dist/fancybox.css" />
-  <!-- Fancybox JS -->
-  <script src="https://cdn.jsdelivr.net/npm/@fancyapps/ui/dist/fancybox.umd.js"></script>
-  <!-- Bootstrap Select CSS -->
   <link rel="stylesheet"
     href="https://cdn.jsdelivr.net/npm/bootstrap-select@1.14.0-beta3/dist/css/bootstrap-select.min.css">
-  <!-- Bootstrap Select JS -->
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap-select@1.14.0-beta3/dist/js/bootstrap-select.min.js"></script>
-  <!-- PapaParse Library -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
-  <!-- DataTables Library -->
-  <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.11.3/css/jquery.dataTables.css">
-  <script type="text/javascript" charset="utf8"
-    src="https://cdn.datatables.net/1.11.3/js/jquery.dataTables.js"></script>
-  <!-- Bootstrap Icons -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css">
-  <!-- Custom CSS -->
+  <link rel="icon" href="{{ BASE_URL }}/static/favicon.ico" type="image/x-icon">
+  <!-- Prism CSS -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism.min.css">
+  <!-- Your custom CSS -->
   <link href="static/styles.css" rel="stylesheet">
+  <style>
+    body {
+      background: #f6f8fa;
+    }
+
+    .main-content {
+      min-height: 100vh;
+      padding-top: 68px;
+      background: #f6f8fa;
+    }
+
+    .topbar {
+      height: 58px;
+      background: #fff;
+      border-bottom: 1px solid #e2e4e8;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 1.5rem;
+      position: fixed;
+      top: 0;
+      z-index: 1020;
+    }
+
+    .brand {
+      color: #222;
+      font-weight: bold;
+      font-size: 1.3rem;
+      letter-spacing: 1px;
+    }
+
+    .brand .highlight {
+      color: #46b9ef;
+    }
+
+    .help-btn {
+      background: none;
+      border: none;
+      color: #1d6fa5;
+      font-size: 2rem;
+    }
+
+    .mobile-cex-title {
+      color: #000000;
+      font-weight: 500;
+      font-size: 1rem;
+      position: absolute;
+      right: 16px;
+      top: 50%;
+      transform: translateY(-50%);
+      text-align: right;
+      white-space: nowrap;
+      z-index: 10;
+    }
+
+    @media (min-width: 768px) {
+      .mobile-cex-title {
+        display: none !important;
+      }
+    }
+
+    @media (max-width: 991.98px) {
+      .coexplore-subtitle {
+        display: none !important;
+      }
+
+      #mainHelpBtn {
+        display: none !important;
+      }
+    }
+
+    @media (min-width: 992px) {
+      #mainHelpBtn {
+        display: flex !important;
+      }
+    }
+
+    .expert-section {
+      display: none;
+    }
+
+    .show-expert .expert-section {
+      display: block;
+    }
+
+    .floating-help {
+      position: fixed;
+      bottom: 18px;
+      right: 30px;
+      z-index: 3000;
+      background: #fff;
+      border-radius: 50%;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.11);
+      width: 52px;
+      height: 52px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2rem;
+      color: #1d6fa5;
+      border: 1.5px solid #e3e4e8;
+      transition: background 0.18s;
+    }
+
+    .floating-help:hover {
+      background: #eef5fa;
+    }
+
+    .help-modal .modal-content {
+      border-radius: 1.2rem;
+    }
+
+    /* Sidebar Styles */
+    .sidebar {
+      position: fixed;
+      top: 58px;
+      left: 0;
+      width: 68px;
+      height: calc(100vh - 58px);
+      background: #fff;
+      border-right: 1px solid #e2e4e8;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding-top: 1.2rem;
+      z-index: 1030;
+      transition: width 0.2s;
+    }
+
+    .sidebar .sidebar-icon {
+      color: #7a8a99;
+      font-size: 1.75rem;
+      margin: 0.3rem 0;
+      padding: 0.7rem 0.6rem;
+      border-radius: 1rem;
+      transition: background 0.13s, color 0.13s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 48px;
+      height: 48px;
+      background: none;
+      border: none;
+      outline: none;
+    }
+
+    .sidebar .sidebar-icon.active,
+    .sidebar .sidebar-icon:hover {
+      color: #1d6fa5;
+      background: #e6f3fb;
+    }
+
+    .sidebar .sidebar-icon[title] {
+      position: relative;
+    }
+
+    .sidebar .sidebar-icon[title]:hover::after {
+      content: attr(title);
+      position: absolute;
+      left: 120%;
+      top: 50%;
+      transform: translateY(-50%);
+      background: #222;
+      color: #fff;
+      font-size: 0.95rem;
+      padding: 2px 10px;
+      border-radius: 6px;
+      white-space: nowrap;
+      z-index: 999;
+      opacity: 0.95;
+      pointer-events: none;
+    }
+
+    @media (max-width: 991.98px) {
+      .sidebar {
+        position: fixed;
+        left: -68px;
+        transition: left 0.22s;
+      }
+
+      .sidebar.show {
+        left: 0;
+      }
+
+      .main-content {
+        padding-left: 0 !important;
+      }
+    }
+
+    @media (min-width: 992px) {
+      .main-content {
+        padding-left: 68px;
+      }
+
+      .sidebar {
+        left: 0 !important;
+      }
+    }
+
+    /* Toggle button for mobile sidebar */
+    .sidebar-toggle {
+      display: none;
+      background: none;
+      border: none;
+      font-size: 2rem;
+      color: #1d6fa5;
+      margin-right: 1.1rem;
+    }
+
+    @media (max-width: 991.98px) {
+      .sidebar-toggle {
+        display: none;
+      }
+    }
+  </style>
 </head>
 
 <body>
@@ -40,830 +244,193 @@
     </div>
   </div>
 
-  <!-- Wrapper for Sidebar and Main Content -->
-  <div id="main-container">
-    <!-- Sidebar for large screens -->
-    <nav id="sidebar" class="d-none d-lg-block">
-      <div class="sidebar-sticky">
-        <a href="#" class="navbar-brand">CoExPlore</a>
-        <ul class="nav flex-column">
-          <li class="nav-item">
-            <a class="nav-link" href="#selectPlantsCard">Datasets</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link" href="#infoDivCard" id="settingsNavLink">Info and Settings</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link" href="#browserCard" id="browserNavLink">Browser</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link" href="#downstreamCard" id="transcriptomeNavLink">Whole Transcriptome Analysis</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link" href="#finishedCard" id="sessionFilesNavLink">Session Files</a>
-          </li>
-        </ul>
+  <!-- Topbar with Brand -->
+  <header class="topbar">
+    <div class="d-flex align-items-center">
+      <button class="sidebar-toggle d-lg-none" id="sidebarToggle" title="Menu"><i class="bi bi-list"></i></button>
+      <span class="brand fw-bold fs-4">C<span class="highlight">E</span>X</span>
+      <span class="ms-3 text-muted fs-6 coexplore-title d-none d-md-inline">CoExPlore</span>
+      <span class="ms-3 text-muted fs-6 coexplore-subtitle d-none d-md-inline">| Comparative Co-Expression
+        Explorer</span>
+    </div>
+    <button class="help-btn" id="mainHelpBtn" title="Show Help"><i class="bi bi-question-circle"></i></button>
+    <span class="mobile-cex-title d-block d-md-none">Comparative Co-Expression Explorer</span>
+  </header>
+
+  <!-- Left Sidebar (Icon-Only Navbar, alternative tab navigation) -->
+  <nav class="sidebar d-flex flex-column" id="sidebar" aria-label="Sidebar">
+    <button class="sidebar-icon active" id="sidebar-datasets" title="Datasets" tabindex="0"><i
+        class="bi bi-database"></i></button>
+    <button class="sidebar-icon" id="sidebar-info" title="Info & Settings" tabindex="0"><i
+        class="bi bi-gear"></i></button>
+    <button class="sidebar-icon" id="sidebar-ai" title="AI Search" tabindex="0"><i
+        class="bi bi-robot"></i></button>
+    <button class="sidebar-icon" id="sidebar-browser" title="Browser" tabindex="0"><i class="bi bi-search"></i></button>
+    <button class="sidebar-icon" id="sidebar-analysis" title="Analysis" tabindex="0"><i
+        class="bi bi-graph-up-arrow"></i></button>
+    <button class="sidebar-icon" id="sidebar-files" title="Files" tabindex="0"><i
+        class="bi bi-folder2-open"></i></button>
+  </nav>
+
+  <main class="main-content">
+    <!-- Original Top Tab Nav bleibt erhalten -->
+    <ul class="nav nav-tabs justify-content-center" id="mainTabs" role="tablist">
+      <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-datasets" type="button"
+          role="tab" id="tabbtn-datasets"><i class="bi bi-database me-1"></i>Datasets</button></li>
+      <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-info" type="button" role="tab"
+          id="tabbtn-info"><i class="bi bi-gear me-1"></i>Info & Settings</button></li>
+      <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-ai" type="button" role="tab" 
+          id="tabbtn-ai"><i class="bi bi-robot me-1"></i>AI Search</button></li>
+      <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-browser" type="button"
+          role="tab" id="tabbtn-browser"><i class="bi bi-search me-1"></i>Browser</button></li>
+      <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-analysis" type="button"
+          role="tab" id="tabbtn-analysis"><i class="bi bi-graph-up-arrow me-1"></i>Analysis</button></li>
+      <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-files" type="button"
+          role="tab" id="tabbtn-files"><i class="bi bi-folder2-open me-1"></i>Files</button></li>
+    </ul>
+    <div class="tab-content">
+      <!-- Datasets -->
+      <div class="tab-pane fade show active" id="tab-datasets" role="tabpanel">
+        {% include "inc_datasets.html" %}
       </div>
-    </nav>
-
-    <!-- Main Content -->
-    <div id="main-content">
-      <div class="container-fluid my-5">
-        <!-- Select Plants Card -->
-        <div class="card mb-3" id="selectPlantsCard" style="display: none;">
-          <div class="card-header">
-            <h5 class="mb-0 d-flex justify-content-between align-items-center">
-              Datasets
-              <button class="btn btn-link toggle-button" data-bs-toggle="collapse" data-bs-target="#selectPlantsSection"
-                aria-expanded="true">
-                <span>Hide</span>
-              </button>
-            </h5>
-          </div>
-          <div id="selectPlantsSection" class="collapse show">
-            <div class="card-body">
-              <form id="analysisForm">
-                <!-- Species Multiselect -->
-                <div class="row justify-content-center">
-                  <div class="col-md-8 text-center">
-                    <div class="form-group">
-                      <br>
-                      <select class="selectpicker" id="plant" multiple data-actions-box="true" data-live-search="true"
-                        data-style="btn-primary" data-width="75%">
-                        {% for code, name in species %}
-                        <option value="{{ code }}" {% if loop.first %}selected{% endif %}>{{ name }}</option>
-                        {% endfor %}
-                      </select>
-                    </div>
-                  </div>
-                </div>
-              </form>
-              <!-- Help Icon Dataset Description -->
-              <div class="text-center mb-3">
-                <button id="helpIconDataset" class="btn btn-link" style="font-size: 24px;">
-                  <i class="bi bi-question-circle"></i>
-                </button>
-              </div>
-              <!-- Dataset Description -->
-              <div id="userGuideCardDataset" class="analysis-description" style="display: none;">
-                <p>
-                  The datasets have been processed using <a href="https://github.com/Mfkessler/PyWGCNA"
-                    target="_blank"><strong>PyWGCNA</strong></a>
-                  with the following default parameters:
-                </p>
-                <ul>
-                  <li>Minimum Module Size: <strong>50</strong></li>
-                  <li>Dissimilarity Threshold: <strong>0.2</strong></li>
-                  <li>Network Type: <strong>signed hybrid</strong></li>
-                  <li>Power: <strong>between 9 and 19</strong> to achieve a <strong>scale‑free network</strong></li>
-                  <li>R² Cut: <strong>0.9</strong></li>
-                  <li>Mean Connectivity: <strong>100</strong></li>
-                </ul>
-              </div>
-            </div>
-          </div>
+      <!-- Info & Settings -->
+      <div class="tab-pane fade" id="tab-info" role="tabpanel">
+        {% include "inc_info.html" %}
+      </div>
+      <!-- AI General Search -->
+      <div class="tab-pane fade" id="tab-ai" role="tabpanel">
+        {% include "inc_ai.html" %}
+      </div>
+      <!-- Browser -->
+      <div class="tab-pane fade" id="tab-browser" role="tabpanel">
+        {% include "inc_browser.html" %}
+      </div>
+      <!-- Analysis -->
+      <div class="tab-pane fade" id="tab-analysis" role="tabpanel">
+        {% include "inc_analysis.html" %}
+      </div>
+      <!-- Files -->
+      <div class="tab-pane fade" id="tab-files" role="tabpanel">
+        {% include "inc_files.html" %}
+      </div>
+    </div>
+    <!-- Floating Help Button for mobile -->
+    <button class="floating-help d-lg-none" id="floatingHelpBtn"><i class="bi bi-question-circle"></i></button>
+  </main>
+  <!-- Help Modal -->
+  <div class="modal fade help-modal" id="helpModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-question-circle me-2"></i>Help</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
-
-        <!-- Info Card -->
-        <div class="card mb-3" id="infoDivCard" style="display: none;">
-          <div class="card-header">
-            <h5 class="mb-0 d-flex justify-content-between align-items-center">
-              Info and Settings
-              <button class="btn btn-link toggle-button" data-bs-toggle="collapse" data-bs-target="#InfoSection"
-                aria-expanded="true">
-                <span>Hide</span>
-              </button>
-            </h5>
-          </div>
-          <div id="InfoSection" class="collapse show">
-            <div class="card-body">
-              <!-- Info Div Container -->
-              <div id="infoDivContainer" style="position: relative;">
-                <!-- Loading Bar Info -->
-                <div id="loadingBarInfo" class="loading-text" style="display:none;">
-                  <span id="loadingBarInfoStatusText">Loading...</span>
-                </div>
-                <!-- Info Div -->
-                <div id="infoDiv">
-                  <iframe id="infoIframe" style="width:100%; height:100%; border:none;"></iframe>
-                </div>
-              </div>
-              <br>
-              <!-- WGCNA Figures Card -->
-              <div class="row justify-content-center">
-                <div id="imageCategoryDiv" class="col-md-8" style="display: none;">
-                  <h5 class="card-title text-center">Plots of Weighted Correlation Network Analysis</h5>
-                  <!-- Form Group for the Select Dropdown -->
-                  <div class="form-group">
-                    <select class="form-control" id="imageCategory">
-                      <option value="general">Module Trait Relationships, Eigengenes Clustering, Soft Threshold, Sample
-                        Clustering</option>
-                      <option value="module_barplot">Module Eigengene Bar Plots</option>
-                      <option value="module_heatmap">Module Eigengene Heat Maps</option>
-                    </select>
-                  </div>
-                  <!-- Image Div -->
-                  <div id="imageDiv" class="imageDiv d-flex flex-wrap justify-content-center"></div>
-                </div>
-              </div>
-              <!-- Settings Card using details/summary for toggle with arrow and fade‑in effect -->
-              <details id="settingsCard">
-                <!-- The summary element acts as the clickable header -->
-                <summary class="toggle-header">Settings</summary>
-                <!-- Toggle content will be hidden by default and shown on toggle -->
-                <div class="toggle-content">
-                  <div class="row justify-content-center mt-3">
-                    <div class="col-md-4 col-lg-6">
-                      <!-- Output Prefix Control -->
-                      <div class="row mb-3">
-                        <label for="outputPrefix" class="col-sm-4 col-form-label text-end">Output Prefix</label>
-                        <div class="col-sm-8">
-                          <input type="text" class="form-control" id="outputPrefix" placeholder="Enter output prefix">
-                        </div>
-                      </div>
-                      <!-- Display in New Window Control -->
-                      <div class="row mb-3">
-                        <label for="displayInNewWindow" class="col-sm-4 col-form-label text-end">Display Results in New
-                          Window</label>
-                        <div class="col-sm-8 d-flex align-items-center">
-                          <div class="form-check">
-                            <input type="checkbox" class="form-check-input large-checkbox" id="displayInNewWindow">
-                            <label class="form-check-label" for="displayInNewWindow"></label>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </details>
-            </div>
-          </div>
-        </div>
-
-        <!-- Browser Card -->
-        <div class="card mb-3" id="browserCard" style="display: none;">
-          <div class="card-header">
-            <h5 class="mb-0 d-flex justify-content-between align-items-center">
-              Browser
-              <button class="btn btn-link toggle-button" data-bs-toggle="collapse" data-bs-target="#browserSection"
-                aria-expanded="true">
-                <span>Hide</span>
-              </button>
-            </h5>
-          </div>
-          <div id="browserSection" class="collapse show">
-            <div class="card-body">
-              <!-- Help Icon Browser -->
-              <div class="text-center mb-3">
-                <button id="helpIconBrowser" class="btn btn-link" style="font-size: 24px;">
-                  <i class="bi bi-question-circle"></i>
-                </button>
-              </div>
-              <!-- Browser Description -->
-              <div id="userGuideCardBrowser" class="analysis-description" style="display: none;">
-                <p>
-                  Explore data for selected plant species by searching for transcripts or provided metadata (e.g. Modules or GO Terms)
-                  using the global search box.
-                  For example, try searching for
-                  <a href="#" onclick="sendGoTermToIframe('GO:0009908'); event.preventDefault();">flower development (GO:0009908)</a>,
-                  <a href="#" onclick="sendGoTermToIframe('GO:0015979'); event.preventDefault();">photosynthesis (GO:0015979)</a>, or
-                  <a href="#" onclick="sendGoTermToIframe('GO:0006950'); event.preventDefault();">response to stress (GO:0006950)</a>.
-                  The global search is case-insensitive and supports partial matches.
-                </p>
-                <p>
-                  If the global search does not meet your needs, you can refine your query using the column search. Select a specific
-                  column from the drop-down menu to limit your search to that field.
-                  Enter multiple search terms separated by commas, spaces, tabs or line breaks. Column search is case-sensitive and
-                  does not support partial matches.
-                </p>
-                <p>
-                  In addition, checking the <i>Use orthogroups</i> box will redirect your search to orthogroup IDs (if this metadata is provided). This
-                  takes the orthogroups from the filtered table entries as new tokens and calculates metrics that show how many
-                  transcripts are retained, lost or added.
-                </p>
-                <p>
-                  You can also customise the table view by adjusting column visibility, downloading the filtered table, or
-                  copying selected column entries to the clipboard. When copying entries, you can choose to export only unique values
-                  and specify a custom separator (default is a new line).
-                </p>
-              </div>
-              <!-- Browser Results Container -->
-              <div id="browserResultsContainer" style="position: relative;">
-                <!-- Loading Bar Browser -->
-                <div id="loadingBarBrowser" class="loading-text" style="display:none;">
-                  <span id="loadingBarBrowserStatusText">Loading...</span>
-                </div>
-                <!-- Browser Results -->
-                <div id="browserResults" style="display: none;">
-                  <iframe id="browserIframe" style="width:100%; border:none;" scrolling="no"></iframe>
-                </div>
-              </div>
-              <!-- Browser analysis Card -->
-              <div id="browserAnalysisCard" style="display: none;">
-                <h5 class="card-title">Browser analysis</h5>
-                <div id="browserAnalysisOptions">
-                  <div class="row justify-content-center">
-                    <div class="col-auto form-group">
-                      <select class="form-control" id="browserAnalysisType">
-                        {% for key, description in browser_options.items() %}
-                        <option value="{{ key }}">{{ description }}</option>
-                        {% endfor %}
-                      </select>
-                    </div>
-                  </div>
-                  <!-- Description Icon -->
-                  <div class="text-center mb-3">
-                    <button id="browserHelpIcon" class="btn btn-link" style="font-size: 24px;">
-                      <i class="bi bi-question-circle"></i>
-                    </button>
-                  </div>
-                  <!-- Browser Analysis Descriptions -->
-                  <div id="analysisDescriptionContainer">
-                    <div id="description_plot_co_expression_network" class="analysis-description"
-                      style="display: none;">
-                      <p>
-                        The Co-Expression Network Analysis provides a view of transcript interactions using
-                        precomputed TOMs. Sub-modules¹ are generated automatically, and
-                        sub-module–trait relationships are computed for each sub-module. You can highlight specific
-                        transcripts, have nodes colored by their original WGCNA module assignments, and choose different
-                        shapes per species.<br>
-                        <br>
-                        1. Sub-modules are subnetworks derived by applying a threshold to the edge weights (TOM values). 
-                        Each sub-module may contain transcripts from multiple original WGCNA modules.
-                      </p>
-                    </div>
-                    <div id="description_plot_go_terms" class="analysis-description" style="display: none;">
-                      <p>The Gene Ontology Enrichment Analysis calculates the enrichment of Gene Ontology (GO) terms for
-                        a given set of transcripts, derived from the Browser results. The analysis uses a specified top
-                        percentage of transcripts to focus on the most highly expressed transcripts. Parameters such as
-                        maximum p‑value to filter significant GO terms, minimum fold enrichment, and minimum depth for
-                        the GO term affect the interactive plot. Detailed results can be found in the Session Files.</p>
-                    </div>
-                    <div id="description_plot_venn" class="analysis-description" style="display: none;">
-                      <p>The analysis takes a list of transcripts from the Browser results and generates a Venn diagram
-                        to show the overlap of orthogroups between the selected species.</p>
-                    </div>
-                    <div id="description_plot_upset" class="analysis-description" style="display: none;">
-                      <p>The analysis takes a list of transcripts from the Browser results and generates an Upset plot
-                        to show the overlap of orthogroups between the selected species.</p>
-                    </div>
-                    <div id="description_plot_filtered_jaccard_modules" class="analysis-description"
-                      style="display: none;">
-                      <p>The Module Similarity Network analysis calculates the Jaccard similarity between modules of
-                        different plant species based on the orthogroups within each module. It examines whether the
-                        same orthogroups are present in the modules across various species. Parameters include a
-                        similarity threshold, options for shapes and colors, and a minimum number of orthogroups.</p>
-                    </div>
-                    <div id="description_plot_filtered_jaccard_species" class="analysis-description"
-                      style="display: none;">
-                      <p>The Species Similarity Network analysis calculates the Jaccard similarity between different
-                        plant species based on the orthogroups within each plant using the Browser results. It examines
-                        whether the same orthogroups are present in various species. Options for shapes and a minimum
-                        orthogroup count are available.</p>
-                    </div>
-                    <div id="description_not_implemented" class="analysis-description" style="display: none;">
-                      <p>Not implemented</p>
-                    </div>
-                  </div>
-                  <!-- Analysis Parameters Toggle -->
-                  <div id="browserParametersToggle">
-                    <details id="parametersToggle">
-                      <summary class="toggle-header">Parameters</summary>
-                      <div class="toggle-content">
-                        <!-- Container für die Browser Analysis Controls -->
-                        <div class="row justify-content-center">
-                          <div class="col-md-6 col-lg-8">
-
-                            <!-- Form Group: Select Tool (Radio Buttons) --> <!-- TODO use Cytoscape only! -->
-                            <div class="row mb-3" id="plotTypeGroupBrowser" style="display: none;">
-                              <label class="col-sm-4 col-form-label text-end">
-                                Select Tool
-                              </label>
-                              <div class="col-sm-8">
-                                <div class="form-check form-check-inline">
-                                  <input class="form-check-input" type="radio" name="plotType" id="plotTypePlotly"
-                                    value="plotly">
-                                  <label class="form-check-label" for="plotTypePlotly">Plotly</label>
-                                </div>
-                                <div class="form-check form-check-inline">
-                                  <input class="form-check-input" type="radio" name="plotType" id="plotTypeCytoscape"
-                                    value="cytoscape" checked>
-                                  <label class="form-check-label" for="plotTypeCytoscape">Cytoscape</label>
-                                </div>
-                              </div>
-                            </div>
-
-                            <!-- Form Group: Percentage of Highest Expressed Transcripts -->
-                            <div class="row mb-3" id="nTopPercentGroupBrowser" style="display: none;">
-                              <label for="nTopPercentBrowser" class="col-sm-4 col-form-label text-end">
-                                Percentage of Highest Expressed Transcripts
-                              </label>
-                              <div class="col-sm-8">
-                                <input type="number" class="form-control" id="nTopPercentBrowser"
-                                  placeholder="Enter top percentage" step="0.1" value="1.0" min="0.1" max="100"
-                                  required>
-                              </div>
-                            </div>
-
-                            <!-- Form Group: Top n of Highest Expressed Transcripts -->
-                            <div class="row mb-3" id="nTopGroupBrowser" style="display: none;">
-                              <label for="nTopBrowser" class="col-sm-4 col-form-label text-end">
-                                Top n of Highest Expressed Transcripts
-                              </label>
-                              <div class="col-sm-8">
-                                <input type="number" class="form-control" id="nTopBrowser" placeholder="Enter top n"
-                                  step="1" value="10" min="1" required>
-                              </div>
-                            </div>
-
-                            <!-- Form Group: Threshold -->
-                            <div class="row mb-3" id="thresholdGroupBrowser" style="display: none;">
-                              <label for="thresholdBrowser" class="col-sm-4 col-form-label text-end">
-                                Threshold
-                              </label>
-                              <div class="col-sm-8">
-                                <input type="number" class="form-control" id="thresholdBrowser"
-                                  placeholder="Enter threshold value" step="0.05" value="0.3" min="0.0" max="1.0"
-                                  required>
-                              </div>
-                            </div>
-
-                            <!-- Form Group: Maximum P‑Value -->
-                            <div class="row mb-3" id="maxPvalGroupBrowser" style="display: none;">
-                              <label for="maxPvalBrowser" class="col-sm-4 col-form-label text-end">
-                                Maximum P‑Value
-                              </label>
-                              <div class="col-sm-8">
-                                <input type="number" class="form-control" id="maxPvalBrowser"
-                                  placeholder="Enter max p‑value" step="0.01" value="0.05" min="0.0" max="1.0" required>
-                              </div>
-                            </div>
-
-                            <!-- Form Group: Minimum Fold Enrichment -->
-                            <div class="row mb-3" id="minFeGroupBrowser" style="display: none;">
-                              <label for="minFeBrowser" class="col-sm-4 col-form-label text-end">
-                                Minimum Fold Enrichment
-                              </label>
-                              <div class="col-sm-8">
-                                <input type="number" class="form-control" id="minFeBrowser"
-                                  placeholder="Enter min fold enrichment" step="0.01" value="0.2" min="0.0" max="1.0"
-                                  required>
-                              </div>
-                            </div>
-
-                            <!-- Form Group: Minimum Depth -->
-                            <div class="row mb-3" id="minDepthGroupBrowser" style="display: none;">
-                              <label for="minDepthBrowser" class="col-sm-4 col-form-label text-end">
-                                Minimum Depth
-                              </label>
-                              <div class="col-sm-8">
-                                <input type="number" class="form-control" id="minDepthBrowser"
-                                  placeholder="Enter min depth" value="2" min="0" required>
-                              </div>
-                            </div>
-
-                            <!-- Form Group: Minimum Number of Orthogroups -->
-                            <div class="row mb-3" id="minOrthosGroupBrowser" style="display: none;">
-                              <label for="minOrthosBrowser" class="col-sm-4 col-form-label text-end">
-                                Minimum Number of Orthogroups
-                              </label>
-                              <div class="col-sm-8">
-                                <input type="number" class="form-control" id="minOrthosBrowser"
-                                  placeholder="Enter min orthogroups" value="10" min="1" required>
-                              </div>
-                            </div>
-
-                            <!-- Form Group: Max Neighbors -->
-                            <div class="row mb-3" id="maxNeighborsGroupBrowser" style="display: none;">
-                              <label for="maxNeighborsBrowser" class="col-sm-4 col-form-label text-end">
-                                Max Neighbors
-                              </label>
-                              <div class="col-sm-8">
-                                <input type="number" class="form-control" id="maxNeighborsBrowser" placeholder="Enter max neighbors" value="0"
-                                  step="1" min="0" max="50" required>
-                              </div>
-                            </div>
-
-                            <!-- Form Group: Min Cluster Size -->
-                            <div class="row mb-3" id="minClusterSizeGroupBrowser" style="display: none;">
-                              <label for="minClusterSizeBrowser" class="col-sm-4 col-form-label text-end">
-                              Min Sub-module Size
-                              </label>
-                              <div class="col-sm-8">
-                              <input type="number" class="form-control" id="minClusterSizeBrowser" placeholder="Min nodes" value="10"
-                                step="1" min="2" max="1000" required>
-                              </div>
-                            </div>
-
-                            <!-- Form Group: Highlight Nodes -->
-                            <div class="row mb-3" id="highlightListGroupBrowser" style="display: none;">
-                              <label for="highlightListBrowser" class="col-sm-4 col-form-label text-end">
-                                Highlight Nodes
-                              </label>
-                              <div class="col-sm-8">
-                                <textarea class="form-control" id="highlightListBrowser" rows="3" placeholder="Enter identifiers separated by comma, space, tab, or newline"></textarea>
-                              </div>
-                            </div>
-
-                            <!-- Form Group: Use Shapes for Modules (Checkbox) -->
-                            <div class="row mb-3" id="useShapesGroupBrowser" style="display: none;">
-                              <label for="useShapesBrowser" class="col-sm-4 col-form-label text-end">
-                                Use Shapes for Modules
-                              </label>
-                              <div class="col-sm-8 d-flex align-items-center">
-                                <div class="form-check">
-                                  <input type="checkbox" class="form-check-input large-checkbox" id="useShapesBrowser">
-                                  <label class="form-check-label" for="useShapesBrowser"></label>
-                                </div>
-                              </div>
-                            </div>
-
-                            <!-- Form Group: Use Colors for Modules (Checkbox) -->
-                            <div class="row mb-3" id="useColorsGroupBrowser" style="display: none;">
-                              <label for="useColorsBrowser" class="col-sm-4 col-form-label text-end">
-                                Use Colors for Modules
-                              </label>
-                              <div class="col-sm-8 d-flex align-items-center">
-                                <div class="form-check">
-                                  <input type="checkbox" class="form-check-input large-checkbox" id="useColorsBrowser">
-                                  <label class="form-check-label" for="useColorsBrowser"></label>
-                                </div>
-                              </div>
-                            </div>
-
-                            <!-- Form Group: Use Shapes for Species (Checkbox) -->
-                            <div class="row mb-3" id="useShapesSpeciesGroupBrowser" style="display: none;">
-                              <label for="useShapesSpeciesBrowser" class="col-sm-4 col-form-label text-end">
-                                Use Shapes for Species
-                              </label>
-                              <div class="col-sm-8 d-flex align-items-center">
-                                <div class="form-check">
-                                  <input type="checkbox" class="form-check-input large-checkbox"
-                                    id="useShapesSpeciesBrowser">
-                                  <label class="form-check-label" for="useShapesSpeciesBrowser"></label>
-                                </div>
-                              </div>
-                            </div>
-
-                            <!-- Form Group: Inter Species Only (Checkbox) -->
-                            <div class="row mb-3" id="interSpeciesOnlyGroupBrowser" style="display: none;">
-                              <label for="interSpeciesOnlyBrowser" class="col-sm-4 col-form-label text-end">
-                                Inter Species Only
-                              </label>
-                              <div class="col-sm-8 d-flex align-items-center">
-                                <div class="form-check">
-                                  <input type="checkbox" class="form-check-input large-checkbox"
-                                    id="interSpeciesOnlyBrowser" checked>
-                                  <label class="form-check-label" for="interSpeciesOnlyBrowser"></label>
-                                </div>
-                              </div>
-                            </div>
-
-                            <!-- Form Group: Force Detailed View (Checkbox) -->
-                            <div class="row mb-3" id="forceDetailedViewGroupBrowser" style="display: none;">
-                              <label for="forceDetailedViewBrowser" class="col-sm-4 col-form-label text-end">
-                                Force Detailed View
-                              </label>
-                              <div class="col-sm-8 d-flex align-items-center">
-                                <div class="form-check">
-                                  <input type="checkbox" class="form-check-input large-checkbox" id="forceDetailedViewBrowser">
-                                  <label class="form-check-label" for="forceDetailedViewBrowser"></label>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                    </details>
-                  </div>
-                  <br>
-                  <!-- Run Browser Analysis Button -->
-                  <div class="d-flex justify-content-center">
-                    <button type="button" class="btn btn-primary" id="runBrowserAnalysis">Run Analysis</button>
-                  </div>
-                  <br>
-                  <!-- Browser Analysis Results Container -->
-                  <div id="browserAnalysisResultsContainer" style="position: relative;">
-                    <!-- Loading Bar3 -->
-                    <div id="loadingBar3" class="loading-text" style="display:none;">
-                      <span id="loadingStatusText3">Loading...</span>
-                    </div>
-                    <!-- Loading Text -->
-                    <div id="loadingText" class="loading-text" style="display: none;">
-                      <span id="loadingStatusText"></span>
-                    </div>
-                    <!-- Browser Analysis Results -->
-                    <div id="browserAnalysisResults" class="results" style="display: none;"></div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Whole Transcriptome Card -->
-        <div class="card mb-3" id="downstreamCard" style="display: none;">
-          <div class="card-header">
-            <h5 class="mb-0 d-flex justify-content-between align-items-center">
-              Whole Transcriptome Analysis
-              <button class="btn btn-link toggle-button" data-bs-toggle="collapse" data-bs-target="#downstreamSection"
-                aria-expanded="true">
-                <span>Hide</span>
-              </button>
-            </h5>
-          </div>
-          <div id="downstreamSection" class="collapse show">
-            <div class="card-body">
-              <h3 class="card-title"></h3>
-              <div id="analysisOptions">
-                <div class="row justify-content-center">
-                  <div class="col-auto form-group">
-                    <select class="form-control" id="analysisType">
-                      {% for key, description in analysis_options.items() %}
-                      <option value="{{ key }}">{{ description }}</option>
-                      {% endfor %}
-                    </select>
-                  </div>
-                </div>
-                <!-- Description Icon -->
-                <div class="text-center mb-3">
-                  <button id="generalHelpIcon" class="btn btn-link" style="font-size: 24px;">
-                    <i class="bi bi-question-circle"></i>
-                  </button>
-                </div>
-                <!-- Analysis Descriptions -->
-                <div id="analysisDescriptionContainer">
-                  <!-- Single Analyses -->
-                  <div id="description_plot_module_props" class="general-analysis-description" style="display: none;">
-                    <p>The Transcripts per Module analysis provides an overview of all transcripts, displaying the
-                      relative share of transcripts in each module using bar plots.</p>
-                  </div>
-                  <div id="description_plot_module_orthos" class="general-analysis-description" style="display: none;">
-                    <p>The Orthogroups per Module analysis shows a bar plot with the number of unique ortholog groups
-                      and total transcripts per module.</p>
-                  </div>
-                  <div id="description_plot_module_hubs" class="general-analysis-description" style="display: none;">
-                    <p>The Top Hub Transcripts per Module analysis generates a bar plot for each module showing
-                      connectivity and mean counts of the top hub transcripts.</p>
-                  </div>
-                  <div id="description_plot_module_goea" class="general-analysis-description" style="display: none;">
-                    <p>The GOEA of each Module analysis performs Gene Ontology Enrichment Analysis per module, using a
-                      specified top percentage of transcripts. Detailed tree representations are available in the
-                      Session Files.</p>
-                  </div>
-                  <div id="description_plot_correlation_network" class="general-analysis-description"
-                    style="display: none;">
-                    <p>The Module Eigengenes Correlation Network analysis calculates correlations between module
-                      eigengenes across samples and displays the resulting network.</p>
-                  </div>
-                  <!-- Multiple Analyses -->
-                  <div id="description_plot_jaccard_tissues" class="general-analysis-description"
-                    style="display: none;">
-                    <p>The Tissues Similarity Network analysis calculates the Jaccard similarity between tissues of
-                      different species based on top expressed orthogroups.</p>
-                  </div>
-                  <div id="description_plot_tissues_corr" class="general-analysis-description" style="display: none;">
-                    <p>The Tissues Similarity Heatmap analysis visualizes the similarity of tissue expression profiles
-                      as a heatmap based on top expressed orthogroups.</p>
-                  </div>
-                  <div id="description_plot_jaccard_modules" class="general-analysis-description"
-                    style="display: none;">
-                    <p>The Module Similarity Network analysis calculates the Jaccard similarity between modules across
-                      species, using options for shapes, colors, and inter‑species focus.</p>
-                  </div>
-                  <div id="description_plot_modules_corr" class="general-analysis-description" style="display: none;">
-                    <p>The Module Similarity Heatmap analysis visualizes the similarity between modules across species
-                      as a heatmap.</p>
-                  </div>
-                  <div id="description_plot_species_correlation_network" class="general-analysis-description"
-                    style="display: none;">
-                    <p>The Module Membership Correlation Network analysis compares modules across species based on
-                      correlations of module memberships. Parameters include a correlation threshold, p‑value, and
-                      visualization options.</p>
-                  </div>
-                  <div id="description_plot_hog_level" class="general-analysis-description" style="display: none;">
-                    <p>The HOGs Level Distribution analysis visualizes the levels of Hierarchical Orthologous Groups for
-                      each species and their commonalities.</p>
-                  </div>
-                </div>
-                <!-- Analysis Parameters Toggle -->
-                <div id="wholeParametersToggle">
-                  <details id="parametersToggle">
-                    <summary class="toggle-header">Parameters</summary>
-                    <div class="toggle-content">
-                      <!-- Whole Analysis Controls using Bootstrap Grid -->
-                      <div class="row justify-content-center mt-3">
-                        <div class="col-md-6 col-lg-8">
-                          <!-- Percentage of Highest Expressed Transcripts -->
-                          <div class="row mb-3" id="nTopPercentGroup" style="display: none;">
-                            <label for="nTopPercent" class="col-sm-4 col-form-label text-end">
-                              Percentage of Highest Expressed Transcripts
-                            </label>
-                            <div class="col-sm-8">
-                              <input type="number" class="form-control" id="nTopPercent"
-                                placeholder="Enter top percentage" step="0.1" value="1.0" min="0.1" max="100" required>
-                            </div>
-                          </div>
-                          <!-- Top n of Highest Expressed Transcripts -->
-                          <div class="row mb-3" id="nTopGroup" style="display: none;">
-                            <label for="nTop" class="col-sm-4 col-form-label text-end">
-                              Top n of Highest Expressed Transcripts
-                            </label>
-                            <div class="col-sm-8">
-                              <input type="number" class="form-control" id="nTop" placeholder="Enter top n" step="1"
-                                value="10" min="1" required>
-                            </div>
-                          </div>
-                          <!-- Threshold -->
-                          <div class="row mb-3" id="thresholdGroup" style="display: none;">
-                            <label for="threshold" class="col-sm-4 col-form-label text-end">
-                              Threshold
-                            </label>
-                            <div class="col-sm-8">
-                              <input type="number" class="form-control" id="threshold"
-                                placeholder="Enter threshold value" step="0.01" value="0.1" min="0.0" max="1.0"
-                                required>
-                            </div>
-                          </div>
-                          <!-- Maximum P‑Value -->
-                          <div class="row mb-3" id="maxPvalGroup" style="display: none;">
-                            <label for="maxPval" class="col-sm-4 col-form-label text-end">
-                              Maximum P‑Value
-                            </label>
-                            <div class="col-sm-8">
-                              <input type="number" class="form-control" id="maxPval" placeholder="Enter max p‑value"
-                                step="0.01" value="0.05" min="0.0" max="1.0" required>
-                            </div>
-                          </div>
-                          <!-- Minimum Fold Enrichment -->
-                          <div class="row mb-3" id="minFeGroup" style="display: none;">
-                            <label for="minFe" class="col-sm-4 col-form-label text-end">
-                              Minimum Fold Enrichment
-                            </label>
-                            <div class="col-sm-8">
-                              <input type="number" class="form-control" id="minFe"
-                                placeholder="Enter min fold enrichment" step="0.01" value="0.2" min="0.0" max="1.0"
-                                required>
-                            </div>
-                          </div>
-                          <!-- Minimum Depth -->
-                          <div class="row mb-3" id="minDepthGroup" style="display: none;">
-                            <label for="minDepth" class="col-sm-4 col-form-label text-end">
-                              Minimum Depth
-                            </label>
-                            <div class="col-sm-8">
-                              <input type="number" class="form-control" id="minDepth" placeholder="Enter min depth"
-                                value="2" min="0" required>
-                            </div>
-                          </div>
-                          <!-- Positive Correlation -->
-                          <div class="row mb-3" id="positiveGroup" style="display: none;">
-                            <label for="positive" class="col-sm-4 col-form-label text-end">
-                              Positive Correlation
-                            </label>
-                            <div class="col-sm-8 d-flex align-items-center">
-                              <div class="form-check">
-                                <input type="checkbox" class="form-check-input large-checkbox" id="positive" checked>
-                                <label class="form-check-label" for="positive"></label>
-                              </div>
-                            </div>
-                          </div>
-                          <!-- Use Shapes for Species -->
-                          <div class="row mb-3" id="useShapesGroup" style="display: none;">
-                            <label for="useShapes" class="col-sm-4 col-form-label text-end" id="useShapesLabel">
-                              Use Shapes for Species
-                            </label>
-                            <div class="col-sm-8 d-flex align-items-center">
-                              <div class="form-check">
-                                <input type="checkbox" class="form-check-input large-checkbox" id="useShapes">
-                                <label class="form-check-label" for="useShapes"></label>
-                              </div>
-                            </div>
-                          </div>
-                          <!-- Use Colors for Modules -->
-                          <div class="row mb-3" id="useColorsGroup" style="display: none;">
-                            <label for="useColors" class="col-sm-4 col-form-label text-end">
-                              Use Colors for Modules
-                            </label>
-                            <div class="col-sm-8 d-flex align-items-center">
-                              <div class="form-check">
-                                <input type="checkbox" class="form-check-input large-checkbox" id="useColors">
-                                <label class="form-check-label" for="useColors"></label>
-                              </div>
-                            </div>
-                          </div>
-                          <!-- Inter Species Only -->
-                          <div class="row mb-3" id="interSpeciesOnlyGroup" style="display: none;">
-                            <label for="interSpeciesOnly" class="col-sm-4 col-form-label text-end">
-                              Inter Species Only
-                            </label>
-                            <div class="col-sm-8 d-flex align-items-center">
-                              <div class="form-check">
-                                <input type="checkbox" class="form-check-input large-checkbox" id="interSpeciesOnly"
-                                  checked>
-                                <label class="form-check-label" for="interSpeciesOnly"></label>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </details>
-                </div>
-                <br>
-                <!-- Run Analysis Button -->
-                <div class="d-flex justify-content-center">
-                  <button type="button" class="btn btn-primary" id="runAnalysis">Run Analysis</button>
-                </div>
-                <br>
-                <!-- Results Container -->
-                <div id="resultsContainer" style="position: relative;">
-                  <!-- Loading Bar4 -->
-                  <div id="loadingBar4" class="loading-text" style="display:none;">
-                    <span id="loadingStatusText4">Loading...</span>
-                  </div>
-                  <!-- Results -->
-                  <div id="results" class="results" style="display: none;"></div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Finished Analysis Card -->
-        <div class="card mb-3" id="finishedCard" style="display: none;">
-          <div class="card-header">
-            <h5 class="mb-0 d-flex justify-content-between align-items-center">
-              Session Files
-              <button class="btn btn-link toggle-button" data-bs-toggle="collapse" data-bs-target="#finishedSection"
-                aria-expanded="true">
-                <span>Show</span>
-              </button>
-            </h5>
-          </div>
-          <div id="finishedSection" class="collapse show">
-            <div class="card-body">
-              <h3 class="card-title"></h3>
-              <div class="row justify-content-center">
-                <div class="col-auto form-group">
-                  <select class="form-control" id="fileTypeSelect">
-                    <option value="all">All Results</option>
-                  </select>
-                </div>
-              </div>
-              <div id="filesDiv" class="results">
-                <div class="card-body">
-                  <div class="row justify-content-center mt-3">
-                    <div class="col-md-6 col-lg-8">
-                      <ul id="analysisList" class="list-group"></ul>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div class="button-container">
-                <button type="button" class="btn btn-primary" id="downloadResultsButton">Download</button>
-                <button type="button" class="btn btn-primary" id="clearFilesButton">Clear</button>
-              </div>
-            </div>
-          </div>
+        <div class="modal-body" id="helpModalContent">
+          <!-- Dynamically loaded -->
         </div>
       </div>
     </div>
   </div>
-
-  <!-- Navbar for small screens -->
-  <nav class="navbar navbar-expand-lg navbar-light bg-light d-lg-none fixed-top">
-    <a href="#" class="navbar-brand">CoExPlore</a>
-    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNavSmall"
-      aria-controls="navbarNavSmall" aria-expanded="false" aria-label="Toggle navigation">
-      <span class="navbar-toggler-icon"></span>
-    </button>
-    <div class="collapse navbar-collapse" id="navbarNavSmall">
-      <ul class="navbar-nav">
-        <li class="nav-item">
-          <a class="nav-link" href="#selectPlantsCard">Datasets</a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link" href="#infoDivCard" id="settingsNavLink">Info and Settings</a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link" href="#browserCard" id="browserNavLink">Browser</a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link" href="#downstreamCard" id="transcriptomeNavLink">Whole Transcriptome Analysis</a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link" href="#finishedCard" id="sessionFilesNavLink">Session Files</a>
-        </li>
-      </ul>
-    </div>
-  </nav>
-
-  <!-- Custom scripts -->
+  <!-- JS Libraries -->
+  <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@fancyapps/ui/dist/fancybox.umd.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap-select@1.14.0-beta3/dist/js/bootstrap-select.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
+    <!-- DataTables JS -->
+  <script src="https://cdn.datatables.net/1.11.3/js/jquery.dataTables.js"></script>
+  <script src="https://cdn.datatables.net/responsive/2.2.9/js/dataTables.responsive.min.js"></script>
+  <script src="https://cdn.datatables.net/buttons/2.0.1/js/dataTables.buttons.min.js"></script>
+  <script src="https://cdn.datatables.net/buttons/2.0.1/js/buttons.html5.min.js"></script>
+  <script src="https://cdn.datatables.net/buttons/2.0.1/js/buttons.colVis.min.js"></script>
+  <!-- Prism JS core -->
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/prism.min.js"></script>
+  <!-- Prism SQL language -->
+  <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-sql.min.js"></script>
+  
   <script>
+    // Help Button (contextual)
+    function getActiveTabId() {
+      return document.querySelector('.tab-pane.active')?.id || '';
+    }
+    function getHelpContent(tabId) {
+      const helps = {
+        "tab-datasets": `<b>Datasets:</b> Select one or more species for analysis. Use the expert toggle for advanced options.`,
+        "tab-info": `<b>Info & Settings:</b> View pipeline parameters, set output prefix, and adjust advanced settings.`,
+        "tab-browser": `<b>Browser:</b> Filter and analyze transcript data for selected species. Global search and expert options available.`,
+        "tab-analysis": `<b>Analysis:</b> Run whole-transcriptome or comparative analyses. Advanced parameters via expert mode.`,
+        "tab-files": `<b>Session Files:</b> Download or clear session results.`
+      };
+      return helps[tabId] || "No help for this view.";
+    }
+    function showHelp() {
+      const tabId = getActiveTabId();
+      document.getElementById('helpModalContent').innerHTML = getHelpContent(tabId);
+      var modal = new bootstrap.Modal(document.getElementById('helpModal'));
+      modal.show();
+    }
+    document.getElementById('mainHelpBtn').onclick = showHelp;
+    document.getElementById('floatingHelpBtn')?.addEventListener('click', showHelp);
+
+    // Sidebar <-> TopTab Sync
+    const sidebarMap = [
+      { sidebar: 'sidebar-datasets', tabbtn: 'tabbtn-datasets' },
+      { sidebar: 'sidebar-info', tabbtn: 'tabbtn-info' },
+      { sidebar: 'sidebar-ai', tabbtn: 'tabbtn-ai' },
+      { sidebar: 'sidebar-browser', tabbtn: 'tabbtn-browser' },
+      { sidebar: 'sidebar-analysis', tabbtn: 'tabbtn-analysis' },
+      { sidebar: 'sidebar-files', tabbtn: 'tabbtn-files' },
+    ];
+    sidebarMap.forEach(({ sidebar, tabbtn }) => {
+      document.getElementById(sidebar).addEventListener('click', function () {
+        // Mark Sidebar Active
+        sidebarMap.forEach(({ sidebar: sid }) => {
+          document.getElementById(sid).classList.remove('active');
+        });
+        this.classList.add('active');
+        // Simulate click on corresponding TopTab
+        document.getElementById(tabbtn).click();
+        // On mobile: sidebar ausblenden
+        if (window.innerWidth < 992) {
+          document.getElementById('sidebar').classList.remove('show');
+        }
+      });
+      // Aktivität der Tabs mit Sidebar synchronisieren:
+      document.getElementById(tabbtn).addEventListener('click', function () {
+        sidebarMap.forEach(({ sidebar: sid, tabbtn: tid }) => {
+          if (tid === this.id) {
+            document.getElementById(sid).classList.add('active');
+          } else {
+            document.getElementById(sid).classList.remove('active');
+          }
+        });
+      });
+    });
+
+    // Sidebar toggle (mobile)
+    const sidebar = document.getElementById('sidebar');
+    const sidebarToggle = document.getElementById('sidebarToggle');
+    if (sidebarToggle) {
+      sidebarToggle.addEventListener('click', function (e) {
+        e.stopPropagation();
+        sidebar.classList.toggle('show');
+      });
+    }
+    // Optional: Hide sidebar when clicking outside on mobile
+    document.addEventListener('click', function (event) {
+      if (window.innerWidth < 992 && sidebar.classList.contains('show')) {
+        if (!sidebar.contains(event.target) && !sidebarToggle.contains(event.target)) {
+          sidebar.classList.remove('show');
+        }
+      }
+    });
+  </script>
+  <script type="module" src="static/js/main.js"></script>
+  <script>
+    // Expose for Jinja2 includes
     const BASE_URL = "{{ BASE_URL }}";
     const OUTPUT_DIR = "{{ OUTPUT_DIR }}";
   </script>
-  <script type="module" src="static/js/main.js"></script>
 </body>
 
 </html>

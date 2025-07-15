@@ -67,7 +67,7 @@ elif is_dockerized():
     print("Running in Docker.")
     metadata_path = "/metadata_dict.json"
     if not os.path.exists(metadata_path):
-        metadata_path = "/vol/blast/wgcna/Project-Setup/wgcna-app/envs/metadata_dict.json"
+        metadata_path = "/home/ubuntu/projects/CoExPlore/metadata_dict.json"
         if not os.path.exists(metadata_path):
             print(f"Warning: {metadata_path} not found. Using an empty dictionary.")
 else:

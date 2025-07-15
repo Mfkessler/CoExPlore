@@ -1,0 +1,13 @@
+name: pywgcna-env
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.13
+  - pip
+  - graphviz
+  - git
+  - compilers
+  - pip:
+      - -r requirements.txt
+      - git+https://github.com/Mfkessler/PyWGCNA.git

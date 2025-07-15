@@ -1,6 +1,7 @@
 # routes.py
 
 from flask import Blueprint, make_response, request, jsonify, send_from_directory, Response, current_app, render_template
+import requests
 import os
 import uuid
 import glob
@@ -10,6 +11,7 @@ import json
 import logging
 import redis
 import re
+import random
 import scanpy as sc
 import pandas as pd
 import numpy as np
@@ -270,15 +272,30 @@ def load_image_data():
                     img.thumbnail((500, 500))
                     img.save(thumbnail_path, "PNG", quality=300)
 
-            thumbnail_url = f"http://{request.host}{Config.BASE_URL}/static/images/{plant}/thumbnails/{original_filename}"
-            original_url = f"http://{request.host}{Config.BASE_URL}/static/images/{plant}/{original_filename}"
+            thumbnail_url = f"{Config.BASE_URL}/static/images/{plant}/thumbnails/{original_filename}"
+            original_url = f"{Config.BASE_URL}/static/images/{plant}/{original_filename}"
 
             figure_urls.append({"thumbnail": thumbnail_url, "original": original_url})
 
         return jsonify({"status": "success", "figures": figure_urls})
     else:
         return jsonify({"status": "error", "message": "No images found"}), 404
-    
+
+
+"""
+AI Search
+"""
+
+CYFISH_API_URL = os.environ.get("CYFISH_API_URL", "http://172.17.0.1:5004/api/transcripts")
+logger.info(f"Using CyFISH API URL: {CYFISH_API_URL}")
+
+@api_bp.route('/ai-search', methods=['POST'])
+def ai_search():
+    data = request.json
+    res = requests.post(CYFISH_API_URL, json=data)
+
+    return jsonify(res.json())
+
 """
 Start table and plot tasks
 """
@@ -312,6 +329,20 @@ def start_task(task_name):
 """
 Table routes helper functions
 """
+
+def force_select(query: str) -> str:
+    # Only apply if SELECT * is not already used
+    if re.search(r'select\s+\*\s+from', query, re.IGNORECASE):
+        return query
+
+    # If aggregations or GROUP BY are present, do not modify
+    if any(kw in query.lower() for kw in ["group by", "having", "count(", "sum(", "avg(", "min(", "max("]):
+        return query
+
+    # Replace SELECT ... FROM with SELECT * FROM
+    select_pattern = re.compile(r'^select\s+.+?\s+from\s', re.IGNORECASE | re.DOTALL)
+    return select_pattern.sub('SELECT * FROM ', query)
+
 
 def parse_request_params(request) -> dict:
     """
@@ -536,21 +567,71 @@ def data():
         params = parse_request_params(request)
         table = params['table_name']
         select_columns = ', '.join([col['name'] for col in params['columns']])
-        query, query_params = build_sql_query(params, select_columns)
+
+        ai_query = request.json.get("ai_query")
+        order_clause = ""
+        limit_offset_clause = ""
+
+        if ai_query:
+            # Security: Only allow SELECT statements
+            if not ai_query.lower().strip().startswith("select"):
+                return jsonify({"error": "Only SELECT statements allowed."}), 400
+
+            base_query = ai_query.strip().rstrip(";")
+            base_query = force_select(base_query)
+
+            # Optionally extract ORDER BY from request
+            order_params = []
+            for order in params.get("order", []):
+                col = params["columns"][order["column"]]
+                if col.get("orderable", True):
+                    col_name = col["name"]
+                    dir_sql = "ASC" if order["dir"].lower() == "asc" else "DESC"
+                    order_params.append(f"{col_name} {dir_sql}")
+            if order_params:
+                order_clause = "ORDER BY " + ", ".join(order_params)
+
+            # LIMIT + OFFSET
+            limit = int(params.get("length", 10))
+            offset = int(params.get("start", 0))
+
+            # Check if LIMIT is already in the base query
+            if re.search(r'\blimit\b', base_query, re.IGNORECASE):
+                limit_offset_clause = ""
+            else:
+                limit_offset_clause = f"LIMIT {limit} OFFSET {offset}"
+
+            query = f"{base_query} {order_clause} {limit_offset_clause}"
+
+            query = f"{base_query} {order_clause} {limit_offset_clause}"
+            query_params = {}
+
+            logger.info("AI query: %s", query)
+            logger.info("AI query params: %s", query_params)
+
+        else:
+            # Default case
+            query, query_params = build_sql_query(params, select_columns)
+
         logger.info("Received transcript_filter: %s", params.get('transcript_filter'))
         logger.info("Received transcript_filter_column: %s", params.get('transcript_filter_column'))
         logger.info("Columns in request: %s", [col['name'] for col in params['columns']])
 
-        # Count total records
-        with engine.connect() as conn:
-            total_records = pd.read_sql(text(f"SELECT COUNT(*) FROM {table}"), conn).iloc[0, 0]
+        # --- total_records + total_filtered_records ---
+        if ai_query:
+            # AI queries: count via subquery
+            count_query = f"SELECT COUNT(*) FROM ({base_query}) AS subquery"
+            with engine.connect() as conn:
+                total_filtered_records = pd.read_sql(text(count_query), conn).iloc[0, 0]
+                total_records = total_filtered_records
+        else:
+            with engine.connect() as conn:
+                total_records = pd.read_sql(text(f"SELECT COUNT(*) FROM {table}"), conn).iloc[0, 0]
+            count_query = f"SELECT COUNT(*) FROM {table} {query.partition(f'FROM {table}')[2].partition('ORDER BY')[0]}"
+            with engine.connect() as conn:
+                total_filtered_records = pd.read_sql(text(count_query), conn, params=query_params).iloc[0, 0]
 
-        # Count filtered records
-        count_query = f"SELECT COUNT(*) FROM {table} {query.partition(f'FROM {table}')[2].partition('ORDER BY')[0]}"
-        with engine.connect() as conn:
-            total_filtered_records = pd.read_sql(text(count_query), conn, params=query_params).iloc[0, 0]
-
-        # Fetch data
+        # --- Fetch data ---
         df = execute_sql_query(query, query_params)
         data = df.replace({np.nan: None}).to_dict(orient='records')
 
@@ -560,30 +641,71 @@ def data():
             'recordsFiltered': int(total_filtered_records),
             'data': data
         })
-    
+
     except Exception as e:
         print(f"Error: {e}")
-
         return jsonify({"error": "Server Error"}), 500
+
+
+@api_bp.route('/api/general-ai', methods=['POST'])
+def api_general_ai():
+    data = request.json
+    sql_query = data.get("ai_query")
+    if not sql_query:
+        return jsonify({"error": "No SQL query provided."}), 400
+
+    try:
+        with engine.connect() as conn:
+            result = conn.execute(text(sql_query))
+            columns = result.keys()
+            rows = [dict(zip(columns, row)) for row in result.fetchall()]
+        return jsonify({"data": rows})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    
+
+@api_bp.route("/api/random-example", methods=["GET"])
+def random_example():
+    examples_path = os.getenv("RANDOM_EXAMPLES_PATH")
+    if not examples_path or not os.path.isfile(examples_path):
+        return jsonify({"error": "Examples file not found."}), 500
+
+    with open(examples_path, "r", encoding="utf-8") as f:
+        lines = f.readlines()
+
+    if not lines:
+        return jsonify({"error": "No examples in file."}), 500
+
+    example_line = random.choice(lines).strip()
+    try:
+        example = json.loads(example_line)
+    except Exception as e:
+        return jsonify({"error": "Failed to parse example."}), 500
+
+    question = example.get("question")
+    if not question:
+        return jsonify({"error": "No question field in example."}), 500
+
+    return jsonify({"question": question})
 
 
 @api_bp.route('/api/get_transcripts', methods=['POST'])
 def get_transcripts():
     try:
         params = parse_request_params(request)
-        select_columns = 'transcript, species'  # Include species in the selection
-        params['start'] = None  # No limit
-        params['length'] = None  # No offset
-        query, query_params = build_sql_query(params, select_columns)
+        select_columns = 'transcript, species'
+        params['start'] = None
+        params['length'] = None
 
-        # Debugging
-        print("SQL Query:", query)
-        print("Search Params:", query_params)
+        ai_query = request.json.get("ai_query")
+        if ai_query:
+            ai_query = force_select(ai_query.strip().rstrip(";"))
+            query = ai_query
+            query_params = {}
+        else:
+            query, query_params = build_sql_query(params, select_columns)
 
-        # Fetch data
         df = execute_sql_query(query, query_params)
-        
-        # Convert to dictionary with species as keys and lists of transcripts as values
         transcripts_dict = df.groupby('species')['transcript'].apply(list).to_dict()
 
         return jsonify({'transcripts': transcripts_dict})
@@ -595,44 +717,30 @@ def get_transcripts():
 
 @api_bp.route('/api/get_column_entries', methods=['POST'])
 def get_column_entries():
-    logger.debug("Request JSON:", request.json)
     try:
         params = parse_request_params(request)
-        # Get the name of the desired column (e.g., "transcript", "author", etc.)
         selected_column = request.json.get('selected_column')
-        if not selected_column:
-            return jsonify({'error': 'No column selected'}), 400
-
-        # Unique flag: True if only unique entries are desired
         unique = request.json.get('unique', False)
-
-        # Build the SQL query only for the selected column
-        select_columns = selected_column
-        
-        # Fetch all rows (all pages)
         params['start'] = None
         params['length'] = None
-        query, query_params = build_sql_query(params, select_columns)
 
-        # Debug outputs
-        logger.info("SQL Query: %s", query)
-        logger.info("Search Params: %s", query_params)
+        ai_query = request.json.get("ai_query")
+        if ai_query:
+            ai_query = force_select(ai_query.strip().rstrip(";"))
+            query = ai_query
+            query_params = {}
+        else:
+            query, query_params = build_sql_query(params, selected_column)
 
-        # Execute the SQL query
         df = execute_sql_query(query, query_params)
-
-        # Remove NaN values and empty strings
         entries = df[selected_column].dropna().astype(str)
         entries = entries[entries.str.strip() != '']
 
-        # If unique is desired, remove duplicates
         if unique:
             entries = entries.drop_duplicates()
 
-        entries_list = entries.tolist()
+        return jsonify({'entries': entries.tolist()})
 
-        return jsonify({'entries': entries_list})
-    
     except Exception as e:
         print(f"Error: {e}")
         return jsonify({'error': 'Server Error'}), 500
@@ -643,28 +751,27 @@ def export_data():
     try:
         params = parse_request_params(request)
         select_columns = ', '.join([col['name'] for col in params['columns']])
-        params['start'] = None  # No limit
-        params['length'] = None  # No offset
-        query, query_params = build_sql_query(params, select_columns)
+        params['start'] = None
+        params['length'] = None
 
-        # Debugging
-        print("SQL Query:", query)
-        print("Search Params:", query_params)
+        ai_query = request.json.get("ai_query")
+        if ai_query:
+            ai_query = force_select(ai_query.strip().rstrip(";"))
+            query = ai_query
+            query_params = {}
+        else:
+            query, query_params = build_sql_query(params, select_columns)
 
-        # Fetch data
         df = execute_sql_query(query, query_params)
-
-        # Create CSV
         csv_data = df.to_csv(index=False, sep='\t')
         response = make_response(csv_data)
         response.headers['Content-Disposition'] = 'attachment; filename=export.csv'
         response.headers['Content-Type'] = 'text/csv'
 
         return response
-    
+
     except Exception as e:
         print(f"Error: {e}")
-
         return jsonify({'error': 'Server Error'}), 500
 
 

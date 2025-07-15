@@ -11,5 +11,12 @@
     "unique_go_terms": "Unique GO Terms",
     "ortho_count": "Ortho Count",
     "ipr_id": "InterPro ID",
-    "ipr_desc": "InterPro Description"
+    "ipr_desc": "InterPro Description",
+    "pfam_id": "Pfam ID",
+    "pfam_desc": "Pfam Description",
+    "tf_family": "TF Family",
+    "ecnumber": "EC Number",
+    "genename": "Gene Name",
+    "description": "UniProt Description",
+    "description_long": "UniProt Description Long"
 }

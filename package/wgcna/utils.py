@@ -8,20 +8,26 @@ import numpy as np
 import scanpy as sc
 import scipy.sparse as sp
 import networkx as nx
+import polars as pl
+import anndata as ad
 from .ortho import add_ortho_count, update_ortho_ID
 from matplotlib import cm, colors
 from goatools.obo_parser import GODag
 from goatools.goea.go_enrichment_ns import GOEnrichmentStudyNS
 from goatools.godag_plot import plot_gos
 from contextlib import redirect_stdout, redirect_stderr
-from typing import List, Dict, Tuple, Union, Callable
+from typing import List, Dict, Tuple, Union, Callable, Set, Any
 from anndata import AnnData
 from sklearn.impute import KNNImputer
 from sklearn.preprocessing import scale
 from pandas.api.types import is_numeric_dtype
 from jinja2 import Environment, FileSystemLoader
 from collections import defaultdict
+from scipy.cluster.hierarchy import linkage, fcluster
 from scipy.spatial.distance import squareform
+from kneed import KneeLocator
+from scipy.stats import median_abs_deviation
+import matplotlib.pyplot as plt
 from .config import METADATA_DICT
 
 
@@ -40,31 +46,51 @@ def create_dir(path: str) -> None:
         print(f"Directory already exists at: {path}")
 
 
-def find_species_by_initials(species: str, file_path: str = "../info/species") -> str:
+def find_species_by_initials(species: str, file_path: str = "../info/species", fallback: str = None) -> str:
     """
     Finds and returns the full name of a species based on the initial letters of its name provided in a single string.
 
     Parameters:
     - species (str): A string containing the initial letters of the first and second word of the species name.
-    - file_path (str): The path to the file containing the species names.
+    - file_path (str): The path to the file containing the species names (one per line, e.g. 'Papaver somniferum').
+    - fallback (str): Optional, content to use if file_path does not exist (one species per line).
 
     Returns:
     - str: The full name of the species that matches the given initials. If no match is found, returns None.
     """
-
+    
+    # If not exactly 2 letters, return unchanged
     if len(species) != 2:
         return species
 
     first_letter, second_letter = species[0].upper(), species[1].upper()
 
-    with open(file_path, 'r') as file:
-        for line in file:
-            words = line.strip().split()
-            if len(words) >= 2 and words[0][0].upper() == first_letter and words[1][0].upper() == second_letter:
-                return line.strip()
+    # Determine data source: file or string
+    if os.path.exists(file_path):
+        with open(file_path, 'r') as file:
+            lines = file.readlines()
+    elif fallback is not None:
+        lines = fallback.strip().splitlines()
+    else:
+        # Default fallback if no string is provided
+        lines = [
+            "Papaver somniferum",
+            "Thalictrum thalictroides",
+            "Aquilegia caerulea",
+            "Staphisagria picta",
+            "Capnoides sempervirens",
+            "Hydrastis canadensis",
+            "Eschscholzia californica",
+            "Epimedium grandiflorum"
+        ]
 
-    raise ValueError(
-        f"No species found with the provided initials. Please check the species file: {os.path.abspath(file_path)}")
+    # Matching
+    for line in lines:
+        words = line.strip().split()
+        if len(words) >= 2 and words[0][0].upper() == first_letter and words[1][0].upper() == second_letter:
+            return line.strip()
+
+    return None
 
 
 def remove_column_if_exists(df: pd.DataFrame, column_name: str) -> None:
@@ -358,6 +384,47 @@ def generate_stage_color_dict(custom_stages: List[str] = None) -> Dict[str, str]
     return color_dict
 
 
+def generate_ranomics_color_dict(obs_stages) -> Dict[str, str]:
+    """
+    Returns a fixed color dictionary for all predefined stages,
+    but only includes stages that are present in obs_stages.
+
+    Parameters:
+    obs_stages : Iterable[str]
+        Stages actually present in adata.obs["tissue"] (e.g., from .unique())
+
+    Returns:
+    Dict[str, str]
+        Mapping stage -> color (as hex string), only for present stages,
+        but with fixed colors per stage.
+    """
+
+    stages = [
+        "Bud stage 1", "Bud stage 2", "Bud stage 3", "Bud stage 4",
+        "Sepals at anthesis", "Petals at anthesis", "Stamens at anthesis",
+        "Gynoecia at anthesis", "Shoot apex", "Petal early stage",
+        "Petal mid stage", "Petal late stage", "Young fruits",
+        "Mid-stage fruit", "Seeds 5 dap", "Root", "Young leaf",
+        "Mature leaf", "Seedling", "Mature petal nectary part",
+        "Mature petal no nectary part", "Non-spurred Petal", "Unknown"
+    ]
+
+    # Assign up to 32 distinct colors
+    colors_tab20 = cm.tab20(np.linspace(0, 1, 20))
+    colors_set3 = cm.Set3(np.linspace(0, 1, 12))
+    all_colors = np.vstack((colors_tab20, colors_set3))[:len(stages)]
+    hex_colors = [colors.to_hex(color) for color in all_colors]
+
+    # Full mapping for ALL stages (always same colors)
+    full_color_dict = dict(zip(stages, hex_colors))
+
+    # Return only those present in obs_stages, but with their fixed color
+    present_stages = set(str(s) for s in obs_stages)  # Convert to str to avoid issues
+    color_dict = {stage: full_color_dict[stage] for stage in stages if stage in present_stages}
+
+    return color_dict
+
+
 def process_anndata(
     adata: AnnData,
     go_path: str = None,
@@ -581,6 +648,16 @@ def add_goea_to_anndata(adata: AnnData, obo_path: str = "../go-basic.obo", resul
     if top_percentage < 1:
         top_percentage = 1
         print("Top percentage set to 1 to ensure at least one transcript is selected.")
+
+    if "mean_counts" not in adata.var.columns:
+        # Calculate mean counts for each transcript
+        if adata.X.shape[0] == adata.var.shape[0]:
+            mean_counts = np.asarray(adata.X).mean(axis=1)
+        elif adata.X.shape[1] == adata.var.shape[0]:
+            mean_counts = np.asarray(adata.X).mean(axis=0)
+        else:
+            raise ValueError(f"Shape mismatch: adata.X {adata.X.shape} vs adata.var {adata.var.shape}")
+        adata.var["mean_counts"] = mean_counts
 
     # Prepare a dummy file to capture all outputs
     with open(os.devnull, 'w') as fnull:
@@ -1032,7 +1109,7 @@ def get_jaccard_df(dicts: List[Dict[str, List[str]]], suffixes: List[str] = None
     Parameters
     ----------
     - dicts (List[Dict[str, List[str]]]): List of dictionaries.
-    - suffixes (List[str], optional): List of suffixes corresponding to each dictionary. If not provided,
+    - suffixes (List[str]): List of suffixes corresponding to each dictionary. If not provided,
       the suffixes will be extracted from the keys in the dictionaries.
 
     Returns
@@ -1325,6 +1402,77 @@ def save_matrix_to_hdf5(table: pd.DataFrame, filename: str, save_sym_only: bool 
             f.attrs['include_diagonal'] = True
 
 
+def load_subset_from_parquet(
+    filename: str,
+    transcripts: list,
+    threshold: float = 0.36,
+    include_neighbours: bool = False,
+    max_neighbors: int = 10,
+    edge_type: str = "TOM"
+):
+    columns = ["source", "target", "weight"]
+    try:
+        sample = pl.read_parquet(filename, n_rows=1)
+        if "edge_type" in sample.columns:
+            columns.append("edge_type")
+    except Exception:
+        pass
+
+    df = pl.read_parquet(filename, columns=columns)
+
+    if "edge_type" in df.columns:
+        df = df.filter(pl.col("edge_type") == edge_type)
+
+    df = df.filter(
+        (pl.col("weight") >= threshold) &
+        (pl.col("source").is_in(transcripts) | pl.col("target").is_in(transcripts))
+    )
+
+    original_set = set(transcripts)
+
+    if include_neighbours:
+        out_neighs = (
+            df.filter(pl.col("source").is_in(transcripts))
+            .sort(["source", "weight"], descending=[False, True])
+            .group_by("source")
+            .agg(pl.col("target").head(max_neighbors))
+        )
+        in_neighs = (
+            df.filter(pl.col("target").is_in(transcripts))
+            .sort(["target", "weight"], descending=[False, True])
+            .group_by("target")
+            .agg(pl.col("source").head(max_neighbors))
+        )
+        neighbors = set()
+        for sublist in out_neighs["target"].to_list():
+            neighbors.update(sublist)
+        for sublist in in_neighs["source"].to_list():
+            neighbors.update(sublist)
+        neighbors -= original_set
+        transcripts = list(original_set.union(neighbors))
+        neighbor_set = neighbors
+
+        df = df.filter(
+            pl.col("source").is_in(transcripts) & pl.col("target").is_in(transcripts)
+        )
+    else:
+        neighbor_set = set()
+        df = df.filter(
+            pl.col("source").is_in(transcripts) & pl.col("target").is_in(transcripts)
+        )
+
+    if edge_type == "GENIE3":
+        return df.to_pandas()[["source", "target", "weight"]], neighbor_set
+
+    mat = df.to_pandas().pivot(index="source", columns="target", values="weight")
+    for gene in transcripts:
+        if gene in mat.index and gene in mat.columns:
+            mat.at[gene, gene] = float('nan')
+    mat = mat.dropna(how='all', axis=0).dropna(how='all', axis=1)
+
+    return mat, neighbor_set
+
+
 def load_subset_from_hdf5(filename: str, rows: list, cols: list = None, threshold: float = None,
                           index_map=None, columns_map=None, use_symmetry: bool = False,
                           include_neighbours: bool = False, max_neighbors: int = 10) -> Tuple[pd.DataFrame, set]:
@@ -1570,7 +1718,7 @@ def identify_network_clusters(G: nx.Graph, cluster_name: str,
     Parameters:
     - G (nx.Graph): The graph object.
     - cluster_name (str): Prefix for cluster assignment.
-    - node_threshold (int, optional): Minimum number of nodes required in a cluster to be assigned.
+    - node_threshold (int): Minimum number of nodes required in a cluster to be assigned.
     - node_threshold_percent (float): Percentage of nodes required in a cluster to be assigned.
     - print_info (bool): If True, prints cluster information.
 
@@ -1922,7 +2070,7 @@ def generate_html_from_df(df: pd.DataFrame, title: str = "Data table", table_id:
 
 def export_co_expression_network_to_cytoscape(
     tom: Union[pd.DataFrame, List[pd.DataFrame]],
-    adata: Union[AnnData, List[AnnData]],
+    adata: Union['AnnData', List['AnnData']],
     selected_module_colors: List[str] = None,
     threshold: float = 0.5,
     neighbor_info: Union[set, List[set]] = None,
@@ -1930,51 +2078,48 @@ def export_co_expression_network_to_cytoscape(
     source_key: str = 'source',
     target_key: str = 'target',
     weight_key: str = 'weight',
-    is_neighbor_key: str = 'is_neighbor'
+    is_neighbor_key: str = 'is_neighbor',
+    remove_single_nodes: bool = True
 ) -> dict:
     """
-    Exports the co-expression network(s) in a format compatible with Cytoscape.js.
+    Exports the co-expression network(s) to a Cytoscape.js-compatible format.
 
-    This function dynamically assigns all metadata from a loaded JSON dictionary.
-    It iterates over all keys in METADATA_DICT and for each gene node:
-      - If the key is "transcript", the gene identifier (i.e. the index) is used.
-      - Otherwise, the corresponding value is retrieved from adata.var for that gene.
+    This function handles both traditional TOM (co-expression) matrices and edge-list
+    DataFrames (e.g., GENIE3 output). For TOM, undirected edges are extracted above a threshold.
+    For edge-lists (containing columns ['source', 'target', 'weight']), directed edges are exported.
 
-    All metadata is assumed to be stored in adata.var under the keys specified in METADATA_DICT.
+    All node metadata is dynamically loaded from adata.var using keys from METADATA_DICT.
 
     Parameters:
-    - tom (pd.DataFrame or List[pd.DataFrame]): The TOM matrix or list of TOM matrices.
+    - tom (pd.DataFrame or List[pd.DataFrame]): The TOM matrix or list of matrices, or an edge-list DataFrame (GENIE3).
     - adata (AnnData or List[AnnData]): Annotated data object(s).
-    - selected_module_colors (List[str]): Module colors to display. If None, all modules are shown.
-    - threshold (float): TOM connection threshold for edges.
-    - neighbor_info (set or List[set]): Neighbor transcripts for the corresponding TOM(s).
+    - selected_module_colors (List[str], optional): If provided, only these module colors are shown.
+    - threshold (float): Threshold for including edges (applies to TOM and edge-list weights).
+    - neighbor_info (set or List[set], optional): Neighbor transcripts for the corresponding TOM(s).
     - id_key (str): Key for node ID in the output dictionary.
     - source_key (str): Key for edge source in the output dictionary.
     - target_key (str): Key for edge target in the output dictionary.
     - weight_key (str): Key for edge weight in the output dictionary.
     - is_neighbor_key (str): Key for neighbor flag in the output dictionary.
+    - remove_single_nodes (bool): If True, nodes without any edges are removed.
 
     Returns:
-    - dict: Dictionary with nodes, edges, and neighbors for each TOM.
+    - dict: Dictionary with 'nodes', 'edges', and 'neighbors' for each TOM/network.
     """
 
-    print(METADATA_DICT)
+    print(METADATA_DICT)  # For debugging, shows what metadata is mapped
 
-    # Ensure the inputs are either both lists or both single objects
+    # Ensure both tom and adata are either lists or single objects
     if isinstance(tom, list) and isinstance(adata, list):
         if len(tom) != len(adata):
-            raise ValueError(
-                "The number of TOMs and AnnData objects must be the same.")
+            raise ValueError("The number of TOMs and AnnData objects must be the same.")
         tom_adata_pairs = list(zip(tom, adata))
-        neighbor_list = neighbor_info if isinstance(neighbor_info, list) else [
-            neighbor_info] * len(tom)
-    elif isinstance(tom, pd.DataFrame) and isinstance(adata, AnnData):
+        neighbor_list = neighbor_info if isinstance(neighbor_info, list) else [neighbor_info] * len(tom)
+    elif isinstance(tom, pd.DataFrame) and hasattr(adata, "var"):
         tom_adata_pairs = [(tom, adata)]
-        neighbor_list = [
-            neighbor_info] if neighbor_info is not None else [set()]
+        neighbor_list = [neighbor_info] if neighbor_info is not None else [set()]
     else:
-        raise TypeError(
-            "Both tom and adata must be either lists or single objects of their respective types.")
+        raise TypeError("Both tom and adata must be either lists or single objects of their respective types.")
 
     nodes = []
     edges = []
@@ -1983,31 +2128,26 @@ def export_co_expression_network_to_cytoscape(
     for idx, (current_tom, current_adata) in enumerate(tom_adata_pairs):
         gene_metadata = current_adata.var
 
-        # Filter genes based on selected module colors if provided (not used, ignore for now)
+        # Select genes based on module colors if provided
         if selected_module_colors:
-            mod_genes = gene_metadata[gene_metadata["module_colors"].isin(
-                selected_module_colors)].index
+            mod_genes = gene_metadata[gene_metadata["module_colors"].isin(selected_module_colors)].index
         else:
             mod_genes = gene_metadata.index
 
-        # Keep only genes that are present in the TOM matrix
-        mod_genes = [gene for gene in mod_genes if gene in current_tom.index]
+        # For TOM-matrix, ensure only genes present in the matrix are included
+        if not (isinstance(current_tom, pd.DataFrame) and set(['source', 'target', 'weight']).issubset(current_tom.columns)):
+            mod_genes = [gene for gene in mod_genes if gene in current_tom.index]
 
         species_value = current_adata.uns['species']
         species_key = METADATA_DICT.get("species", "Species")
 
-        # Prepare neighbor output using species information
-        current_neighbors = neighbor_list[idx] if neighbor_list[idx] is not None else set(
-        )
-        neighbors_output.append(
-            {species_key: species_value, 'neighbors': list(current_neighbors)})
+        current_neighbors = neighbor_list[idx] if neighbor_list[idx] is not None else set()
+        neighbors_output.append({species_key: species_value, 'neighbors': list(current_neighbors)})
 
-        # Build nodes with dynamic metadata from METADATA_DICT
+        # Build node list with dynamic metadata
         for gene in mod_genes:
             node_data = {'data': {}}
-            # Set the node ID
             node_data['data'][id_key] = f"{species_value}_{gene}"
-            # Iterate over all keys in METADATA_DICT to add metadata dynamically
             for meta_key, output_key in METADATA_DICT.items():
                 if meta_key == "transcript":
                     value = gene
@@ -2015,40 +2155,61 @@ def export_co_expression_network_to_cytoscape(
                 elif meta_key == "species":
                     value = species_value
                 else:
-                    value = gene_metadata.loc[gene,
-                                              meta_key] if meta_key in gene_metadata.columns else ""
-                # Replace NaN values with empty string
+                    value = gene_metadata.loc[gene, meta_key] if meta_key in gene_metadata.columns else ""
                 if pd.isna(value):
                     value = ""
                 else:
                     value = str(value)
-
                 node_data['data'][meta_key] = value
-            # Mark as neighbor if the gene is in the neighbor set
             if gene in current_neighbors:
                 node_data['data'][is_neighbor_key] = True
-
-            # Add the dataset name
             node_data['data']['name'] = current_adata.uns['name']
             nodes.append(node_data)
 
-        # Build edges based on TOM threshold
-        for i in range(len(mod_genes)):
-            for j in range(i + 1, len(mod_genes)):
-                gene_i = mod_genes[i]
-                gene_j = mod_genes[j]
-                if current_tom.loc[gene_i, gene_j] > threshold:
-                    # Create a unique edge ID (for instance, by concatenating source and target)
-                    edge_id = f"{species_value}_{gene_i}_{gene_j}"
+        # --- EDGE CREATION (TOM or Edge-list) ---
+        # If DataFrame has source/target/weight columns: treat as edge-list (GENIE3 etc.)
+        if isinstance(current_tom, pd.DataFrame) and set(['source', 'target', 'weight']).issubset(current_tom.columns):
+            # Only use edges above threshold and with nodes present as mod_genes
+            for _, row in current_tom.iterrows():
+                if row['weight'] >= threshold and row['source'] in mod_genes and row['target'] in mod_genes:
+                    edge_id = f"{species_value}_{row['source']}_{row['target']}"
                     edge_data = {
                         'data': {
                             'id': edge_id,
-                            source_key: f"{species_value}_{gene_i}",
-                            target_key: f"{species_value}_{gene_j}",
-                            weight_key: current_tom.loc[gene_i, gene_j]
+                            source_key: f"{species_value}_{row['source']}",
+                            target_key: f"{species_value}_{row['target']}",
+                            weight_key: row['weight'],
+                            'directed': True  # Use this flag in Cytoscape.js for arrows
                         }
                     }
                     edges.append(edge_data)
+        else:
+            # TOM matrix (undirected, symmetric, only upper triangle)
+            for i in range(len(mod_genes)):
+                for j in range(i + 1, len(mod_genes)):
+                    gene_i = mod_genes[i]
+                    gene_j = mod_genes[j]
+                    # Add edge if above threshold
+                    if current_tom.loc[gene_i, gene_j] > threshold:
+                        edge_id = f"{species_value}_{gene_i}_{gene_j}"
+                        edge_data = {
+                            'data': {
+                                'id': edge_id,
+                                source_key: f"{species_value}_{gene_i}",
+                                target_key: f"{species_value}_{gene_j}",
+                                weight_key: current_tom.loc[gene_i, gene_j],
+                                'directed': False
+                            }
+                        }
+                        edges.append(edge_data)
+
+    # Optionally, remove single nodes (no edges)
+    if remove_single_nodes:
+        connected_ids = set()
+        for edge in edges:
+            connected_ids.add(edge['data'][source_key])
+            connected_ids.add(edge['data'][target_key])
+        nodes = [node for node in nodes if node['data'][id_key] in connected_ids]
 
     return {'nodes': nodes, 'edges': edges, 'neighbors': neighbors_output}
 
@@ -2124,7 +2285,10 @@ def identify_network_clusters_from_json(network_data: dict, cluster_name: str,
     all_transcripts = {node['data']['id'] for node in network_data['nodes']}
     for transcript in all_transcripts:
         if transcript not in cluster_map:
-            cluster_map[transcript] = "No Sub-modules"
+            if cluster_name == "TH":
+                cluster_map[transcript] = f"{cluster_name} No Sub-modules"
+            else:
+                cluster_map[transcript] = "No Sub-modules"
 
     # Optional printing of cluster information
     if print_info:
@@ -2138,98 +2302,258 @@ def identify_network_clusters_from_json(network_data: dict, cluster_name: str,
     return cluster_map
 
 
+def identify_network_clusters_tree_cut(
+    tom: Union[pd.DataFrame, List[pd.DataFrame]],
+    adata: Union[object, List[object]],
+    cluster_prefix: str,  # e.g., "subset_new"
+    node_threshold_percent: float = 0.02,
+    node_threshold: int = 10,
+    cut_threshold: float = 0.5
+) -> dict:
+    """
+    Identify clusters using a tree cut method based on TOM matrices and assign full transcript IDs.
+
+    The full transcript ID is constructed as: "{species}_{transcript_id}", where the species is 
+    extracted from adata.uns['species']. Cluster names are generated as 
+    "{speciesAbbrev}: {cluster_prefix} {new_label}", where new_label is a continuous numbering 
+    starting at 1 for clusters that meet the minimum size. Clusters below the minimum size are 
+    labeled as "{speciesAbbrev}: No Sub-modules".
+
+    If only one "No Sub-modules" cluster is found for a species (i.e., no valid clusters), 
+    no entries for that species will be included in the resulting dictionary.
+
+    Parameters:
+    - tom (Union[pd.DataFrame, List[pd.DataFrame]]): A TOM matrix or list of TOM matrices.
+    - adata (Union[object, List[object]]): AnnData object(s) corresponding to each TOM. The species 
+      name is expected in adata.uns['species'] and an abbreviation in ad.uns['name'].
+    - cluster_prefix (str): The prefix for cluster assignment (e.g., "subset_new").
+    - node_threshold_percent (float): Minimum percentage of nodes required for a cluster.
+    - node_threshold (int): Minimum absolute number of nodes required for a cluster.
+    - cut_threshold (float): Threshold for cutting the dendrogram to form clusters.
+
+    Returns:
+    - dict: A dictionary mapping full transcript IDs to their cluster labels.
+    """
+    # Ensure input types are lists
+    if not isinstance(tom, list):
+        tom = [tom]
+    if not isinstance(adata, list):
+        adata = [adata]
+
+    cluster_map = {}
+
+    # Iterate over each TOM and corresponding AnnData object
+    for tom_df, ad in zip(tom, adata):
+        species = ad.uns.get("species", "UnknownSpecies")
+        species_abbrev = ad.uns.get("name", "UnknownAbbrev")
+
+        transcripts = tom_df.index.tolist()
+        full_transcripts = [f"{species}_{t}" for t in transcripts]
+
+        tom_filled = tom_df.fillna(0).copy()
+        np.fill_diagonal(tom_filled.values, 1)
+
+        diss = 1 - tom_filled
+        condensed = squareform(diss.values, checks=False)
+
+        Z = linkage(condensed, method='average')
+        labels = fcluster(Z, t=cut_threshold, criterion='distance')
+
+        if not node_threshold:
+            if not node_threshold_percent:
+                raise ValueError("Either node_threshold or node_threshold_percent must be provided")
+            node_threshold = int(len(tom_df) * node_threshold_percent)
+
+        cluster_sizes = pd.Series(labels).value_counts()
+
+        valid_clusters = cluster_sizes[cluster_sizes >= node_threshold].index.tolist()
+
+        if len(valid_clusters) == 0:
+            # Only one "No Sub-modules" cluster for species, skip species
+            continue
+
+        valid_clusters_sorted = sorted(valid_clusters)
+        label_map = {orig_label: new_label for new_label, orig_label in enumerate(valid_clusters_sorted, start=1)}
+
+        for full_id, label in zip(full_transcripts, labels):
+            if label not in label_map:
+                if cluster_prefix == "TC":
+                    cluster_label = f"{cluster_prefix} No Sub-modules"
+                else:
+                    cluster_label = f"No Sub-modules"
+            else:
+                cluster_label = f"{species_abbrev}: {cluster_prefix} {label_map[label]}"
+            cluster_map[full_id] = cluster_label
+
+    return cluster_map
+
+
+def combine_cluster_maps(
+    network_data: dict,
+    tom: Union[pd.DataFrame, List[pd.DataFrame]],
+    adata: Union[object, List[object]],
+    node_threshold: int = None,
+    node_threshold_percent: float = 0.02,
+    cut_threshold: float = 0.5,
+    print_info: bool = False
+) -> Dict[str, List[str]]:
+    """
+    Combines cluster assignments from the threshold-based method and the tree cut method.
+    Some nodes may belong to multiple clusters.
+
+    Parameters:
+    - network_data (dict): Network data in Cytoscape.js format for the threshold-based method.
+    - tom (Union[pd.DataFrame, List[pd.DataFrame]]): TOM matrix (or list of TOM matrices) for the tree cut method.
+    - adata (Union[object, List[object]]): AnnData object (or list of objects) corresponding to the TOM matrix.
+    - node_threshold (int): Minimum number of nodes required in a cluster.
+    - node_threshold_percent (float): Minimum percentage of nodes required in a cluster.
+    - cut_threshold (float): Threshold for cutting the dendrogram (tree cut method).
+    - print_info (bool): If True, prints additional information.
+
+    Returns:
+    - Dict[str, List[str]]: A dictionary where each node (key) is assigned a list of cluster labels (values).
+      The labels are prefixed with "TH" for the threshold-based method and "TC" for the tree cut method.
+    """
+
+    # Cluster assignments using the threshold-based method (edge-weight based)
+    threshold_map = identify_network_clusters_from_json(
+        network_data,
+        cluster_name="TH",
+        node_threshold=node_threshold,
+        node_threshold_percent=node_threshold_percent,
+        print_info=False
+    )
+    
+    # Cluster assignments using the tree cut method
+    tree_cut_map = identify_network_clusters_tree_cut(
+        tom,
+        adata,
+        cluster_prefix="TC",
+        node_threshold_percent=node_threshold_percent,
+        node_threshold=node_threshold,
+        cut_threshold=cut_threshold
+    )
+    
+    # Combine the two cluster assignments into a single map, where each node is assigned all relevant clusters
+    combined_map: Dict[str, List[str]] = {}
+    all_nodes = set(threshold_map.keys()) | set(tree_cut_map.keys())
+    for node in all_nodes:
+        assignments = []
+        if node in threshold_map:
+            assignments.append(threshold_map[node])
+        if node in tree_cut_map:
+            assignments.append(tree_cut_map[node])
+        combined_map[node] = assignments
+ 
+    # Print the count of both cluster assignments
+    if print_info:
+        threshold_count = pd.Series(threshold_map).value_counts().sort_index()
+        tree_cut_count = pd.Series(tree_cut_map).value_counts().sort_index()
+        print(f"Threshold-based cluster assignments: {threshold_count}")
+        print(f"Tree cut cluster assignments: {tree_cut_count}")
+        print(f"Number of nodes in combined cluster assignments: {len(combined_map)}")
+        print(f"Combined cluster assignments: {combined_map}")
+
+    return combined_map
+
+
 def get_node_table(
     tom: Union[pd.DataFrame, List[pd.DataFrame]],
-    adata: Union[AnnData, List[AnnData]],
-    cluster_info: Dict[str, str],
+    adata: Union[ad.AnnData, List[ad.AnnData]],
+    cluster_info: dict,
     tool: str,
     progress_callback: Callable[[str], None] = None
 ) -> pd.DataFrame:
     """
-    Combines TOM-based degree metrics with cluster assignments and metadata from adata.var.
+    Combines TOM-based or edge-list-based node metrics with cluster assignments and metadata from adata.var.
     
-    This function calculates only the necessary metrics:
-    - Node: Gene/transcript identifier.
-    - Species: Species name from adata.uns.
-    - Degree: Number of non-zero connections in the TOM matrix.
-    - Orthogroup: Orthogroup assignment from adata.var (if available, otherwise 'No orthogroup').
-    - Cluster: Cluster assignment from the provided cluster_info.
-    
-    Additional metadata columns are added from adata.var based on the global METADATA_DICT mapping.
-    METADATA_DICT keys correspond to adata.var column names and their values are the desired DataFrame column names.
-    The keys 'transcript', 'species', and 'ortho_id' are excluded from additional metadata.
-    
+    Supports both symmetric TOM matrices (co-expression networks, unweighted/undirected)
+    and directed edge lists (e.g. GENIE3, regulatory networks).
+    TOM matrices are handled as before; edge lists use in-degree + out-degree per node.
+
     Parameters:
-    - tom (pd.DataFrame or List[pd.DataFrame]): TOM matrix or list of matrices.
-    - adata (AnnData or List[AnnData]): AnnData object(s) containing gene metadata in .var and species info in .uns.
-    - cluster_info (dict): Dictionary mapping node identifiers to cluster assignments.
-    - tool (str): Tool used to generate cluster assignments (e.g., "cytoscape").
-    - progress_callback (Callable[[str], None], optional): Callback for reporting progress.
-    
+    - tom (pd.DataFrame or List[pd.DataFrame]): TOM matrix, list of TOMs, or edge-list DataFrame.
+    - adata (AnnData or List[AnnData]): AnnData object(s) with gene metadata.
+    - cluster_info (dict): Node-to-cluster assignments.
+    - tool (str): Tool used (e.g. 'cytoscape').
+    - progress_callback (Callable, optional): Progress callback.
+
     Returns:
-    - pd.DataFrame: Combined DataFrame with columns "Node", "Species", "Degree", "Orthogroup", "Cluster"
-      and additional metadata columns from adata.var.
+    - pd.DataFrame: Node table with Degree, Cluster, Orthogroup, and extra metadata.
     """
-    
-    def process_single_tom(tom_single: pd.DataFrame, adata_obj: AnnData, cluster_info_local: Dict[str, str]) -> pd.DataFrame:
-        # Fill missing values in the TOM matrix
-        tom_filled = tom_single.fillna(0)
-        
-        # Raw node identifiers (assumed to match adata.var index)
-        raw_nodes = tom_filled.index
-        
-        # Get species name from adata.uns (default 'Unknown' if not provided)
+
+    def process_single_tom(tom_single: pd.DataFrame, adata_obj, cluster_info_local: dict) -> pd.DataFrame:
+        # Check if DataFrame is an edge list (GENIE3): has source/target/weight columns
+        is_edgelist = set(['source', 'target', 'weight']).issubset(tom_single.columns)
         species = adata_obj.uns.get('species', 'Unknown')
-        
-        # Compute degree: count of non-zero connections per row
-        degree = (tom_filled > 0).sum(axis=1)
-        
-        # Create base DataFrame with required columns
-        df_metrics = pd.DataFrame({
-            'Node': raw_nodes,
-            'Species': species,
-            'Degree': degree
-        }, index=raw_nodes)
-        
-        # Add Orthogroup from adata.var; if missing, assign 'No orthogroup'
+
+        if is_edgelist:
+            # Edge-list: calculate degree (sum of in- and out-degree)
+            sources = tom_single['source']
+            targets = tom_single['target']
+            all_nodes = pd.Index(sources.tolist() + targets.tolist()).unique()
+            degree_out = sources.value_counts().reindex(all_nodes, fill_value=0)
+            degree_in = targets.value_counts().reindex(all_nodes, fill_value=0)
+            degree = degree_in + degree_out
+            raw_nodes = all_nodes
+
+            # Create basic DataFrame
+            df_metrics = pd.DataFrame({
+                'Node': raw_nodes,
+                'Species': species,
+                'Degree': degree
+            }, index=raw_nodes)
+
+        else:
+            # TOM-matrix
+            tom_filled = tom_single.fillna(0)
+            raw_nodes = tom_filled.index
+            degree = (tom_filled > 0).sum(axis=1)
+            df_metrics = pd.DataFrame({
+                'Node': raw_nodes,
+                'Species': species,
+                'Degree': degree
+            }, index=raw_nodes)
+
+        # Add Orthogroup
         if 'ortho_id' in adata_obj.var.columns:
             ortho_series = adata_obj.var['ortho_id']
         else:
             ortho_series = pd.Series('No orthogroup', index=adata_obj.var.index)
         df_metrics = df_metrics.join(ortho_series.rename('Orthogroup'), how='left')
-        
-        # Falls Orthogroup als Categorical vorliegt, fehlende Kategorie hinzufügen
         if pd.api.types.is_categorical_dtype(df_metrics['Orthogroup']):
             if 'No orthogroup' not in df_metrics['Orthogroup'].cat.categories:
                 df_metrics['Orthogroup'] = df_metrics['Orthogroup'].cat.add_categories('No orthogroup')
         df_metrics['Orthogroup'] = df_metrics['Orthogroup'].fillna('No orthogroup')
-        
-        # Determine Cluster assignment.
-        # For "cytoscape", adjust keys by removing species prefix if present.
+
+        # Cluster assignment
         if tool == "cytoscape":
             adjusted_cluster_info = {"_".join(key.split("_")[1:]): val for key, val in cluster_info_local.items()}
             clusters = [adjusted_cluster_info.get(node, None) for node in raw_nodes]
         else:
-            # For non-cytoscape, try both raw and species-prefixed node names.
             species_prefixed = [f"{species}_{node}" for node in raw_nodes]
             clusters = []
             for raw, pref in zip(raw_nodes, species_prefixed):
                 clusters.append(cluster_info_local.get(raw, cluster_info_local.get(pref, None)))
         df_metrics['Cluster'] = clusters
-        
-        # Add additional metadata from adata.var based on METADATA_DICT (excluding specified keys)
+
+        # Add additional metadata from adata.var using METADATA_DICT (excluding certain keys)
         extra_keys = [k for k in METADATA_DICT.keys() if k not in ['transcript', 'species', 'ortho_id']]
         available_keys = [k for k in extra_keys if k in adata_obj.var.columns]
+        # For edge-list: Only keep extra metadata for nodes present in adata
         if available_keys:
-            extra_metadata = adata_obj.var.loc[raw_nodes, available_keys]
-            extra_metadata = extra_metadata.rename(columns={k: METADATA_DICT[k] for k in available_keys})
+            extra_metadata = adata_obj.var.loc[
+                adata_obj.var.index.intersection(raw_nodes), available_keys]
+            extra_metadata = extra_metadata.rename(
+                columns={k: METADATA_DICT[k] for k in available_keys})
+            # Use reindex to keep only valid nodes and align index
+            extra_metadata = extra_metadata.reindex(raw_nodes)
             df_metrics = df_metrics.join(extra_metadata, how='left')
-        
-        # Set 'Node' as index and remove duplicate Index-Spalte
+
         df_metrics = df_metrics.set_index('Node', drop=True)
         return df_metrics
 
-    # Process multiple TOM matrices if provided
+    # Multi-dataset support
     if isinstance(tom, list):
         if not isinstance(adata, list):
             raise ValueError("When 'tom' is a list, 'adata' must be a list of AnnData objects.")
@@ -2239,23 +2563,19 @@ def get_node_table(
         for i, tom_single in enumerate(tom):
             if tom_single.empty:
                 continue
-            # For multiple TOMs, assume cluster_info keys are species-prefixed.
             species = adata[i].uns.get('species', 'Unknown')
-            raw_nodes = tom_single.index
+            raw_nodes = tom_single.index if not set(['source','target','weight']).issubset(tom_single.columns) else \
+                        pd.Index(tom_single['source'].tolist() + tom_single['target'].tolist()).unique()
             prefixed_nodes = [f"{species}_{node}" for node in raw_nodes]
-            # Filter cluster_info for nodes in the current dataset
             cluster_info_single = {node: cluster_info[node] for node in prefixed_nodes if node in cluster_info}
-            
             if progress_callback:
                 progress_callback(f"Processing dataset: {adata[i].uns.get('name', 'Unnamed')}")
-            
             df_single = process_single_tom(tom_single, adata[i], cluster_info_single)
             df_list.append(df_single)
         return pd.concat(df_list)
-    
+
     elif isinstance(tom, pd.DataFrame):
         return process_single_tom(tom, adata, cluster_info)
-    
     else:
         raise TypeError("'tom' must be a pandas DataFrame or a list of DataFrames.")
 
@@ -2591,7 +2911,7 @@ def add_metadata_columns(adata: AnnData, mapping_file: str, columns: Dict[str, s
     return adata
 
 
-def add_metadata_uniprot(adata: AnnData, up_file: str, selected_columns: List[str] = None) -> AnnData:
+def add_metadata_uniprot(adata: AnnData, up_file: str, selected_columns: List[str] = None, warn: bool = False) -> AnnData:
     """
     Parses a Uniprot annotation file and annotates the adata.var DataFrame of an AnnData object with selected columns.
 
@@ -2599,6 +2919,7 @@ def add_metadata_uniprot(adata: AnnData, up_file: str, selected_columns: List[st
     - adata (AnnData): The AnnData object to annotate.
     - up_file (str): Path to the Uniprot annotation file.
     - selected_columns (List[str]): List of column names from the Uniprot file to add to adata.var.
+    - warn (bool): If True, prints warnings for missing IDs in the Uniprot file.
 
     Returns:
     - AnnData: The updated AnnData object with adata.var annotated.
@@ -2645,7 +2966,317 @@ def add_metadata_uniprot(adata: AnnData, up_file: str, selected_columns: List[st
     adata.var = pd.concat([adata.var, df_annot], axis=1)
 
     # Display differences between IDs in adata.var and IDs in the Uniprot file
-    missing_in_uniprot = adata.var.index.difference(df_up.index)
-    print("IDs in adata.var that are missing in the Uniprot file:", missing_in_uniprot)
+    if warn:
+        missing_in_uniprot = adata.var.index.difference(df_up.index)
+        if missing_in_uniprot.any():
+            print(
+                f"WARNING: The following IDs in adata.var are not found in the Uniprot file: {', '.join(missing_in_uniprot)}")
 
     return adata
+
+
+def detect_tom_threshold_from_array(
+    tom: 'np.ndarray | pd.DataFrame',
+    plot_path: str = None
+) -> float:
+    """
+    Detect optimal TOM threshold using knee-detection.
+
+    Parameters:
+    tom : np.ndarray or pd.DataFrame
+        Topological overlap matrix (square matrix).
+    plot_path : str or None
+        If set, path to save the threshold plot.
+
+    Returns:
+    float or None
+        Detected threshold (knee) or None.
+    """
+
+    arr = tom.values if isinstance(tom, pd.DataFrame) else tom
+    thresholds = np.arange(0.1, 1.01, 0.01)
+    edge_counts = [(arr >= t).sum() for t in thresholds]
+    knee_locator = KneeLocator(thresholds, edge_counts, curve="convex", direction="decreasing")
+    knee = round(knee_locator.knee, 2) if knee_locator.knee else None
+
+    if plot_path:
+        plt.figure(figsize=(7, 4))
+        plt.plot(thresholds, edge_counts, label="Number of edges")
+        if knee:
+            plt.axvline(knee, color="red", linestyle="--", label=f"Knee: {knee}")
+            plt.scatter([knee], [edge_counts[int((knee-0.1)/0.01)]], color="red")
+        plt.title("Edges vs. Threshold")
+        plt.xlabel("Threshold")
+        plt.ylabel("Number of edges")
+        plt.legend()
+        plt.tight_layout()
+        plt.savefig(plot_path)
+        plt.close()
+
+    return knee
+
+
+def export_tom_edges_to_parquet(
+    tom: 'pd.DataFrame | np.ndarray',
+    threshold: float,
+    out_parquet: str
+) -> int:
+    """
+    Export all edges above a threshold from TOM to Parquet.
+
+    Parameters:
+    tom : pd.DataFrame or np.ndarray
+        TOM similarity matrix (square, symmetrical).
+    threshold : float
+        Edge threshold.
+    out_parquet : str
+        Output parquet file path.
+
+    Returns:
+    int
+        Number of edges saved.
+    """
+
+    if isinstance(tom, pd.DataFrame):
+        index = tom.index.to_numpy()
+        arr = tom.values
+    else:
+        index = np.arange(tom.shape[0])
+        arr = tom
+    edge_idx = np.where(arr > threshold)
+    sources = [index[i] for i in edge_idx[0]]
+    targets = [index[j] for j in edge_idx[1]]
+    weights = arr[edge_idx]
+    # Remove self-loops
+    df_edges = pd.DataFrame({"source": sources, "target": targets, "weight": weights})
+    df_edges = df_edges[df_edges.source != df_edges.target]
+    # If symmetric, keep only one direction:
+    # df_edges = df_edges[df_edges.source < df_edges.target]
+    df_edges.to_parquet(out_parquet, index=False)
+    print(f"{out_parquet}: {len(df_edges)} edges saved.")
+
+    return len(df_edges)
+
+
+def filter_genes_with_always_keep(
+    adata: ad.AnnData,
+    prop: float = 0.3,
+    min_mean: float = 1.0,
+    min_samples_prop: float = 0.15,
+    min_genes_prop: float = 0.10,
+    max_genes_prop: float = 0.70,
+    always_keep_column: str = "tf_family"
+) -> ad.AnnData:
+    """
+    Efficiently filter genes in AnnData using relative thresholds for variance and expression,
+    but always keep genes where `always_keep_column` is not null or empty.
+
+    Parameters
+    ----------
+    adata : ad.AnnData
+        AnnData object containing the count matrix (.X) and gene metadata (.var).
+    prop : float
+        Proportion (0–1) of highest variance genes to keep (e.g., 0.3 for 30%).
+    min_mean : float
+        Minimum mean expression across samples required for a gene to pass the filter.
+    min_samples_prop : float
+        Minimum proportion (0–1) of samples in which a gene must be expressed (expression > 1).
+        (e.g., 0.15 means gene must be expressed in at least 15% of samples)
+    min_genes_prop : float
+        Minimum proportion (0–1) of genes to keep after filtering.
+    max_genes_prop : float
+        Maximum proportion (0–1) of genes to keep after filtering.
+    always_keep_column : str
+        Column in adata.var indicating genes that must always be kept (e.g., "tf_family").
+
+    Returns
+    -------
+    ad.AnnData
+        Filtered AnnData object containing only the selected genes.
+    """
+
+    arr = adata.X
+    # Convert sparse matrices or other formats to dense numpy array
+    if not isinstance(arr, np.ndarray):
+        arr = arr.toarray() if hasattr(arr, 'toarray') else np.asarray(arr)
+    arr = arr.astype(np.float32)
+
+    n_samples = arr.shape[0]
+    n_genes = arr.shape[1]
+
+    # --- Relative calculation of thresholds ---
+    # Minimum number of samples required for a gene (at least 3, or min_samples_prop * n_samples)
+    min_samples = max(3, int(min_samples_prop * n_samples))
+    # Minimum and maximum number of genes to keep (relative to n_genes)
+    min_genes = max(1000, int(min_genes_prop * n_genes))
+    max_genes = min(n_genes, int(max_genes_prop * n_genes))
+
+    # --- Expression filter: remove genes with low mean or in too few samples ---
+    mean_keep = arr.mean(axis=0) > min_mean
+    sample_keep = (arr > 1).sum(axis=0) >= min_samples
+    gene_mask = mean_keep & sample_keep
+
+    # --- Variance filter: select top 'prop' most variable genes after expression filtering ---
+    arr_filt = arr[:, gene_mask]
+    n_filt_genes = arr_filt.shape[1]
+    n_keep = min(max(int(n_filt_genes * prop), min_genes), max_genes)
+    vars = arr_filt.var(axis=0)
+    # Take the indices of the top n_keep variable genes
+    if n_keep < n_filt_genes:
+        top_idx = np.argsort(vars)[-n_keep:]
+    else:
+        top_idx = np.arange(n_filt_genes)
+    filtered_var = adata.var[gene_mask]
+    top_gene_names = filtered_var.index[top_idx]
+
+    # --- Always-keep logic: include all genes where always_keep_column is not null or empty ---
+    if always_keep_column and always_keep_column in adata.var.columns:
+        always_keep_genes = set(
+            adata.var.index[
+                (~adata.var[always_keep_column].isnull()) &
+                (adata.var[always_keep_column] != "")
+            ]
+        )
+        # Combine always-keep genes with high-variance genes, keeping original AnnData order
+        all_genes_to_keep = set(top_gene_names) | always_keep_genes
+        all_genes_to_keep = [g for g in adata.var_names if g in all_genes_to_keep]
+    else:
+        all_genes_to_keep = list(top_gene_names)
+
+    # --- Subset the AnnData object with the filtered genes ---
+    adata_filtered = adata[:, adata.var_names.isin(all_genes_to_keep)].copy()
+
+    # Optional: Add summary info as AnnData attribute for reproducibility
+    adata_filtered.uns["filter_params"] = {
+        "prop": prop,
+        "min_mean": min_mean,
+        "min_samples_prop": min_samples_prop,
+        "min_genes_prop": min_genes_prop,
+        "max_genes_prop": max_genes_prop,
+        "always_keep_column": always_keep_column,
+        "n_genes_final": adata_filtered.n_vars
+    }
+
+    return adata_filtered
+
+
+def create_anndata(
+    name: str,
+    base_uniprot: str,
+    base_ortho: str,
+    base_interpro: str,
+    base_pfam: str,
+    base_tfs: str,
+    base_counts: str
+) -> ad.AnnData:
+    """
+    Create an AnnData object for a given dataset name, including filtering genes and adding metadata.
+
+    Parameters:
+    name : str
+        Dataset name (species or project ID, e.g. "AC", "PS", ...).
+    base_uniprot : str
+        Base folder for UniProt annotation files.
+    base_ortho : str
+        Base folder for Ortho annotation files.
+    base_interpro : str
+        Base folder for InterPro annotation files.
+    base_pfam : str
+        Base folder for Pfam annotation files.
+    base_tfs : str
+        Base folder for TF annotation files.
+    base_counts : str
+        Base folder for count matrix files.
+
+    Returns:
+    ad.AnnData
+        Filtered AnnData object with metadata and annotation columns in .var.
+    """
+
+    go_path   = f"{base_uniprot}/{name}.uniprot.goslim_plant.gaf"
+    ortho_path= f"{base_ortho}/N0.tsv"
+    ipr_path  = f"{base_interpro}/{name}.iprid.tsv"
+    pfam_path = f"{base_pfam}/{name}.pfam.tsv"
+    tf_path   = f"{base_tfs}/{name}.TF.csv"
+    up_path   = f"{base_uniprot}/{name}.faa.annotation.csv"
+
+    if name == 'EC':
+        input_matrix = f"{base_counts}/{name}.isoform.TMM.EXPR.matrix.updated"
+    else:
+        input_matrix = f"{base_counts}/{name}.isoform.TMM.EXPR.matrix"
+        
+    # Load count and metadata tables
+    count_df = transform_count_matrix(input_matrix)
+    metadata_df = map_tissue_types(count_df)
+    
+    count_df = count_df.set_index('sample')
+    metadata_df = metadata_df.set_index('sample')
+    metadata_df = metadata_df.loc[count_df.index]
+    
+    # Create initial AnnData (no I/O, all in memory)
+    adata = ad.AnnData(
+        X=count_df.values.astype(float),
+        obs=metadata_df,
+        var=pd.DataFrame(index=count_df.columns)
+    )
+
+    # Add gene annotation columns to .var
+    add_go_terms_to_anndata(adata, go_path)
+    add_ortho_id_to_anndata(adata, ortho_path, name)
+    add_ipr_columns(adata, ipr_path)
+    add_pfam_columns(adata, pfam_path)
+    add_tf_columns(adata, tf_path)
+    add_metadata_uniprot(adata, up_path)
+
+    print("AnnData:", adata)
+
+    return adata
+
+
+def calculate_qc_metrics(adata: ad.AnnData, mt_prefix="MT-", inplace=True) -> pd.DataFrame:
+    """
+    Calculates QC metrics for AnnData object (analogous to scanpy's sc.pp.calculate_qc_metrics).
+    Adds results to adata.obs and adata.var if inplace=True.
+
+    Parameters:
+    adata : AnnData
+        AnnData object (cells x genes, or samples x genes for bulk).
+    mt_prefix : str
+        Prefix for mitochondrial genes (default: "MT-").
+    inplace : bool
+        If True, adds metrics to adata.obs and adata.var.
+
+    Returns:
+    pd.DataFrame
+        DataFrame with QC metrics (if inplace=False).
+    """
+
+    X = np.asarray(adata.X)
+
+    # "Cells" = rows, "Genes" = columns (bulk: cells=samples)
+    total_counts = X.sum(axis=1)
+    n_genes_by_counts = (X > 0).sum(axis=1)
+    total_counts_per_gene = X.sum(axis=0)
+    n_cells_by_counts = (X > 0).sum(axis=0)
+
+    # Detect mitochondrial genes by var_names prefix (case-insensitive)
+    var_names = adata.var_names.str.upper()
+    mt_genes = var_names.str.startswith(mt_prefix.upper())
+    pct_counts_mt = X[:, mt_genes].sum(axis=1) / total_counts * 100 if mt_genes.any() else np.zeros_like(total_counts)
+
+    # Add to AnnData
+    if inplace:
+        adata.obs["total_counts"] = total_counts
+        adata.obs["n_genes_by_counts"] = n_genes_by_counts
+        adata.obs["pct_counts_mt"] = pct_counts_mt
+        adata.var["total_counts"] = total_counts_per_gene
+        adata.var["n_cells_by_counts"] = n_cells_by_counts
+
+    # Optional: return as DataFrame
+    qc = pd.DataFrame({
+        "total_counts": total_counts,
+        "n_genes_by_counts": n_genes_by_counts,
+        "pct_counts_mt": pct_counts_mt
+    }, index=adata.obs_names)
+
+    return qc
