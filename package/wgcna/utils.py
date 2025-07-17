@@ -2647,7 +2647,7 @@ def add_ipr_columns(adata: AnnData, ipr_mapping_file: str) -> AnnData:
     # Group IPR IDs and descriptions by transcript
     grouped_ipr = ipr_df.groupby("transcript").agg({
         "ipr_id": lambda x: ",".join(x),
-        "ipr_desc": lambda x: ",".join(x)
+        "ipr_desc": lambda x: "|".join(x)
     }).reset_index()
 
     # Create dictionaries for fast mapping
@@ -2710,7 +2710,7 @@ def add_pfam_columns(adata: AnnData, pfam_mapping_file: str) -> AnnData:
     # Group PFAM IDs and descriptions by transcript, concatenating multiple entries with a comma
     grouped_pfam = pfam_df.groupby("transcript").agg({
         "pfam_id": lambda x: ",".join(x),
-        "pfam_desc": lambda x: ",".join(x)
+        "pfam_desc": lambda x: "|".join(x)
     }).reset_index()
 
     # Create dictionaries for fast mapping
