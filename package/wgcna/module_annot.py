@@ -1,6 +1,10 @@
 import pandas as pd
 import requests
 import re
+import pandas as pd
+from collections import Counter
+from scipy.stats import fisher_exact
+import anndata as ad
 from typing import List, Optional, Any, Tuple, Dict
 
 
@@ -321,3 +325,100 @@ def annotate_modules_with_weight(
         records.append({"Module": mod, "Annotation": annotation, "Weight": weight})
 
     return pd.DataFrame.from_records(records)
+
+
+def generic_enrichment(
+    adata: ad.AnnData,
+    group_col: str,
+    value_col: str,
+    delimiter: str = ',',
+    min_count: int = 2,
+    pval_thresh: float = 0.05
+) -> pd.DataFrame:
+    """
+    Perform enrichment analysis for annotation terms (GO, IPR, PFAM, etc.) in each group of an AnnData object.
+    
+    Parameters:
+    - adata (AnnData): AnnData object with .var DataFrame containing group_col and value_col.
+    - group_col (str): Column name in .var for grouping (e.g., 'module_labels').
+    - value_col (str): Column name in .var with term lists (comma- or delimiter-separated).
+    - delimiter (str): Delimiter for splitting term strings.
+    - min_count (int): Minimum number of occurrences in group to test.
+    - pval_thresh (float): P-value cutoff for reporting enrichment.
+    
+    Returns:
+    - pd.DataFrame: Enriched terms per group with counts and p-values.
+    """
+    df = adata.var
+    background_size = df.shape[0]
+
+    # Explode the value_col so each row is a single term
+    df_exp = df[[group_col, value_col]].dropna()
+    df_exp[value_col] = df_exp[value_col].astype(str)
+    df_exp = df_exp.assign(**{value_col: df_exp[value_col].str.split(delimiter)})
+    df_exp = df_exp.explode(value_col)
+    df_exp[value_col] = df_exp[value_col].str.strip()
+    df_exp = df_exp[df_exp[value_col] != '']
+
+    all_terms = df_exp[value_col].tolist()
+    counter_all = Counter(all_terms)
+
+    results = []
+    for grp, sub in df_exp.groupby(group_col):
+        terms_in_grp = sub[value_col].tolist()
+        grp_size = df[df[group_col] == grp].shape[0]
+        counter_grp = Counter(terms_in_grp)
+        for term, count_in_grp in counter_grp.items():
+            if count_in_grp < min_count:
+                continue
+            count_in_all = counter_all[term]
+            a = count_in_grp  # term in group
+            b = count_in_all - a  # term in rest
+            c = grp_size - a      # no term in group
+            d = background_size - a - b - c  # no term in rest
+            table = [[a, b], [c, d]]
+            _, pval = fisher_exact(table, alternative='greater')
+            results.append({
+                group_col: grp,
+                "term": term,
+                "count_in_group": a,
+                "count_in_total": count_in_all,
+                "group_size": grp_size,
+                "background_size": background_size,
+                "pvalue": pval
+            })
+    res_df = pd.DataFrame(results)
+    if not res_df.empty:
+        res_df['p_adj_bonf'] = res_df['pvalue'] * res_df.shape[0]
+        res_df = res_df.sort_values(['pvalue', 'count_in_group'], ascending=[True, False])
+        res_df = res_df[res_df['pvalue'] <= pval_thresh]
+    return res_df.reset_index(drop=True)
+
+
+def top_enriched_term_per_group(
+    enrich_df: pd.DataFrame,
+    group_col: str = "module_labels",
+    term_col: str = "term"
+) -> pd.DataFrame:
+    """
+    Reduce enrichment result to the top (most significantly enriched) term per group.
+
+    Parameters:
+    - enrich_df (pd.DataFrame): Output from generic_enrichment().
+    - group_col (str): The column indicating groups/modules.
+    - term_col (str): The column with the term/ID.
+
+    Returns:
+    - pd.DataFrame: DataFrame with the top term for each group/module.
+    """
+    if enrich_df.empty:
+        return enrich_df
+
+    # Sort: lowest p-value first, then highest count_in_group
+    enrich_df = enrich_df.sort_values(
+        ["pvalue", "count_in_group"],
+        ascending=[True, False]
+    )
+    # Keep only the top term per group
+    top_df = enrich_df.groupby(group_col).first().reset_index()
+    return top_df[[group_col, term_col, "pvalue", "count_in_group", "group_size"]]
