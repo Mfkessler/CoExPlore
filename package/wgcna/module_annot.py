@@ -1,7 +1,12 @@
 import pandas as pd
 import requests
 import re
-import pandas as pd
+import numpy as np
+from sklearn.decomposition import PCA
+from umap import UMAP
+from sklearn.cluster import DBSCAN
+import matplotlib.pyplot as plt
+import seaborn as sns
 from collections import Counter
 from scipy.stats import fisher_exact
 import anndata as ad
@@ -422,3 +427,247 @@ def top_enriched_term_per_group(
     # Keep only the top term per group
     top_df = enrich_df.groupby(group_col).first().reset_index()
     return top_df[[group_col, term_col, "pvalue", "count_in_group", "group_size"]]
+
+
+def fetch_go_names_and_categories(
+    go_ids: List[str],
+    batch_size: int = 100
+) -> Dict[str, Tuple[str, Optional[str], Optional[str]]]:
+    """
+    Fetch GO term names and categories for a list of GO IDs using the QuickGO API.
+
+    Parameters:
+    - go_ids (List[str]): List of GO term IDs (e.g., ["GO:0008150"]).
+    - batch_size (int): Maximum number of IDs per API request.
+
+    Returns:
+    - Dict[str, Tuple[str, Optional[str], Optional[str]]]: 
+        Mapping from GO ID to a tuple of (GO term name, category code, category name).
+        Category code is one of "P" (biological_process), "F" (molecular_function), "C" (cellular_component).
+    """
+    go_dict: Dict[str, Tuple[str, Optional[str], Optional[str]]] = {}
+    for i in range(0, len(go_ids), batch_size):
+        batch = go_ids[i:i+batch_size]
+        url = "https://www.ebi.ac.uk/QuickGO/services/ontology/go/terms/" + ",".join(batch)
+        resp = requests.get(url)
+        if resp.status_code == 200:
+            for entry in resp.json().get("results", []):
+                go_id = entry.get("id")
+                go_name = entry.get("name")
+                cat_name = entry.get("aspect")
+                cat_code = cat_name[:1].upper() if cat_name else None  # "P", "F", "C"
+                if go_id and go_name and cat_name:
+                    go_dict[go_id] = (go_name, cat_code, cat_name)
+        else:
+            print(f"Error fetching GO info: {resp.status_code} {resp.text}")
+    return go_dict
+
+
+def collect_module_enrichment(
+    adatas: List[ad.AnnData],
+    config_list: List[Dict[str, Any]],
+    group_col: str = 'module_labels',
+    sort_cols_base: Optional[List[str]] = None,
+    top_n: int = 1
+) -> ad.AnnData:
+    """
+    Automated pipeline for module enrichment and feature matrix construction.
+    
+    Parameters:
+    adatas : list
+        List of AnnData objects.
+    config_list : list of dicts
+        Each dict describes one annotation type. Required keys:
+            - 'value_col': column in .var or .obs with annotation (e.g. 'go_terms')
+            - 'delimiter': (optional) delimiter for multiple entries (e.g. ',' or '|')
+            - 'mapping_func': (optional) function to map term->metadata
+            - 'mapping_columns': (optional) columns for mapped values
+            - 'prefix': (optional) prefix for feature names (else value_col is used)
+    group_col : str
+        Column to group by (default: 'module_labels')
+    sort_cols_base : list of str
+        Default sorting columns for enrichment results (used if not given per config)
+    top_n : int
+        How many top entries per group/category?
+    
+    Returns:
+    AnnData : Feature matrix across all annotation types, modules as rows, binary features.
+    """
+
+    if sort_cols_base is None:
+        sort_cols_base = [group_col, 'pvalue', 'count_in_group']
+
+    all_annots = []
+    all_prefixes = []
+
+    # 1. Collect enrichment results for each annotation type
+    for config in config_list:
+        value_col = config['value_col']
+        delimiter = config.get('delimiter')
+        mapping_func = config.get('mapping_func')
+        mapping_columns = config.get('mapping_columns')
+        sort_cols = config.get('sort_cols', sort_cols_base)
+        prefix = config.get('prefix', value_col.upper() + "_")
+        
+        annots_dict = {}
+        for adata in adatas:
+            name = adata.uns.get('name', 'unknown')
+            enrich = generic_enrichment(
+                adata, group_col=group_col, value_col=value_col, delimiter=delimiter
+            )
+            if mapping_func is not None and mapping_columns is not None:
+                unique_terms = [t for t in enrich['term'].unique() if isinstance(t, str)]
+                term_info = mapping_func(unique_terms)
+                for i, col in enumerate(mapping_columns):
+                    enrich[col] = enrich['term'].map(lambda x: term_info.get(x, (None,) * len(mapping_columns))[i])
+            # Sort and take top N per group/category
+            enrich = enrich.sort_values(sort_cols, ascending=[True]*len(sort_cols))
+            groupby_cols = [group_col]
+            if 'go_cat_code' in enrich.columns:  # For GO only, but generalizes
+                groupby_cols.append('go_cat_code')
+            top_terms = enrich.groupby(groupby_cols).head(top_n).reset_index(drop=True)
+            annots_dict[name] = top_terms
+        all_annots.append(annots_dict)
+        all_prefixes.append(prefix)
+
+    # 2. Build feature matrices (membership matrices) for each annotation type
+    feature_matrices = []
+    def collect_unique_terms(annot_dict, value_col='term'):
+        all_terms = set()
+        for df in annot_dict.values():
+            if value_col in df.columns:
+                all_terms.update(df[value_col].dropna().unique())
+        return sorted(all_terms)
+    
+    def build_membership_matrix(annot_dict, group_col, value_col, all_values=None, prefix=""):
+        if all_values is None:
+            all_values = collect_unique_terms(annot_dict, value_col)
+        module_names = []
+        records = []
+        for species, df in annot_dict.items():
+            for _, row in df.iterrows():
+                module = f"{species}_{row[group_col]}"
+                module_names.append(module)
+                records.append((module, row[value_col]))
+        module_names = sorted(set(module_names))
+        matrix = pd.DataFrame(0, index=module_names, columns=[f"{prefix}{col}" for col in all_values])
+        for module, term in records:
+            col = f"{prefix}{term}"
+            if col in matrix.columns:
+                matrix.loc[module, col] = 1
+        return matrix
+
+    for annots_dict, config, prefix in zip(all_annots, config_list, all_prefixes):
+        value_col = config['value_col']
+        M = build_membership_matrix(annots_dict, group_col=group_col, value_col='term', prefix=prefix)
+        feature_matrices.append(M)
+
+    # 3. Intersect index for all feature matrices (modules present in all)
+    common_index = feature_matrices[0].index
+    for M in feature_matrices[1:]:
+        common_index = common_index.intersection(M.index)
+    feature_matrices = [M.loc[common_index] for M in feature_matrices]
+    
+    # 4. Concatenate all feature matrices column-wise
+    M_combined = pd.concat(feature_matrices, axis=1)
+
+    # 5. Convert to AnnData
+    adata_features = ad.AnnData(X=np.array(M_combined.values, dtype=np.float32))
+    adata_features.obs_names = M_combined.index.astype(str)
+    adata_features.var_names = M_combined.columns.astype(str)
+
+    return adata_features
+
+
+def module_clustering_analysis(
+    adata: ad.AnnData,
+    eps: float = 0.7,
+    min_samples: int = 3,
+    pca_components: int = 2,
+    umap_components: int = 2,
+    umap_random_state: int = 0,
+    figsize: Tuple[int, int] = (7, 5)
+) -> Dict[str, Any]:
+    """
+    Perform dimensionality reduction (PCA, UMAP), clustering (DBSCAN) and visualization for module-level features.
+
+    Parameters:
+    adata : ad.AnnData
+        AnnData object with modules as observations (rows) and features (columns).
+    eps : float
+        DBSCAN epsilon parameter (neighborhood radius).
+    min_samples : int
+        DBSCAN min_samples parameter (minimum samples for core point).
+    pca_components : int
+        Number of components for PCA.
+    umap_components : int
+        Number of components for UMAP.
+    umap_random_state : int
+        Random state for UMAP reproducibility.
+    figsize : tuple
+        Figure size for the cluster plot.
+
+    Returns:
+    results : dict
+        Dictionary with the following keys:
+            - 'pca': PCA projection (np.ndarray)
+            - 'umap': UMAP projection (np.ndarray)
+            - 'clusters': DBSCAN cluster labels (np.ndarray)
+            - 'df_cluster': DataFrame with module, species, and cluster
+    """
+    # PCA
+    pca = PCA(n_components=pca_components)
+    proj_pca = pca.fit_transform(adata.X)
+
+    # UMAP
+    umap = UMAP(n_components=umap_components, random_state=umap_random_state)
+    proj_umap = umap.fit_transform(adata.X)
+
+    # Module and species extraction
+    module_names = adata.obs_names
+    species_per_module = [str(name).split("_")[0] for name in module_names]
+    unique_species = sorted(set(species_per_module))
+
+    palette = sns.color_palette("tab10", len(unique_species))
+    species_colors = [palette[unique_species.index(s)] for s in species_per_module]
+
+    # DBSCAN clustering
+    dbscan = DBSCAN(eps=eps, min_samples=min_samples)
+    clusters = dbscan.fit_predict(proj_umap)
+
+    # Plotting
+    plt.figure(figsize=figsize)
+    plt.scatter(proj_umap[:, 0], proj_umap[:, 1], c=clusters, cmap="tab20", s=50)
+    plt.xlabel("UMAP1")
+    plt.ylabel("UMAP2")
+    plt.title("Module-Clustering (DBSCAN on UMAP)")
+    plt.colorbar(label="Cluster")
+    plt.show()
+
+    # Cluster DataFrame
+    df_cluster = pd.DataFrame({
+        "module": module_names,
+        "species": species_per_module,
+        "cluster": clusters
+    })
+
+    print("\nModules per cluster:")
+    print(df_cluster['cluster'].value_counts().sort_index())
+
+    print("\nSingletons (Cluster -1):")
+    print(df_cluster[df_cluster['cluster'] == -1][['module', 'species']])
+
+    print("\nConserved clusters (with modules from multiple species):")
+    for c in sorted(df_cluster['cluster'].unique()):
+        if c == -1: continue
+        subset = df_cluster[df_cluster['cluster'] == c]
+        arts = set(subset['species'])
+        if len(arts) > 1:
+            print(f"  Cluster {c}: {len(subset)} modules from species {sorted(arts)}")
+
+    return {
+        "pca": proj_pca,
+        "umap": proj_umap,
+        "clusters": clusters,
+        "df_cluster": df_cluster
+    }
