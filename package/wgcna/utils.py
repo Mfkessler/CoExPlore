@@ -2,6 +2,7 @@ import os
 import random
 import h5py
 import re
+import requests
 import matplotlib.cm as cm
 import pandas as pd
 import numpy as np
@@ -3280,3 +3281,77 @@ def calculate_qc_metrics(adata: ad.AnnData, mt_prefix="MT-", inplace=True) -> pd
     }, index=adata.obs_names)
 
     return qc
+
+
+def fetch_go_names(
+    go_ids: list,
+    requests_module: Any = requests,
+    batch_size: int = 100
+) -> dict:
+    """
+    Fetch GO term names from QuickGO API in batches.
+
+    Parameters:
+    - go_ids (list): List of GO term IDs to fetch names for.
+    - requests_module (module): Requests module to use for HTTP requests (default: requests).
+    - batch_size (int): Maximum number of IDs per API request.
+
+    Returns:
+    - dict: Mapping from GO ID to GO term name.
+    """
+
+    go_name_dict = {}
+    for i in range(0, len(go_ids), batch_size):
+        batch_ids = go_ids[i:i+batch_size]
+        joined_ids = ",".join(batch_ids)
+        url = f"https://www.ebi.ac.uk/QuickGO/services/ontology/go/terms/{joined_ids}"
+        resp = requests_module.get(url)
+        if resp.status_code == 200:
+            for entry in resp.json()["results"]:
+                go_id = entry["id"]
+                go_name = entry["name"]
+                go_name_dict[go_id] = go_name
+        else:
+            print("Error with QuickGO request:", resp.status_code, resp.text)
+
+    return go_name_dict
+
+
+def add_go_names_column(
+    adatas,
+    go_term_col='go_terms',
+    new_col='go_desc',
+    delimiter=',',
+    name_delimiter='|'
+):
+    """
+    Add a new column to adata.var with GO term names based on a GO term column.
+
+    Parameters:
+    - adatas (AnnData or list of AnnData): AnnData object(s) with var containing GO term IDs.
+    - go_term_col (str): Column name in adata.var containing GO term IDs.
+    - new_col (str): Name of the new column to add with GO term names.
+    - delimiter (str): Delimiter used to separate multiple GO terms in go_term_col.
+    - name_delimiter (str): Delimiter used to join GO term names in the new column.
+    """
+
+    adata_list = adatas if isinstance(adatas, (list, tuple)) else [adatas]
+
+    all_go_ids = set()
+    for adata in adata_list:
+        if go_term_col in adata.var.columns:
+            for entry in adata.var[go_term_col].dropna():
+                all_go_ids.update([x.strip() for x in str(entry).split(delimiter) if x.strip()])
+    all_go_ids = sorted(all_go_ids)
+
+    go_name_dict = fetch_go_names(all_go_ids)
+
+    def map_terms_to_names(go_str):
+        if pd.isna(go_str):
+            return ''
+        go_ids = [x.strip() for x in str(go_str).split(delimiter) if x.strip()]
+        names = [go_name_dict.get(go_id, go_id) for go_id in go_ids]
+        return name_delimiter.join(names)
+
+    for adata in adata_list:
+        adata.var[new_col] = adata.var[go_term_col].apply(map_terms_to_names)
